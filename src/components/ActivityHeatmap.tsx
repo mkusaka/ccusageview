@@ -182,7 +182,8 @@ export function ActivityHeatmap({ entries }: Props) {
   const labelWidth = 28;
   const availableWidth = Math.max(containerWidth - labelWidth, 100);
   const numWeeks = weeks.length;
-  const cellStep = availableWidth / numWeeks;
+  const maxCellStep = 16;
+  const cellStep = Math.min(availableWidth / numWeeks, maxCellStep);
   const cellGap = Math.max(cellStep * 0.15, 1.5);
   const cellSize = cellStep - cellGap;
   const monthLabelHeight = 14;
