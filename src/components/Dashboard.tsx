@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import type { ReportData, ReportType } from "../types";
-import { normalizeEntries, normalizeTotals, aggregateToMonthly } from "../utils/normalize";
+import type { ReportType } from "../types";
+import type { DashboardData } from "../utils/normalize";
+import { aggregateToMonthly } from "../utils/normalize";
 import { SummaryCards } from "./SummaryCards";
 import { CostChart } from "./CostChart";
 import { TokenChart } from "./TokenChart";
@@ -9,7 +10,7 @@ import { ActivityHeatmap } from "./ActivityHeatmap";
 import { DataTable } from "./DataTable";
 
 interface Props {
-  report: ReportData;
+  data: DashboardData;
 }
 
 const TYPE_LABELS: Record<ReportType, string> = {
@@ -22,12 +23,11 @@ const TYPE_LABELS: Record<ReportType, string> = {
 
 type TimeGranularity = "daily" | "monthly";
 
-export function Dashboard({ report }: Props) {
-  const dailyEntries = useMemo(() => normalizeEntries(report), [report]);
-  const totals = useMemo(() => normalizeTotals(report), [report]);
+export function Dashboard({ data }: Props) {
+  const { entries: dailyEntries, totals, reportType, sourceLabels } = data;
 
   // Daily reports can be viewed as monthly too
-  const canToggleGranularity = report.type === "daily";
+  const canToggleGranularity = reportType === "daily";
   const [granularity, setGranularity] = useState<TimeGranularity>("daily");
 
   const monthlyEntries = useMemo(
@@ -40,17 +40,13 @@ export function Dashboard({ report }: Props) {
 
   const hasModelBreakdowns = entries.some((e) => e.modelBreakdowns && e.modelBreakdowns.length > 0);
 
-  // Heatmap only makes sense with daily-granularity data.
-  // Show for: daily reports (even when viewing monthly aggregation, use raw daily),
-  // weekly reports. Skip for: monthly-only reports (no daily data to show).
-  const showHeatmap = report.type === "daily" || report.type === "weekly";
+  const showHeatmap = reportType === "daily" || reportType === "weekly";
 
-  // The displayed label reflects the active granularity
   const displayLabel = canToggleGranularity
     ? granularity === "daily"
       ? "Daily Report"
       : "Monthly Report"
-    : TYPE_LABELS[report.type];
+    : TYPE_LABELS[reportType];
 
   return (
     <div className="space-y-4">
@@ -59,6 +55,9 @@ export function Dashboard({ report }: Props) {
           {displayLabel}
         </span>
         <span className="text-sm text-text-secondary">{entries.length} entries</span>
+        {sourceLabels.length > 0 && (
+          <span className="text-xs text-text-secondary">Sources: {sourceLabels.join(", ")}</span>
+        )}
 
         {/* Granularity toggle for daily reports */}
         {canToggleGranularity && (

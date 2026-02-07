@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { normalizeEntries, normalizeTotals, aggregateToMonthly } from "../normalize";
+import {
+  normalizeEntries,
+  normalizeTotals,
+  aggregateToMonthly,
+  computeTotalsFromEntries,
+} from "../normalize";
 import {
   DAILY_REPORT,
   WEEKLY_REPORT,
@@ -131,5 +136,25 @@ describe("aggregateToMonthly", () => {
   it("snapshot: monthly aggregation from daily", () => {
     const daily = normalizeEntries(DAILY_REPORT);
     expect(aggregateToMonthly(daily)).toMatchSnapshot();
+  });
+});
+
+describe("computeTotalsFromEntries", () => {
+  it("sums all numeric fields from entries", () => {
+    const entries = normalizeEntries(DAILY_REPORT);
+    const totals = computeTotalsFromEntries(entries);
+    expect(totals.inputTokens).toBe(DAILY_REPORT.totals.inputTokens);
+    expect(totals.outputTokens).toBe(DAILY_REPORT.totals.outputTokens);
+    expect(totals.totalCost).toBeCloseTo(DAILY_REPORT.totals.totalCost);
+  });
+
+  it("returns zeros for empty entries", () => {
+    const totals = computeTotalsFromEntries([]);
+    expect(totals.inputTokens).toBe(0);
+    expect(totals.outputTokens).toBe(0);
+    expect(totals.cacheCreationTokens).toBe(0);
+    expect(totals.cacheReadTokens).toBe(0);
+    expect(totals.totalTokens).toBe(0);
+    expect(totals.totalCost).toBe(0);
   });
 });
