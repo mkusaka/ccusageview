@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { createSourceInput } from "../App";
 import type { SourceInput } from "../App";
 
 interface Props {
@@ -37,7 +38,7 @@ export function InputView({ inputs, onChange, activeTab, onTabChange, error }: P
   );
 
   const addTab = useCallback(() => {
-    onChange([...inputs, { label: "", content: "" }]);
+    onChange([...inputs, createSourceInput()]);
     onTabChange(inputs.length);
   }, [inputs, onChange, onTabChange]);
 
@@ -63,7 +64,7 @@ export function InputView({ inputs, onChange, activeTab, onTabChange, error }: P
       {showTabs && (
         <div className="flex items-center gap-0.5 mb-2">
           {inputs.map((inp, i) => (
-            <div key={i} className="flex items-center">
+            <div key={inp.id} className="flex items-center">
               <button
                 onClick={() => onTabChange(i)}
                 className={`px-3 py-1 text-xs rounded-t transition-colors ${

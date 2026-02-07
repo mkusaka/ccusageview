@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildHashPayload, restoreFromHash } from "../App";
+import { buildHashPayload, restoreFromHash, createSourceInput } from "../App";
 import type { SourceInput } from "../App";
 
-function inp(content: string, label = ""): SourceInput {
-  return { label, content };
+function inp(content: string, label = "", enabled = true): SourceInput {
+  return createSourceInput({ label, content, enabled });
 }
 
 const REPORT_A = JSON.stringify({ daily: [{ date: "2025-07-01" }], totals: {} });
@@ -107,6 +107,28 @@ describe("restoreFromHash", () => {
       expect(result).toHaveLength(1);
       expect(result[0].label).toBe("");
       expect(JSON.parse(result[0].content)).toHaveProperty("daily");
+    });
+  });
+
+  describe("restores with enabled: true", () => {
+    it("labeled format includes enabled: true", () => {
+      const json = JSON.stringify({
+        sources: [{ label: "A", data: { daily: [] } }],
+      });
+      const result = restoreFromHash(json)!;
+      expect(result[0].enabled).toBe(true);
+    });
+
+    it("array format includes enabled: true", () => {
+      const json = JSON.stringify([{ daily: [{ date: "2025-07-01" }] }]);
+      const result = restoreFromHash(json)!;
+      expect(result[0].enabled).toBe(true);
+    });
+
+    it("legacy format includes enabled: true", () => {
+      const json = JSON.stringify({ daily: [], totals: {} });
+      const result = restoreFromHash(json)!;
+      expect(result[0].enabled).toBe(true);
     });
   });
 
