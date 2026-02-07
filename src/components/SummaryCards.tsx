@@ -28,21 +28,10 @@ export function SummaryCards({ totals, entryCount }: Props) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       {cards.map((card) => (
-        <div
-          key={card.label}
-          className="bg-bg-card border border-border rounded-lg p-4"
-        >
-          <p className="text-xs text-text-secondary uppercase tracking-wide">
-            {card.label}
-          </p>
-          <p className="text-xl font-semibold mt-1 text-text-primary">
-            {card.value}
-          </p>
-          {card.subLabel && (
-            <p className="text-xs text-text-secondary mt-0.5">
-              {card.subLabel}
-            </p>
-          )}
+        <div key={card.label} className="bg-bg-card border border-border rounded-lg p-4">
+          <p className="text-xs text-text-secondary uppercase tracking-wide">{card.label}</p>
+          <p className="text-xl font-semibold mt-1 text-text-primary">{card.value}</p>
+          {card.subLabel && <p className="text-xs text-text-secondary mt-0.5">{card.subLabel}</p>}
         </div>
       ))}
     </div>
