@@ -1,4 +1,4 @@
-import type { ModelBreakdown, ReportData } from "../types";
+import type { ModelBreakdown, ReportData, ReportType } from "../types";
 
 // Unified entry format for chart components
 export interface NormalizedEntry {
@@ -203,4 +203,37 @@ export function normalizeTotals(report: ReportData): NormalizedTotals {
     totalTokens: t.totalTokens,
     totalCost: t.totalCost,
   };
+}
+
+// Compute totals from an array of NormalizedEntry (for merged data)
+export function computeTotalsFromEntries(entries: NormalizedEntry[]): NormalizedTotals {
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let cacheCreationTokens = 0;
+  let cacheReadTokens = 0;
+  let totalTokens = 0;
+  let totalCost = 0;
+  for (const e of entries) {
+    inputTokens += e.inputTokens;
+    outputTokens += e.outputTokens;
+    cacheCreationTokens += e.cacheCreationTokens;
+    cacheReadTokens += e.cacheReadTokens;
+    totalTokens += e.totalTokens;
+    totalCost += e.cost;
+  }
+  return {
+    inputTokens,
+    outputTokens,
+    cacheCreationTokens,
+    cacheReadTokens,
+    totalTokens,
+    totalCost,
+  };
+}
+
+export interface DashboardData {
+  entries: NormalizedEntry[];
+  totals: NormalizedTotals;
+  reportType: ReportType;
+  sourceLabels: string[];
 }

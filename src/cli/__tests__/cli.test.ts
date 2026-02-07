@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildViewerUrl } from "../main.ts";
+import { buildViewerUrl, buildPayload } from "../main.ts";
 import { loadFromHash } from "../../utils/compression.ts";
 
 const SAMPLE_JSON = JSON.stringify({
@@ -64,5 +64,43 @@ describe("buildViewerUrl", () => {
 
   it("throws on empty input", () => {
     expect(() => buildViewerUrl("", "https://example.com")).toThrow();
+  });
+});
+
+describe("buildPayload", () => {
+  it("returns raw data for single unlabeled input", () => {
+    const result = buildPayload([{ label: "", data: SAMPLE_JSON }]);
+    expect(result).toBe(SAMPLE_JSON);
+  });
+
+  it("returns sources format for labeled input", () => {
+    const result = buildPayload([{ label: "Claude Code", data: SAMPLE_JSON }]);
+    const parsed = JSON.parse(result);
+    expect(parsed).toHaveProperty("sources");
+    expect(parsed.sources).toHaveLength(1);
+    expect(parsed.sources[0].label).toBe("Claude Code");
+    expect(parsed.sources[0].data).toEqual(JSON.parse(SAMPLE_JSON));
+  });
+
+  it("returns array format for multiple unlabeled inputs", () => {
+    const result = buildPayload([
+      { label: "", data: SAMPLE_JSON },
+      { label: "", data: SAMPLE_JSON },
+    ]);
+    const parsed = JSON.parse(result);
+    expect(Array.isArray(parsed)).toBe(true);
+    expect(parsed).toHaveLength(2);
+  });
+
+  it("returns sources format when any input has a label", () => {
+    const result = buildPayload([
+      { label: "Claude Code", data: SAMPLE_JSON },
+      { label: "", data: SAMPLE_JSON },
+    ]);
+    const parsed = JSON.parse(result);
+    expect(parsed).toHaveProperty("sources");
+    expect(parsed.sources).toHaveLength(2);
+    expect(parsed.sources[0].label).toBe("Claude Code");
+    expect(parsed.sources[1].label).toBe("");
   });
 });
