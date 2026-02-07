@@ -1,0 +1,80 @@
+{
+  "daily": [
+    {
+      "date": "2025-07-01",
+      "inputTokens": 600000,
+      "outputTokens": 25000,
+      "cacheCreationTokens": 110000,
+      "cacheReadTokens": 1000000,
+      "totalTokens": 1735000,
+      "totalCost": 2.8,
+      "modelsUsed": ["claude-sonnet-4-20250514", "claude-haiku-3-20240307"],
+      "modelBreakdowns": [
+        {
+          "modelName": "claude-sonnet-4-20250514",
+          "inputTokens": 500000,
+          "outputTokens": 20000,
+          "cacheCreationTokens": 100000,
+          "cacheReadTokens": 800000,
+          "cost": 2.5
+        },
+        {
+          "modelName": "claude-haiku-3-20240307",
+          "inputTokens": 100000,
+          "outputTokens": 5000,
+          "cacheCreationTokens": 10000,
+          "cacheReadTokens": 200000,
+          "cost": 0.3
+        }
+      ]
+    },
+    {
+      "date": "2025-07-02",
+      "inputTokens": 400000,
+      "outputTokens": 15000,
+      "cacheCreationTokens": 50000,
+      "cacheReadTokens": 500000,
+      "totalTokens": 965000,
+      "totalCost": 1.5,
+      "modelsUsed": ["claude-sonnet-4-20250514"],
+      "modelBreakdowns": [
+        {
+          "modelName": "claude-sonnet-4-20250514",
+          "inputTokens": 500000,
+          "outputTokens": 20000,
+          "cacheCreationTokens": 100000,
+          "cacheReadTokens": 800000,
+          "cost": 2.5
+        }
+      ]
+    },
+    {
+      "date": "2025-08-01",
+      "inputTokens": 200000,
+      "outputTokens": 10000,
+      "cacheCreationTokens": 30000,
+      "cacheReadTokens": 300000,
+      "totalTokens": 540000,
+      "totalCost": 0.9,
+      "modelsUsed": ["claude-haiku-3-20240307"],
+      "modelBreakdowns": [
+        {
+          "modelName": "claude-haiku-3-20240307",
+          "inputTokens": 100000,
+          "outputTokens": 5000,
+          "cacheCreationTokens": 10000,
+          "cacheReadTokens": 200000,
+          "cost": 0.3
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "inputTokens": 1200000,
+    "outputTokens": 50000,
+    "cacheCreationTokens": 190000,
+    "cacheReadTokens": 1800000,
+    "totalTokens": 3240000,
+    "totalCost": 5.2
+  }
+}

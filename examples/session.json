@@ -1,0 +1,56 @@
+{
+  "sessions": [
+    {
+      "sessionId": "abc123def456ghi789jkl012mno345",
+      "inputTokens": 600000,
+      "outputTokens": 25000,
+      "cacheCreationTokens": 110000,
+      "cacheReadTokens": 1000000,
+      "totalTokens": 1735000,
+      "totalCost": 2.8,
+      "lastActivity": "2025-07-02T10:00:00Z",
+      "modelsUsed": ["claude-sonnet-4-20250514"],
+      "modelBreakdowns": [
+        {
+          "modelName": "claude-sonnet-4-20250514",
+          "inputTokens": 500000,
+          "outputTokens": 20000,
+          "cacheCreationTokens": 100000,
+          "cacheReadTokens": 800000,
+          "cost": 2.5
+        }
+      ],
+      "projectPath": "/home/user/my-project"
+    },
+    {
+      "sessionId": "zzz999yyy888xxx777www666vvv555",
+      "inputTokens": 100000,
+      "outputTokens": 5000,
+      "cacheCreationTokens": 10000,
+      "cacheReadTokens": 200000,
+      "totalTokens": 315000,
+      "totalCost": 0.3,
+      "lastActivity": "2025-07-01T08:00:00Z",
+      "modelsUsed": ["claude-haiku-3-20240307"],
+      "modelBreakdowns": [
+        {
+          "modelName": "claude-haiku-3-20240307",
+          "inputTokens": 100000,
+          "outputTokens": 5000,
+          "cacheCreationTokens": 10000,
+          "cacheReadTokens": 200000,
+          "cost": 0.3
+        }
+      ],
+      "projectPath": "Unknown Project"
+    }
+  ],
+  "totals": {
+    "inputTokens": 700000,
+    "outputTokens": 30000,
+    "cacheCreationTokens": 120000,
+    "cacheReadTokens": 1200000,
+    "totalTokens": 2050000,
+    "totalCost": 3.1
+  }
+}
