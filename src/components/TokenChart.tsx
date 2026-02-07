@@ -33,9 +33,7 @@ const SERIES = [
 export function TokenChart({ entries }: Props) {
   return (
     <div className="bg-bg-card border border-border rounded-lg p-4">
-      <h3 className="text-sm font-medium text-text-secondary mb-4">
-        Token Breakdown
-      </h3>
+      <h3 className="text-sm font-medium text-text-secondary mb-4">Token Breakdown</h3>
       <ResponsiveContainer width="100%" height={380}>
         <BarChart data={entries}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -52,10 +50,7 @@ export function TokenChart({ entries }: Props) {
             tickFormatter={(v: number) => formatTokens(v)}
           />
           <Tooltip
-            formatter={(value, name) => [
-              formatTokens(Number(value ?? 0)),
-              String(name),
-            ]}
+            formatter={(value, name) => [formatTokens(Number(value ?? 0)), String(name)]}
             contentStyle={{
               backgroundColor: "var(--color-bg-card)",
               border: "1px solid var(--color-border)",
@@ -63,11 +58,7 @@ export function TokenChart({ entries }: Props) {
               fontSize: 12,
             }}
           />
-          <Legend
-            wrapperStyle={{ fontSize: 12 }}
-            iconType="square"
-            iconSize={10}
-          />
+          <Legend wrapperStyle={{ fontSize: 12 }} iconType="square" iconSize={10} />
           {SERIES.map((s) => (
             <Bar
               key={s.key}

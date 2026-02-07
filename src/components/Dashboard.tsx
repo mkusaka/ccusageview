@@ -1,10 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ReportData, ReportType } from "../types";
-import {
-  normalizeEntries,
-  normalizeTotals,
-  aggregateToMonthly,
-} from "../utils/normalize";
+import { normalizeEntries, normalizeTotals, aggregateToMonthly } from "../utils/normalize";
 import { SummaryCards } from "./SummaryCards";
 import { CostChart } from "./CostChart";
 import { TokenChart } from "./TokenChart";
@@ -36,18 +32,13 @@ export function Dashboard({ report }: Props) {
 
   const monthlyEntries = useMemo(
     () => (canToggleGranularity ? aggregateToMonthly(dailyEntries) : []),
-    [canToggleGranularity, dailyEntries]
+    [canToggleGranularity, dailyEntries],
   );
 
   // Pick entries based on the active granularity
-  const entries =
-    canToggleGranularity && granularity === "monthly"
-      ? monthlyEntries
-      : dailyEntries;
+  const entries = canToggleGranularity && granularity === "monthly" ? monthlyEntries : dailyEntries;
 
-  const hasModelBreakdowns = entries.some(
-    (e) => e.modelBreakdowns && e.modelBreakdowns.length > 0
-  );
+  const hasModelBreakdowns = entries.some((e) => e.modelBreakdowns && e.modelBreakdowns.length > 0);
 
   // Heatmap only makes sense with daily-granularity data.
   // Show for: daily reports (even when viewing monthly aggregation, use raw daily),
@@ -67,9 +58,7 @@ export function Dashboard({ report }: Props) {
         <span className="inline-block px-2.5 py-0.5 text-xs font-medium bg-accent/10 text-accent rounded-full">
           {displayLabel}
         </span>
-        <span className="text-sm text-text-secondary">
-          {entries.length} entries
-        </span>
+        <span className="text-sm text-text-secondary">{entries.length} entries</span>
 
         {/* Granularity toggle for daily reports */}
         {canToggleGranularity && (

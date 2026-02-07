@@ -82,10 +82,10 @@ export function DataTable({ entries }: Props) {
 
   // Default: reverse order (newest first, since entries are typically time-ascending)
   const sorted = useMemo(() => {
-    if (!sortCol) return [...entries].reverse();
+    if (!sortCol) return entries.toReversed();
     const col = COLUMNS.find((c) => c.key === sortCol);
-    if (!col) return [...entries].reverse();
-    return [...entries].sort((a, b) => {
+    if (!col) return entries.toReversed();
+    return entries.toSorted((a, b) => {
       const va = col.sortValue(a);
       const vb = col.sortValue(b);
       const cmp = va < vb ? -1 : va > vb ? 1 : 0;
@@ -126,9 +126,7 @@ export function DataTable({ entries }: Props) {
                   >
                     {col.label}
                     {sortCol === col.key && (
-                      <span className="ml-1">
-                        {sortDir === "asc" ? "\u2191" : "\u2193"}
-                      </span>
+                      <span className="ml-1">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
                     )}
                   </th>
                 ))}

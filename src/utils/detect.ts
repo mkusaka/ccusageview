@@ -32,6 +32,6 @@ export function detectReportType(data: unknown): ReportData {
   }
 
   throw new Error(
-    "Unrecognized report format. Expected one of: daily, weekly, monthly, sessions, blocks"
+    "Unrecognized report format. Expected one of: daily, weekly, monthly, sessions, blocks",
   );
 }

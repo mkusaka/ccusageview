@@ -66,15 +66,9 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
 
     case "session":
       return report.sessions
-        .slice()
-        .sort(
-          (a, b) =>
-            new Date(a.lastActivity).getTime() -
-            new Date(b.lastActivity).getTime()
-        )
+        .toSorted((a, b) => new Date(a.lastActivity).getTime() - new Date(b.lastActivity).getTime())
         .map((e) => {
-          const project =
-            e.projectPath !== "Unknown Project" ? e.projectPath : "";
+          const project = e.projectPath !== "Unknown Project" ? e.projectPath : "";
           const shortId = e.sessionId.slice(-20);
           return {
             label: project || shortId,
@@ -111,9 +105,7 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
 }
 
 // Aggregate daily entries into monthly entries (frontend computation)
-export function aggregateToMonthly(
-  dailyEntries: NormalizedEntry[]
-): NormalizedEntry[] {
+export function aggregateToMonthly(dailyEntries: NormalizedEntry[]): NormalizedEntry[] {
   const map = new Map<
     string,
     {
@@ -173,7 +165,7 @@ export function aggregateToMonthly(
   }
 
   return Array.from(map.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
+    .toSorted(([a], [b]) => a.localeCompare(b))
     .map(([month, b]) => ({
       label: month,
       inputTokens: b.inputTokens,
@@ -193,22 +185,10 @@ export function normalizeTotals(report: ReportData): NormalizedTotals {
     // Blocks totals may have different structure, compute from entries
     const entries = report.blocks.filter((e) => !e.isGap);
     return {
-      inputTokens: entries.reduce(
-        (s, e) => s + e.tokenCounts.inputTokens,
-        0
-      ),
-      outputTokens: entries.reduce(
-        (s, e) => s + e.tokenCounts.outputTokens,
-        0
-      ),
-      cacheCreationTokens: entries.reduce(
-        (s, e) => s + e.tokenCounts.cacheCreationInputTokens,
-        0
-      ),
-      cacheReadTokens: entries.reduce(
-        (s, e) => s + e.tokenCounts.cacheReadInputTokens,
-        0
-      ),
+      inputTokens: entries.reduce((s, e) => s + e.tokenCounts.inputTokens, 0),
+      outputTokens: entries.reduce((s, e) => s + e.tokenCounts.outputTokens, 0),
+      cacheCreationTokens: entries.reduce((s, e) => s + e.tokenCounts.cacheCreationInputTokens, 0),
+      cacheReadTokens: entries.reduce((s, e) => s + e.tokenCounts.cacheReadInputTokens, 0),
       totalTokens: entries.reduce((s, e) => s + e.totalTokens, 0),
       totalCost: entries.reduce((s, e) => s + e.costUSD, 0),
     };

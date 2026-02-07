@@ -1,0 +1,92 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`detectReportType > snapshot: detected daily report shape 1`] = `
+{
+  "daily": [
+    {
+      "cacheCreationTokens": 110000,
+      "cacheReadTokens": 1000000,
+      "date": "2025-07-01",
+      "inputTokens": 600000,
+      "modelBreakdowns": [
+        {
+          "cacheCreationTokens": 100000,
+          "cacheReadTokens": 800000,
+          "cost": 2.5,
+          "inputTokens": 500000,
+          "modelName": "claude-sonnet-4-20250514",
+          "outputTokens": 20000,
+        },
+        {
+          "cacheCreationTokens": 10000,
+          "cacheReadTokens": 200000,
+          "cost": 0.3,
+          "inputTokens": 100000,
+          "modelName": "claude-haiku-3-20240307",
+          "outputTokens": 5000,
+        },
+      ],
+      "modelsUsed": [
+        "claude-sonnet-4-20250514",
+        "claude-haiku-3-20240307",
+      ],
+      "outputTokens": 25000,
+      "totalCost": 2.8,
+      "totalTokens": 1735000,
+    },
+    {
+      "cacheCreationTokens": 50000,
+      "cacheReadTokens": 500000,
+      "date": "2025-07-02",
+      "inputTokens": 400000,
+      "modelBreakdowns": [
+        {
+          "cacheCreationTokens": 100000,
+          "cacheReadTokens": 800000,
+          "cost": 2.5,
+          "inputTokens": 500000,
+          "modelName": "claude-sonnet-4-20250514",
+          "outputTokens": 20000,
+        },
+      ],
+      "modelsUsed": [
+        "claude-sonnet-4-20250514",
+      ],
+      "outputTokens": 15000,
+      "totalCost": 1.5,
+      "totalTokens": 965000,
+    },
+    {
+      "cacheCreationTokens": 30000,
+      "cacheReadTokens": 300000,
+      "date": "2025-08-01",
+      "inputTokens": 200000,
+      "modelBreakdowns": [
+        {
+          "cacheCreationTokens": 10000,
+          "cacheReadTokens": 200000,
+          "cost": 0.3,
+          "inputTokens": 100000,
+          "modelName": "claude-haiku-3-20240307",
+          "outputTokens": 5000,
+        },
+      ],
+      "modelsUsed": [
+        "claude-haiku-3-20240307",
+      ],
+      "outputTokens": 10000,
+      "totalCost": 0.9,
+      "totalTokens": 540000,
+    },
+  ],
+  "totals": {
+    "cacheCreationTokens": 190000,
+    "cacheReadTokens": 1800000,
+    "inputTokens": 1200000,
+    "outputTokens": 50000,
+    "totalCost": 5.2,
+    "totalTokens": 3240000,
+  },
+  "type": "daily",
+}
+`;

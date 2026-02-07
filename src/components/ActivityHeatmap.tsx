@@ -35,9 +35,7 @@ const METRICS = {
 } as const;
 
 // Build a map of date -> aggregated values from normalized entries
-function buildDayMap(
-  entries: NormalizedEntry[]
-): Map<string, DayData> {
+function buildDayMap(entries: NormalizedEntry[]): Map<string, DayData> {
   const map = new Map<string, DayData>();
 
   function getOrCreate(dateStr: string): DayData {
@@ -78,6 +76,18 @@ function buildDayMap(
   return map;
 }
 
+function emptyDay(dateStr: string): DayData {
+  return {
+    date: dateStr,
+    cost: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    totalTokens: 0,
+  };
+}
+
 // Generate grid of weeks (columns) x days (rows)
 function buildGrid(dayMap: Map<string, DayData>): {
   weeks: DayData[][];
@@ -85,7 +95,7 @@ function buildGrid(dayMap: Map<string, DayData>): {
 } {
   if (dayMap.size === 0) return { weeks: [], months: [] };
 
-  const dates = Array.from(dayMap.keys()).sort();
+  const dates = Array.from(dayMap.keys()).toSorted();
   const startDate = new Date(dates[0] + "T00:00:00");
   const endDate = new Date(dates[dates.length - 1] + "T00:00:00");
 
@@ -94,16 +104,6 @@ function buildGrid(dayMap: Map<string, DayData>): {
 
   const gridEnd = new Date(endDate);
   gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()));
-
-  const emptyDay = (dateStr: string): DayData => ({
-    date: dateStr,
-    cost: 0,
-    inputTokens: 0,
-    outputTokens: 0,
-    cacheCreationTokens: 0,
-    cacheReadTokens: 0,
-    totalTokens: 0,
-  });
 
   const weeks: DayData[][] = [];
   const months: { label: string; colStart: number }[] = [];
@@ -242,7 +242,7 @@ export function ActivityHeatmap({ entries }: Props) {
                   >
                     {label}
                   </text>
-                )
+                ),
             )}
 
             {/* Cells */}
@@ -258,9 +258,7 @@ export function ActivityHeatmap({ entries }: Props) {
                   fill={getColor(day[metric])}
                   onMouseEnter={(e) => {
                     setHoveredDay(day);
-                    const rect = (
-                      e.target as SVGRectElement
-                    ).getBoundingClientRect();
+                    const rect = (e.target as SVGRectElement).getBoundingClientRect();
                     setTooltipPos({
                       x: rect.left + rect.width / 2,
                       y: rect.top,
@@ -268,7 +266,7 @@ export function ActivityHeatmap({ entries }: Props) {
                   }}
                   onMouseLeave={() => setHoveredDay(null)}
                 />
-              ))
+              )),
             )}
           </svg>
         )}
@@ -303,9 +301,7 @@ export function ActivityHeatmap({ entries }: Props) {
               className="inline-block w-3 h-3 rounded-sm"
               style={{
                 backgroundColor:
-                  ratio === 0
-                    ? "var(--color-bg-secondary)"
-                    : getColor(ratio * maxValue),
+                  ratio === 0 ? "var(--color-bg-secondary)" : getColor(ratio * maxValue),
               }}
             />
           ))}

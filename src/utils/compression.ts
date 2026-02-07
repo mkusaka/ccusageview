@@ -1,7 +1,4 @@
-import {
-  compressToEncodedURIComponent,
-  decompressFromEncodedURIComponent,
-} from "lz-string";
+import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from "lz-string";
 
 const HASH_PREFIX = "#data=";
 

@@ -101,11 +101,6 @@ export interface BlocksReport {
   totals: Record<string, unknown>;
 }
 
-export type ReportData =
-  | DailyReport
-  | WeeklyReport
-  | MonthlyReport
-  | SessionReport
-  | BlocksReport;
+export type ReportData = DailyReport | WeeklyReport | MonthlyReport | SessionReport | BlocksReport;
 
 export type ReportType = ReportData["type"];

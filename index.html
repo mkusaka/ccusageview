@@ -6,10 +6,13 @@
     <title>ccusageview</title>
     <script>
       // Prevent dark mode flash
-      (function() {
-        var saved = localStorage.getItem('ccusageview-dark');
-        var dark = saved !== null ? saved === 'true' : window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (dark) document.documentElement.classList.add('dark');
+      (function () {
+        var saved = localStorage.getItem("ccusageview-dark");
+        var dark =
+          saved !== null
+            ? saved === "true"
+            : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (dark) document.documentElement.classList.add("dark");
       })();
     </script>
   </head>

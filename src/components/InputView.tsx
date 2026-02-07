@@ -13,14 +13,14 @@ export function InputView({ value, onChange, error }: Props) {
       const file = e.dataTransfer.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.addEventListener("load", () => {
         if (typeof reader.result === "string") {
           onChange(reader.result);
         }
-      };
+      });
       reader.readAsText(file);
     },
-    [onChange]
+    [onChange],
   );
 
   return (
@@ -34,9 +34,7 @@ export function InputView({ value, onChange, error }: Props) {
         onDragOver={(e) => e.preventDefault()}
         spellCheck={false}
       />
-      {error && (
-        <p className="text-sm text-chart-red mt-1.5 opacity-80">{error}</p>
-      )}
+      {error && <p className="text-sm text-chart-red mt-1.5 opacity-80">{error}</p>}
     </div>
   );
 }

@@ -1,0 +1,190 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`aggregateToMonthly > snapshot: monthly aggregation from daily 1`] = `
+[
+  {
+    "cacheCreationTokens": 160000,
+    "cacheReadTokens": 1500000,
+    "cost": 4.3,
+    "inputTokens": 1000000,
+    "label": "2025-07",
+    "modelBreakdowns": [
+      {
+        "cacheCreationTokens": 200000,
+        "cacheReadTokens": 1600000,
+        "cost": 5,
+        "inputTokens": 1000000,
+        "modelName": "claude-sonnet-4-20250514",
+        "outputTokens": 40000,
+      },
+      {
+        "cacheCreationTokens": 10000,
+        "cacheReadTokens": 200000,
+        "cost": 0.3,
+        "inputTokens": 100000,
+        "modelName": "claude-haiku-3-20240307",
+        "outputTokens": 5000,
+      },
+    ],
+    "models": [
+      "claude-sonnet-4-20250514",
+      "claude-haiku-3-20240307",
+    ],
+    "outputTokens": 40000,
+    "totalTokens": 2700000,
+  },
+  {
+    "cacheCreationTokens": 30000,
+    "cacheReadTokens": 300000,
+    "cost": 0.9,
+    "inputTokens": 200000,
+    "label": "2025-08",
+    "modelBreakdowns": [
+      {
+        "cacheCreationTokens": 10000,
+        "cacheReadTokens": 200000,
+        "cost": 0.3,
+        "inputTokens": 100000,
+        "modelName": "claude-haiku-3-20240307",
+        "outputTokens": 5000,
+      },
+    ],
+    "models": [
+      "claude-haiku-3-20240307",
+    ],
+    "outputTokens": 10000,
+    "totalTokens": 540000,
+  },
+]
+`;
+
+exports[`normalizeEntries > snapshot: blocks normalized entries 1`] = `
+[
+  {
+    "cacheCreationTokens": 100000,
+    "cacheReadTokens": 800000,
+    "cost": 2.5,
+    "inputTokens": 500000,
+    "label": "Jul 1, 06:00 PM",
+    "models": [
+      "claude-sonnet-4-20250514",
+    ],
+    "outputTokens": 20000,
+    "totalTokens": 1420000,
+  },
+  {
+    "cacheCreationTokens": 10000,
+    "cacheReadTokens": 200000,
+    "cost": 0.3,
+    "inputTokens": 100000,
+    "label": "Jul 1, 08:00 PM",
+    "models": [
+      "claude-haiku-3-20240307",
+    ],
+    "outputTokens": 5000,
+    "totalTokens": 315000,
+  },
+]
+`;
+
+exports[`normalizeEntries > snapshot: daily normalized entries 1`] = `
+[
+  {
+    "cacheCreationTokens": 110000,
+    "cacheReadTokens": 1000000,
+    "cost": 2.8,
+    "inputTokens": 600000,
+    "label": "2025-07-01",
+    "modelBreakdowns": [
+      {
+        "cacheCreationTokens": 100000,
+        "cacheReadTokens": 800000,
+        "cost": 2.5,
+        "inputTokens": 500000,
+        "modelName": "claude-sonnet-4-20250514",
+        "outputTokens": 20000,
+      },
+      {
+        "cacheCreationTokens": 10000,
+        "cacheReadTokens": 200000,
+        "cost": 0.3,
+        "inputTokens": 100000,
+        "modelName": "claude-haiku-3-20240307",
+        "outputTokens": 5000,
+      },
+    ],
+    "models": [
+      "claude-sonnet-4-20250514",
+      "claude-haiku-3-20240307",
+    ],
+    "outputTokens": 25000,
+    "totalTokens": 1735000,
+  },
+  {
+    "cacheCreationTokens": 50000,
+    "cacheReadTokens": 500000,
+    "cost": 1.5,
+    "inputTokens": 400000,
+    "label": "2025-07-02",
+    "modelBreakdowns": [
+      {
+        "cacheCreationTokens": 100000,
+        "cacheReadTokens": 800000,
+        "cost": 2.5,
+        "inputTokens": 500000,
+        "modelName": "claude-sonnet-4-20250514",
+        "outputTokens": 20000,
+      },
+    ],
+    "models": [
+      "claude-sonnet-4-20250514",
+    ],
+    "outputTokens": 15000,
+    "totalTokens": 965000,
+  },
+  {
+    "cacheCreationTokens": 30000,
+    "cacheReadTokens": 300000,
+    "cost": 0.9,
+    "inputTokens": 200000,
+    "label": "2025-08-01",
+    "modelBreakdowns": [
+      {
+        "cacheCreationTokens": 10000,
+        "cacheReadTokens": 200000,
+        "cost": 0.3,
+        "inputTokens": 100000,
+        "modelName": "claude-haiku-3-20240307",
+        "outputTokens": 5000,
+      },
+    ],
+    "models": [
+      "claude-haiku-3-20240307",
+    ],
+    "outputTokens": 10000,
+    "totalTokens": 540000,
+  },
+]
+`;
+
+exports[`normalizeTotals > snapshot: blocks totals 1`] = `
+{
+  "cacheCreationTokens": 110000,
+  "cacheReadTokens": 1000000,
+  "inputTokens": 600000,
+  "outputTokens": 25000,
+  "totalCost": 2.8,
+  "totalTokens": 1735000,
+}
+`;
+
+exports[`normalizeTotals > snapshot: daily totals 1`] = `
+{
+  "cacheCreationTokens": 190000,
+  "cacheReadTokens": 1800000,
+  "inputTokens": 1200000,
+  "outputTokens": 50000,
+  "totalCost": 5.2,
+  "totalTokens": 3240000,
+}
+`;

@@ -21,9 +21,7 @@ export function CostChart({ entries }: Props) {
 
   return (
     <div className="bg-bg-card border border-border rounded-lg p-4">
-      <h3 className="text-sm font-medium text-text-secondary mb-4">
-        Cost Over Time
-      </h3>
+      <h3 className="text-sm font-medium text-text-secondary mb-4">Cost Over Time</h3>
       <ResponsiveContainer width="100%" height={320}>
         {useBars ? (
           <BarChart data={entries}>
