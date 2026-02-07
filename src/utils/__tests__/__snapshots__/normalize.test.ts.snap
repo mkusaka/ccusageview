@@ -58,14 +58,13 @@ exports[`aggregateToMonthly > snapshot: monthly aggregation from daily 1`] = `
 ]
 `;
 
-exports[`normalizeEntries > snapshot: blocks normalized entries 1`] = `
+exports[`normalizeEntries > blocks normalized entries have correct structure (label is TZ-dependent) 1`] = `
 [
   {
     "cacheCreationTokens": 100000,
     "cacheReadTokens": 800000,
     "cost": 2.5,
     "inputTokens": 500000,
-    "label": "Jul 1, 06:00 PM",
     "models": [
       "claude-sonnet-4-20250514",
     ],
@@ -77,7 +76,6 @@ exports[`normalizeEntries > snapshot: blocks normalized entries 1`] = `
     "cacheReadTokens": 200000,
     "cost": 0.3,
     "inputTokens": 100000,
-    "label": "Jul 1, 08:00 PM",
     "models": [
       "claude-haiku-3-20240307",
     ],

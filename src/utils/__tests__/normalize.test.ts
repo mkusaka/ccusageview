@@ -51,8 +51,14 @@ describe("normalizeEntries", () => {
     expect(normalizeEntries(DAILY_REPORT)).toMatchSnapshot();
   });
 
-  it("snapshot: blocks normalized entries", () => {
-    expect(normalizeEntries(BLOCKS_REPORT)).toMatchSnapshot();
+  it("blocks normalized entries have correct structure (label is TZ-dependent)", () => {
+    const entries = normalizeEntries(BLOCKS_REPORT);
+    // Labels use toLocaleString which varies by timezone, so check structure not exact labels
+    expect(entries.map(({ label: _, ...rest }) => rest)).toMatchSnapshot();
+    // Verify labels contain expected date parts
+    for (const entry of entries) {
+      expect(entry.label).toMatch(/Jul 1/);
+    }
   });
 });
 
