@@ -1,0 +1,40 @@
+{
+  "weekly": [
+    {
+      "week": "2025-06-30",
+      "inputTokens": 1000000,
+      "outputTokens": 40000,
+      "cacheCreationTokens": 160000,
+      "cacheReadTokens": 1500000,
+      "totalTokens": 2700000,
+      "totalCost": 4.3,
+      "modelsUsed": ["claude-sonnet-4-20250514", "claude-haiku-3-20240307"],
+      "modelBreakdowns": [
+        {
+          "modelName": "claude-sonnet-4-20250514",
+          "inputTokens": 500000,
+          "outputTokens": 20000,
+          "cacheCreationTokens": 100000,
+          "cacheReadTokens": 800000,
+          "cost": 2.5
+        },
+        {
+          "modelName": "claude-haiku-3-20240307",
+          "inputTokens": 100000,
+          "outputTokens": 5000,
+          "cacheCreationTokens": 10000,
+          "cacheReadTokens": 200000,
+          "cost": 0.3
+        }
+      ]
+    }
+  ],
+  "totals": {
+    "inputTokens": 1000000,
+    "outputTokens": 40000,
+    "cacheCreationTokens": 160000,
+    "cacheReadTokens": 1500000,
+    "totalTokens": 2700000,
+    "totalCost": 4.3
+  }
+}
