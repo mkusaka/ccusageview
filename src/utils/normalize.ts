@@ -1,4 +1,5 @@
 import type { ModelBreakdown, ReportData, ReportType } from "../types";
+import { groupEntries, sumEntries } from "./aggregate";
 
 // Unified entry format for chart components
 export interface NormalizedEntry {
@@ -106,77 +107,10 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
 
 // Aggregate daily entries into monthly entries (frontend computation)
 export function aggregateToMonthly(dailyEntries: NormalizedEntry[]): NormalizedEntry[] {
-  const map = new Map<
-    string,
-    {
-      inputTokens: number;
-      outputTokens: number;
-      cacheCreationTokens: number;
-      cacheReadTokens: number;
-      totalTokens: number;
-      cost: number;
-      models: Set<string>;
-      modelMap: Map<string, ModelBreakdown>;
-    }
-  >();
-
-  for (const entry of dailyEntries) {
-    // Extract YYYY-MM from a YYYY-MM-DD label
-    const month = entry.label.slice(0, 7);
-    if (!month || !/^\d{4}-\d{2}$/.test(month)) continue;
-
-    let bucket = map.get(month);
-    if (!bucket) {
-      bucket = {
-        inputTokens: 0,
-        outputTokens: 0,
-        cacheCreationTokens: 0,
-        cacheReadTokens: 0,
-        totalTokens: 0,
-        cost: 0,
-        models: new Set(),
-        modelMap: new Map(),
-      };
-      map.set(month, bucket);
-    }
-
-    bucket.inputTokens += entry.inputTokens;
-    bucket.outputTokens += entry.outputTokens;
-    bucket.cacheCreationTokens += entry.cacheCreationTokens;
-    bucket.cacheReadTokens += entry.cacheReadTokens;
-    bucket.totalTokens += entry.totalTokens;
-    bucket.cost += entry.cost;
-    for (const m of entry.models) bucket.models.add(m);
-
-    if (entry.modelBreakdowns) {
-      for (const mb of entry.modelBreakdowns) {
-        const existing = bucket.modelMap.get(mb.modelName);
-        if (existing) {
-          existing.inputTokens += mb.inputTokens;
-          existing.outputTokens += mb.outputTokens;
-          existing.cacheCreationTokens += mb.cacheCreationTokens;
-          existing.cacheReadTokens += mb.cacheReadTokens;
-          existing.cost += mb.cost;
-        } else {
-          bucket.modelMap.set(mb.modelName, { ...mb });
-        }
-      }
-    }
-  }
-
-  return Array.from(map.entries())
-    .toSorted(([a], [b]) => a.localeCompare(b))
-    .map(([month, b]) => ({
-      label: month,
-      inputTokens: b.inputTokens,
-      outputTokens: b.outputTokens,
-      cacheCreationTokens: b.cacheCreationTokens,
-      cacheReadTokens: b.cacheReadTokens,
-      totalTokens: b.totalTokens,
-      cost: b.cost,
-      models: Array.from(b.models),
-      modelBreakdowns: Array.from(b.modelMap.values()),
-    }));
+  return groupEntries(dailyEntries, (e) => {
+    const month = e.label.slice(0, 7);
+    return /^\d{4}-\d{2}$/.test(month) ? month : null;
+  });
 }
 
 // Extract totals from any report type
@@ -207,28 +141,7 @@ export function normalizeTotals(report: ReportData): NormalizedTotals {
 
 // Compute totals from an array of NormalizedEntry (for merged data)
 export function computeTotalsFromEntries(entries: NormalizedEntry[]): NormalizedTotals {
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let cacheCreationTokens = 0;
-  let cacheReadTokens = 0;
-  let totalTokens = 0;
-  let totalCost = 0;
-  for (const e of entries) {
-    inputTokens += e.inputTokens;
-    outputTokens += e.outputTokens;
-    cacheCreationTokens += e.cacheCreationTokens;
-    cacheReadTokens += e.cacheReadTokens;
-    totalTokens += e.totalTokens;
-    totalCost += e.cost;
-  }
-  return {
-    inputTokens,
-    outputTokens,
-    cacheCreationTokens,
-    cacheReadTokens,
-    totalTokens,
-    totalCost,
-  };
+  return sumEntries(entries);
 }
 
 export interface DashboardData {

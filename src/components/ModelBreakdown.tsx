@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
+import { aggregateModelBreakdowns } from "../utils/aggregate";
 import { formatCost, formatTokens } from "../utils/format";
 
 interface Props {
@@ -15,15 +16,6 @@ const COLORS = [
   "var(--color-chart-teal)",
   "var(--color-chart-red)",
 ];
-
-interface AggregatedModel {
-  modelName: string;
-  inputTokens: number;
-  outputTokens: number;
-  cacheCreationTokens: number;
-  cacheReadTokens: number;
-  cost: number;
-}
 
 type Metric = keyof typeof METRICS;
 
@@ -86,25 +78,7 @@ function CustomPieTooltip({
 export function ModelBreakdown({ entries }: Props) {
   const [metric, setMetric] = useState<Metric>("cost");
 
-  const models = useMemo(() => {
-    const map = new Map<string, AggregatedModel>();
-    for (const entry of entries) {
-      if (!entry.modelBreakdowns) continue;
-      for (const mb of entry.modelBreakdowns) {
-        const existing = map.get(mb.modelName);
-        if (existing) {
-          existing.inputTokens += mb.inputTokens;
-          existing.outputTokens += mb.outputTokens;
-          existing.cacheCreationTokens += mb.cacheCreationTokens;
-          existing.cacheReadTokens += mb.cacheReadTokens;
-          existing.cost += mb.cost;
-        } else {
-          map.set(mb.modelName, { ...mb });
-        }
-      }
-    }
-    return Array.from(map.values());
-  }, [entries]);
+  const models = useMemo(() => aggregateModelBreakdowns(entries), [entries]);
 
   // Sort by the selected metric (descending)
   const sortedModels = useMemo(
