@@ -10,8 +10,15 @@ import { InputView } from "./components/InputView";
 import { Dashboard } from "./components/Dashboard";
 
 export interface SourceInput {
+  id: string;
   label: string;
   content: string;
+  enabled: boolean;
+}
+
+let nextId = 0;
+export function createSourceInput(patch?: Partial<Omit<SourceInput, "id">>): SourceInput {
+  return { id: String(nextId++), label: "", content: "", enabled: true, ...patch };
 }
 
 interface ParsedSource {
@@ -26,6 +33,7 @@ export function parseInputs(inputs: SourceInput[]): {
   const sources: ParsedSource[] = [];
 
   for (const input of inputs) {
+    if (!input.enabled) continue;
     const text = input.content.trim();
     if (!text) continue;
 
@@ -124,10 +132,12 @@ export function restoreFromHash(json: string): SourceInput[] | null {
     // Labeled format: { sources: [{ label, data }...] }
     if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && "sources" in parsed) {
       const sources = parsed.sources as { label: string; data: unknown }[];
-      return sources.map((s) => ({
-        label: s.label ?? "",
-        content: JSON.stringify(s.data, null, 2),
-      }));
+      return sources.map((s) =>
+        createSourceInput({
+          label: s.label ?? "",
+          content: JSON.stringify(s.data, null, 2),
+        }),
+      );
     }
 
     // Array format (multi-source, no labels)
@@ -138,23 +148,24 @@ export function restoreFromHash(json: string): SourceInput[] | null {
         const firstKeys = Object.keys(parsed[0]);
         const reportKeys = new Set(["daily", "weekly", "monthly", "sessions", "blocks"]);
         if (firstKeys.some((k) => reportKeys.has(k))) {
-          return parsed.map((item: unknown) => ({
-            label: "",
-            content: JSON.stringify(item, null, 2),
-          }));
+          return parsed.map((item: unknown) =>
+            createSourceInput({
+              content: JSON.stringify(item, null, 2),
+            }),
+          );
         }
       }
     }
 
     // Legacy single report
-    return [{ label: "", content: JSON.stringify(parsed, null, 2) }];
+    return [createSourceInput({ content: JSON.stringify(parsed, null, 2) })];
   } catch {
     return null;
   }
 }
 
 function App() {
-  const [inputs, setInputs] = useState<SourceInput[]>([{ label: "", content: "" }]);
+  const [inputs, setInputs] = useState<SourceInput[]>([createSourceInput()]);
   const [activeTab, setActiveTab] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(() => {
@@ -220,6 +231,14 @@ function App() {
     setInputs(newInputs);
   }, []);
 
+  const toggleSource = useCallback((index: number) => {
+    setInputs((prev) =>
+      prev.map((inp, i) => (i === index ? { ...inp, enabled: !inp.enabled } : inp)),
+    );
+  }, []);
+
+  const nonEmptyInputs = inputs.filter((inp) => inp.content.trim());
+
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
       {/* Header */}
@@ -267,6 +286,27 @@ function App() {
           onTabChange={setActiveTab}
           error={error}
         />
+        {nonEmptyInputs.length >= 2 && (
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-text-secondary">Sources:</span>
+            {inputs.map((inp, i) => {
+              if (!inp.content.trim()) return null;
+              return (
+                <button
+                  key={inp.id}
+                  onClick={() => toggleSource(i)}
+                  className={`px-2.5 py-1 rounded-full border transition-colors select-none ${
+                    inp.enabled
+                      ? "bg-accent/15 border-accent/40 text-accent"
+                      : "bg-bg-secondary border-border text-text-secondary"
+                  }`}
+                >
+                  {inp.label || `Source ${i + 1}`}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {parseResult.data && <Dashboard data={parseResult.data} />}
       </main>
     </div>

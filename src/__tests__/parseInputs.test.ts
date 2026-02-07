@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseInputs } from "../App";
+import { parseInputs, createSourceInput } from "../App";
 import type { SourceInput } from "../App";
 
 // Minimal valid daily report in claude format
@@ -118,8 +118,8 @@ const DAILY_CODEX = JSON.stringify({
   },
 });
 
-function inp(content: string, label = ""): SourceInput {
-  return { label, content };
+function inp(content: string, label = "", enabled = true): SourceInput {
+  return createSourceInput({ label, content, enabled });
 }
 
 describe("parseInputs", () => {
@@ -219,6 +219,32 @@ describe("parseInputs", () => {
       const result = parseInputs([inp(DAILY_CLAUDE), inp(SESSION_REPORT)]);
       expect(result.data).toBeNull();
       expect(result.error).toContain("Cannot merge different report types");
+    });
+  });
+
+  describe("enabled toggle", () => {
+    it("skips disabled inputs", () => {
+      const result = parseInputs([inp(DAILY_CLAUDE, "", false), inp(DAILY_CLAUDE_2)]);
+      expect(result.error).toBeNull();
+      expect(result.data).not.toBeNull();
+      expect(result.data!.entries).toHaveLength(1);
+      expect(result.data!.entries[0].label).toBe("2025-07-02");
+    });
+
+    it("returns null data when all inputs are disabled", () => {
+      const result = parseInputs([inp(DAILY_CLAUDE, "", false), inp(DAILY_CLAUDE_2, "", false)]);
+      expect(result).toEqual({ data: null, error: null });
+    });
+
+    it("merges only enabled inputs", () => {
+      const result = parseInputs([
+        inp(DAILY_CLAUDE, "A"),
+        inp(DAILY_CLAUDE_2, "B", false),
+        inp(DAILY_CODEX, "C"),
+      ]);
+      expect(result.error).toBeNull();
+      expect(result.data!.entries).toHaveLength(2);
+      expect(result.data!.sourceLabels).toEqual(["A", "C"]);
     });
   });
 
