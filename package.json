@@ -1,37 +1,46 @@
 {
   "name": "ccusageview",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "bin": {
+    "ccusageview": "dist-cli/ccusageview.mjs"
+  },
+  "files": [
+    "dist-cli"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:cli": "esbuild src/cli/main.ts --bundle --platform=node --target=node22 --format=esm --outfile=dist-cli/ccusageview.mjs --banner:js='#!/usr/bin/env node'",
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@tailwindcss/vite": "^4.1.18",
-    "lz-string": "^1.5.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "recharts": "^3.7.0",
-    "tailwindcss": "^4.1.18"
+    "preview": "vite preview",
+    "prepublishOnly": "pnpm build:cli"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.1",
+    "esbuild": "^0.27.3",
     "lefthook": "^2.1.0",
+    "lz-string": "^1.5.0",
     "oxfmt": "^0.28.0",
     "oxlint": "~1.35.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "recharts": "^3.7.0",
+    "tailwindcss": "^4.1.18",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
     "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "packageManager": "pnpm@10.26.2",
   "pnpm": {
