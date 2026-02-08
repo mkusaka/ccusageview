@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { execSync } from "node:child_process";
 import { encodePayload } from "../utils/compression.ts";
 
-const DEFAULT_BASE_URL = "https://mkusaka.github.io/ccusageview/";
+const DEFAULT_BASE_URL = "https://ccusageview.polyfill.workers.dev/";
 
 export function buildViewerUrl(jsonInput: string, baseUrl: string): string {
   const encoded = encodePayload(jsonInput);
