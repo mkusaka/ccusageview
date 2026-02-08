@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
 import { aggregateModelBreakdowns } from "../utils/aggregate";
 import { formatCost, formatTokens } from "../utils/format";
+import { CopyImageButton } from "./CopyImageButton";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -76,6 +77,7 @@ function CustomPieTooltip({
 }
 
 export function ModelBreakdown({ entries }: Props) {
+  const chartRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<Metric>("cost");
 
   const models = useMemo(() => aggregateModelBreakdowns(entries), [entries]);
@@ -97,10 +99,13 @@ export function ModelBreakdown({ entries }: Props) {
   }));
 
   return (
-    <div className="bg-bg-card border border-border rounded-lg p-4">
+    <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
       {/* Header with metric tabs */}
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-text-secondary">Model Breakdown</h3>
+        <div className="flex items-center gap-1">
+          <h3 className="text-sm font-medium text-text-secondary">Model Breakdown</h3>
+          <CopyImageButton targetRef={chartRef} />
+        </div>
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
           {(Object.keys(METRICS) as Metric[]).map((key) => (
             <button

@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import type { NormalizedEntry } from "../utils/normalize";
 import { formatCost, formatTokens } from "../utils/format";
+import { CopyImageButton } from "./CopyImageButton";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -136,6 +137,7 @@ function buildGrid(dayMap: Map<string, DayData>): {
 const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 
 export function ActivityHeatmap({ entries }: Props) {
+  const chartRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [hoveredDay, setHoveredDay] = useState<DayData | null>(null);
@@ -193,10 +195,13 @@ export function ActivityHeatmap({ entries }: Props) {
   const metricConfig = METRICS[metric];
 
   return (
-    <div className="bg-bg-card border border-border rounded-lg p-4">
+    <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
       {/* Header with metric tabs */}
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium text-text-secondary">Activity</h3>
+        <div className="flex items-center gap-1">
+          <h3 className="text-sm font-medium text-text-secondary">Activity</h3>
+          <CopyImageButton targetRef={chartRef} />
+        </div>
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
           {(Object.keys(METRICS) as Metric[]).map((key) => (
             <button

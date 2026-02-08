@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -12,6 +12,7 @@ import {
 import type { NormalizedEntry } from "../utils/normalize";
 import { formatCost } from "../utils/format";
 import { collectModels, buildModelSeries, buildCostByModel, MODEL_COLORS } from "../utils/chart";
+import { CopyImageButton } from "./CopyImageButton";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -20,6 +21,7 @@ interface Props {
 type ViewMode = "total" | "model";
 
 export function CostChart({ entries }: Props) {
+  const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("total");
 
   const allModels = useMemo(() => collectModels(entries), [entries]);
@@ -38,9 +40,12 @@ export function CostChart({ entries }: Props) {
   const isModelView = viewMode === "model" && hasModelData;
 
   return (
-    <div className="bg-bg-card border border-border rounded-lg p-4">
+    <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-medium text-text-secondary">Cost Over Time</h3>
+        <div className="flex items-center gap-1">
+          <h3 className="text-sm font-medium text-text-secondary">Cost Over Time</h3>
+          <CopyImageButton targetRef={chartRef} />
+        </div>
         {hasModelData && (
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
             <button
