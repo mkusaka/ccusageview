@@ -143,38 +143,23 @@ const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 
 export function ActivityHeatmap({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [hoveredDay, setHoveredDay] = useState<DayData | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [metric, setMetric] = useState<Metric>("cost");
 
   const dayMap = useMemo(() => buildDayMap(entries), [entries]);
 
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // Calculate layout from container width
+  // Fixed layout: always 53 weeks, fixed cell size
+  const numWeeks = 53;
   const labelWidth = 28;
-  const maxCellStep = 16;
-  const availableWidth = Math.max(containerWidth - labelWidth, 100);
-  // Fill the width: how many weeks fit? Cap at 53 (~1 year)
-  const numWeeks = Math.min(Math.max(Math.floor(availableWidth / maxCellStep), 4), 53);
-  const cellStep = availableWidth / numWeeks;
-  const cellGap = Math.max(cellStep * 0.15, 1.5);
+  const cellStep = 16;
+  const cellGap = 2;
   const cellSize = cellStep - cellGap;
   const monthLabelHeight = 14;
   const gridTop = monthLabelHeight + 4;
   const svgHeight = gridTop + 7 * cellStep;
+  const svgWidth = labelWidth + numWeeks * cellStep;
 
   const { weeks, months } = useMemo(() => buildGrid(dayMap, numWeeks), [dayMap, numWeeks]);
 
@@ -187,6 +172,12 @@ export function ActivityHeatmap({ entries }: Props) {
     }
     return max;
   }, [dayMap, metric]);
+
+  // Auto-scroll to the right (most recent) on mount
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [weeks]);
 
   if (weeks.length === 0) return null;
 
@@ -227,16 +218,16 @@ export function ActivityHeatmap({ entries }: Props) {
         </div>
       </div>
 
-      <div ref={containerRef} className="relative">
-        {containerWidth > 0 && (
-          <svg width="100%" height={svgHeight} className="block">
+      <div className="relative">
+        <div ref={scrollRef} className="overflow-x-auto">
+          <svg width={svgWidth} height={svgHeight} className="block">
             {/* Month labels */}
             {months.map((m, i) => (
               <text
                 key={i}
                 x={labelWidth + m.colStart * cellStep}
                 y={monthLabelHeight - 2}
-                fontSize={Math.min(cellStep * 0.8, 11)}
+                fontSize={11}
                 fill="var(--color-text-secondary)"
               >
                 {m.label}
@@ -251,7 +242,7 @@ export function ActivityHeatmap({ entries }: Props) {
                     key={i}
                     x={0}
                     y={gridTop + i * cellStep + cellSize * 0.8}
-                    fontSize={Math.min(cellSize * 0.7, 10)}
+                    fontSize={10}
                     fill="var(--color-text-secondary)"
                   >
                     {label}
@@ -268,7 +259,7 @@ export function ActivityHeatmap({ entries }: Props) {
                   y={gridTop + di * cellStep}
                   width={cellSize}
                   height={cellSize}
-                  rx={Math.max(cellSize * 0.15, 1.5)}
+                  rx={2}
                   fill={getColor(day[metric])}
                   onMouseEnter={(e) => {
                     setHoveredDay(day);
@@ -283,7 +274,7 @@ export function ActivityHeatmap({ entries }: Props) {
               )),
             )}
           </svg>
-        )}
+        </div>
 
         {/* Tooltip */}
         {hoveredDay && (
