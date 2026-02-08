@@ -144,16 +144,32 @@ const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 export function ActivityHeatmap({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
   const [hoveredDay, setHoveredDay] = useState<DayData | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [metric, setMetric] = useState<Metric>("cost");
 
   const dayMap = useMemo(() => buildDayMap(entries), [entries]);
 
-  // Fixed layout: always 53 weeks, fixed cell size
+  // Measure container width
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Layout: 53 weeks, cell size scales up on wide screens, min 16px for scroll
   const numWeeks = 53;
   const labelWidth = 28;
-  const cellStep = 16;
+  const minCellStep = 16;
+  const availableWidth = Math.max(containerWidth - labelWidth, 0);
+  const cellStep = Math.max(availableWidth / numWeeks, minCellStep);
   const cellGap = 2;
   const cellSize = cellStep - cellGap;
   const monthLabelHeight = 14;
