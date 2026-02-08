@@ -8,6 +8,7 @@ import type { DashboardData } from "./utils/normalize";
 import { mergeNormalizedEntries } from "./utils/merge";
 import { InputView } from "./components/InputView";
 import { Dashboard } from "./components/Dashboard";
+import { ShareButton } from "./components/ShareButton";
 
 export interface SourceInput {
   id: string;
@@ -247,33 +248,36 @@ function App() {
           <h1 className="text-sm font-semibold tracking-tight">
             ccusage<span className="text-text-secondary font-normal">view</span>
           </h1>
-          <button
-            onClick={() => setDarkMode((d) => !d)}
-            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors"
-            title="Toggle dark mode"
-          >
-            {darkMode ? (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5" />
-                <path
-                  d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path
-                  d="M14 9.5A6.5 6.5 0 016.5 2 5.5 5.5 0 1014 9.5z"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            )}
-          </button>
+          <div className="flex items-center gap-1">
+            {parseResult.data && <ShareButton />}
+            <button
+              onClick={() => setDarkMode((d) => !d)}
+              className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors"
+              title="Toggle dark mode"
+            >
+              {darkMode ? (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+                  <path
+                    d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M14 9.5A6.5 6.5 0 016.5 2 5.5 5.5 0 1014 9.5z"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 

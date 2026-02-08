@@ -18,8 +18,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",
+    "cf:dev": "pnpm build && wrangler dev",
     "cf:deploy": "pnpm build && wrangler deploy",
     "prepublishOnly": "pnpm build:cli"
+  },
+  "dependencies": {
+    "hono": "^4.11.9",
+    "nanoid": "^5.1.6"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.18",
