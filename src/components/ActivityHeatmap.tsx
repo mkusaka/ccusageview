@@ -90,21 +90,26 @@ function emptyDay(dateStr: string): DayData {
 }
 
 // Generate grid of weeks (columns) x days (rows)
-function buildGrid(dayMap: Map<string, DayData>): {
+// Right-aligned to today, showing numWeeks columns (like GitHub's contribution graph)
+function buildGrid(
+  dayMap: Map<string, DayData>,
+  numWeeks: number,
+): {
   weeks: DayData[][];
   months: { label: string; colStart: number }[];
 } {
   if (dayMap.size === 0) return { weeks: [], months: [] };
 
-  const dates = Array.from(dayMap.keys()).toSorted();
-  const startDate = new Date(dates[0] + "T00:00:00");
-  const endDate = new Date(dates[dates.length - 1] + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  const gridStart = new Date(startDate);
-  gridStart.setDate(gridStart.getDate() - gridStart.getDay());
-
-  const gridEnd = new Date(endDate);
+  // Grid ends at the end of today's week (Saturday)
+  const gridEnd = new Date(today);
   gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()));
+
+  // Grid starts numWeeks back from gridEnd's Sunday
+  const gridStart = new Date(gridEnd);
+  gridStart.setDate(gridStart.getDate() - (numWeeks * 7 - 1));
 
   const weeks: DayData[][] = [];
   const months: { label: string; colStart: number }[] = [];
@@ -145,17 +150,6 @@ export function ActivityHeatmap({ entries }: Props) {
   const [metric, setMetric] = useState<Metric>("cost");
 
   const dayMap = useMemo(() => buildDayMap(entries), [entries]);
-  const { weeks, months } = useMemo(() => buildGrid(dayMap), [dayMap]);
-
-  // Max value for the selected metric
-  const maxValue = useMemo(() => {
-    let max = 0;
-    for (const d of dayMap.values()) {
-      const v = d[metric];
-      if (v > max) max = v;
-    }
-    return max;
-  }, [dayMap, metric]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -169,6 +163,31 @@ export function ActivityHeatmap({ entries }: Props) {
     return () => ro.disconnect();
   }, []);
 
+  // Calculate layout from container width
+  const labelWidth = 28;
+  const maxCellStep = 16;
+  const availableWidth = Math.max(containerWidth - labelWidth, 100);
+  // Fill the width: how many weeks fit? Cap at 53 (~1 year)
+  const numWeeks = Math.min(Math.max(Math.floor(availableWidth / maxCellStep), 4), 53);
+  const cellStep = availableWidth / numWeeks;
+  const cellGap = Math.max(cellStep * 0.15, 1.5);
+  const cellSize = cellStep - cellGap;
+  const monthLabelHeight = 14;
+  const gridTop = monthLabelHeight + 4;
+  const svgHeight = gridTop + 7 * cellStep;
+
+  const { weeks, months } = useMemo(() => buildGrid(dayMap, numWeeks), [dayMap, numWeeks]);
+
+  // Max value for the selected metric
+  const maxValue = useMemo(() => {
+    let max = 0;
+    for (const d of dayMap.values()) {
+      const v = d[metric];
+      if (v > max) max = v;
+    }
+    return max;
+  }, [dayMap, metric]);
+
   if (weeks.length === 0) return null;
 
   function getColor(value: number): string {
@@ -181,33 +200,22 @@ export function ActivityHeatmap({ entries }: Props) {
     return "oklch(0.45 0.19 155)";
   }
 
-  const labelWidth = 28;
-  const availableWidth = Math.max(containerWidth - labelWidth, 100);
-  const numWeeks = weeks.length;
-  const maxCellStep = 16;
-  const cellStep = Math.min(availableWidth / numWeeks, maxCellStep);
-  const cellGap = Math.max(cellStep * 0.15, 1.5);
-  const cellSize = cellStep - cellGap;
-  const monthLabelHeight = 14;
-  const gridTop = monthLabelHeight + 4;
-  const svgHeight = gridTop + 7 * cellStep;
-
   const metricConfig = METRICS[metric];
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
       {/* Header with metric tabs */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-1 shrink-0">
           <h3 className="text-sm font-medium text-text-secondary">Activity</h3>
           <CopyImageButton targetRef={chartRef} />
         </div>
-        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 overflow-x-auto">
           {(Object.keys(METRICS) as Metric[]).map((key) => (
             <button
               key={key}
               onClick={() => setMetric(key)}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
                 metric === key
                   ? "bg-bg-card text-text-primary shadow-sm"
                   : "text-text-secondary hover:text-text-primary"

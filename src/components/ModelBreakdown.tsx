@@ -101,17 +101,17 @@ export function ModelBreakdown({ entries }: Props) {
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
       {/* Header with metric tabs */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-1 shrink-0">
           <h3 className="text-sm font-medium text-text-secondary">Model Breakdown</h3>
           <CopyImageButton targetRef={chartRef} />
         </div>
-        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 overflow-x-auto">
           {(Object.keys(METRICS) as Metric[]).map((key) => (
             <button
               key={key}
               onClick={() => setMetric(key)}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
                 metric === key
                   ? "bg-bg-card text-text-primary shadow-sm"
                   : "text-text-secondary hover:text-text-primary"
