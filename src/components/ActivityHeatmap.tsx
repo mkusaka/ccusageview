@@ -90,21 +90,26 @@ function emptyDay(dateStr: string): DayData {
 }
 
 // Generate grid of weeks (columns) x days (rows)
-function buildGrid(dayMap: Map<string, DayData>): {
+// Right-aligned to today, showing numWeeks columns (like GitHub's contribution graph)
+function buildGrid(
+  dayMap: Map<string, DayData>,
+  numWeeks: number,
+): {
   weeks: DayData[][];
   months: { label: string; colStart: number }[];
 } {
   if (dayMap.size === 0) return { weeks: [], months: [] };
 
-  const dates = Array.from(dayMap.keys()).toSorted();
-  const startDate = new Date(dates[0] + "T00:00:00");
-  const endDate = new Date(dates[dates.length - 1] + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  const gridStart = new Date(startDate);
-  gridStart.setDate(gridStart.getDate() - gridStart.getDay());
-
-  const gridEnd = new Date(endDate);
+  // Grid ends at the end of today's week (Saturday)
+  const gridEnd = new Date(today);
   gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()));
+
+  // Grid starts numWeeks back from gridEnd's Sunday
+  const gridStart = new Date(gridEnd);
+  gridStart.setDate(gridStart.getDate() - (numWeeks * 7 - 1));
 
   const weeks: DayData[][] = [];
   const months: { label: string; colStart: number }[] = [];
@@ -138,14 +143,41 @@ const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 
 export function ActivityHeatmap({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [hoveredDay, setHoveredDay] = useState<DayData | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [metric, setMetric] = useState<Metric>("cost");
 
   const dayMap = useMemo(() => buildDayMap(entries), [entries]);
-  const { weeks, months } = useMemo(() => buildGrid(dayMap), [dayMap]);
+
+  // Measure container width
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Layout: 53 weeks, cell size scales up on wide screens, min 16px for scroll
+  const numWeeks = 53;
+  const labelWidth = 28;
+  const minCellStep = 16;
+  const availableWidth = Math.max(containerWidth - labelWidth, 0);
+  const cellStep = Math.max(availableWidth / numWeeks, minCellStep);
+  const cellGap = 2;
+  const cellSize = cellStep - cellGap;
+  const monthLabelHeight = 14;
+  const gridTop = monthLabelHeight + 4;
+  const svgHeight = gridTop + 7 * cellStep;
+  const svgWidth = labelWidth + numWeeks * cellStep;
+
+  const { weeks, months } = useMemo(() => buildGrid(dayMap, numWeeks), [dayMap, numWeeks]);
 
   // Max value for the selected metric
   const maxValue = useMemo(() => {
@@ -157,17 +189,11 @@ export function ActivityHeatmap({ entries }: Props) {
     return max;
   }, [dayMap, metric]);
 
+  // Auto-scroll to the right (most recent) on mount
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    const el = scrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [weeks]);
 
   if (weeks.length === 0) return null;
 
@@ -181,33 +207,22 @@ export function ActivityHeatmap({ entries }: Props) {
     return "oklch(0.45 0.19 155)";
   }
 
-  const labelWidth = 28;
-  const availableWidth = Math.max(containerWidth - labelWidth, 100);
-  const numWeeks = weeks.length;
-  const maxCellStep = 16;
-  const cellStep = Math.min(availableWidth / numWeeks, maxCellStep);
-  const cellGap = Math.max(cellStep * 0.15, 1.5);
-  const cellSize = cellStep - cellGap;
-  const monthLabelHeight = 14;
-  const gridTop = monthLabelHeight + 4;
-  const svgHeight = gridTop + 7 * cellStep;
-
   const metricConfig = METRICS[metric];
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
       {/* Header with metric tabs */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-1 shrink-0">
           <h3 className="text-sm font-medium text-text-secondary">Activity</h3>
           <CopyImageButton targetRef={chartRef} />
         </div>
-        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 overflow-x-auto">
           {(Object.keys(METRICS) as Metric[]).map((key) => (
             <button
               key={key}
               onClick={() => setMetric(key)}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
                 metric === key
                   ? "bg-bg-card text-text-primary shadow-sm"
                   : "text-text-secondary hover:text-text-primary"
@@ -219,16 +234,16 @@ export function ActivityHeatmap({ entries }: Props) {
         </div>
       </div>
 
-      <div ref={containerRef} className="relative">
-        {containerWidth > 0 && (
-          <svg width="100%" height={svgHeight} className="block">
+      <div className="relative">
+        <div ref={scrollRef} className="overflow-x-auto">
+          <svg width={svgWidth} height={svgHeight} className="block">
             {/* Month labels */}
             {months.map((m, i) => (
               <text
                 key={i}
                 x={labelWidth + m.colStart * cellStep}
                 y={monthLabelHeight - 2}
-                fontSize={Math.min(cellStep * 0.8, 11)}
+                fontSize={11}
                 fill="var(--color-text-secondary)"
               >
                 {m.label}
@@ -243,7 +258,7 @@ export function ActivityHeatmap({ entries }: Props) {
                     key={i}
                     x={0}
                     y={gridTop + i * cellStep + cellSize * 0.8}
-                    fontSize={Math.min(cellSize * 0.7, 10)}
+                    fontSize={10}
                     fill="var(--color-text-secondary)"
                   >
                     {label}
@@ -260,7 +275,7 @@ export function ActivityHeatmap({ entries }: Props) {
                   y={gridTop + di * cellStep}
                   width={cellSize}
                   height={cellSize}
-                  rx={Math.max(cellSize * 0.15, 1.5)}
+                  rx={2}
                   fill={getColor(day[metric])}
                   onMouseEnter={(e) => {
                     setHoveredDay(day);
@@ -275,7 +290,7 @@ export function ActivityHeatmap({ entries }: Props) {
               )),
             )}
           </svg>
-        )}
+        </div>
 
         {/* Tooltip */}
         {hoveredDay && (
