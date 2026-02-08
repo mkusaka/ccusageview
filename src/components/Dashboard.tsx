@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ReportType } from "../types";
 import type { DashboardData } from "../utils/normalize";
 import { aggregateToMonthly } from "../utils/normalize";
@@ -8,6 +8,7 @@ import { TokenChart } from "./TokenChart";
 import { ModelBreakdown } from "./ModelBreakdown";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { DataTable } from "./DataTable";
+import { CopyImageButton } from "./CopyImageButton";
 
 interface Props {
   data: DashboardData;
@@ -24,6 +25,7 @@ const TYPE_LABELS: Record<ReportType, string> = {
 type TimeGranularity = "daily" | "monthly";
 
 export function Dashboard({ data }: Props) {
+  const dashboardRef = useRef<HTMLDivElement>(null);
   const { entries: dailyEntries, totals, reportType, sourceLabels } = data;
 
   // Daily reports can be viewed as monthly too
@@ -59,6 +61,8 @@ export function Dashboard({ data }: Props) {
           <span className="text-xs text-text-secondary">Sources: {sourceLabels.join(", ")}</span>
         )}
 
+        <CopyImageButton targetRef={dashboardRef} />
+
         {/* Granularity toggle for daily reports */}
         {canToggleGranularity && (
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 ml-auto">
@@ -79,17 +83,20 @@ export function Dashboard({ data }: Props) {
         )}
       </div>
 
-      <SummaryCards totals={totals} entryCount={entries.length} />
+      <div ref={dashboardRef} className="space-y-4">
+        <SummaryCards totals={totals} entryCount={entries.length} />
 
-      {entries.length > 0 && (
-        <>
-          {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
-          <CostChart entries={entries} />
-          <TokenChart entries={entries} />
-          {hasModelBreakdowns && <ModelBreakdown entries={entries} />}
-          <DataTable entries={entries} />
-        </>
-      )}
+        {entries.length > 0 && (
+          <>
+            {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
+            <CostChart entries={entries} />
+            <TokenChart entries={entries} />
+            {hasModelBreakdowns && <ModelBreakdown entries={entries} />}
+          </>
+        )}
+      </div>
+
+      {entries.length > 0 && <DataTable entries={entries} />}
     </div>
   );
 }
