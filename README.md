@@ -1,6 +1,6 @@
 # ccusageview
 
-A web dashboard and CLI tool for visualizing [ccusage](https://github.com/anthropics/ccusage) JSON reports — tokens, costs, and model breakdown at a glance.
+A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppippi/ccusage) JSON reports — tokens, costs, and model breakdown at a glance.
 
 **Live:** https://ccusageview.polyfill.workers.dev/
 
