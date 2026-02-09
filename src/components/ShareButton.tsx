@@ -45,7 +45,7 @@ export function ShareButton() {
       onClick={handleShare}
       disabled={status === "loading"}
       className="h-8 px-2.5 flex items-center gap-1.5 rounded-md hover:bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors text-xs disabled:opacity-50"
-      title="Copy short URL"
+      title="Generate Tiny URL"
     >
       {status === "loading" ? (
         <svg
@@ -101,7 +101,7 @@ export function ShareButton() {
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
       )}
-      {status === "copied" ? "Copied!" : "Share"}
+      {status === "copied" ? "Copied!" : "Generate Tiny URL"}
     </button>
   );
 }
