@@ -39,14 +39,23 @@ const METRICS: Record<StatMetricKey, MetricConfig> = {
 
 const METRIC_KEYS = Object.keys(METRICS) as StatMetricKey[];
 
+/** Color mapping for percentile labels that match chart reference lines */
+const STAT_LABEL_COLORS: Record<string, string> = {
+  "Median (P50)": "var(--color-chart-green)",
+  P90: "var(--color-chart-orange)",
+  P95: "var(--color-chart-purple)",
+  P99: "var(--color-chart-red)",
+};
+
 interface StatItem {
   label: string;
   value: string;
   subLabel?: string;
+  color?: string;
 }
 
 function buildStatItems(stats: DescriptiveStats, fmt: (v: number) => string): StatItem[] {
-  return [
+  const items: StatItem[] = [
     { label: "Mean", value: fmt(stats.mean) },
     { label: "Median (P50)", value: fmt(stats.median) },
     { label: "Min", value: fmt(stats.min) },
@@ -69,6 +78,11 @@ function buildStatItems(stats: DescriptiveStats, fmt: (v: number) => string): St
     },
     { label: "Skewness", value: formatSkewness(stats.skewness) },
   ];
+  for (const item of items) {
+    const c = STAT_LABEL_COLORS[item.label];
+    if (c) item.color = c;
+  }
+  return items;
 }
 
 export function StatisticsSummary({ entries }: Props) {
@@ -125,7 +139,18 @@ export function StatisticsSummary({ entries }: Props) {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
         {items.map((item) => (
           <div key={item.label}>
-            <p className="text-xs text-text-secondary uppercase tracking-wide">{item.label}</p>
+            <p
+              className="text-xs uppercase tracking-wide flex items-center gap-1.5"
+              style={{ color: item.color ?? "var(--color-text-secondary)" }}
+            >
+              {item.color && (
+                <span
+                  className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: item.color }}
+                />
+              )}
+              {item.label}
+            </p>
             <p className="text-lg font-semibold mt-0.5 text-text-primary">{item.value}</p>
             {item.subLabel && <p className="text-xs text-text-secondary mt-0.5">{item.subLabel}</p>}
           </div>
