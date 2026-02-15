@@ -50,7 +50,7 @@
   "engines": {
     "node": ">=22"
   },
-  "packageManager": "pnpm@10.29.1",
+  "packageManager": "pnpm@10.29.3",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
