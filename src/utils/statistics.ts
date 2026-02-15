@@ -1,4 +1,5 @@
 import type { NormalizedEntry } from "./normalize";
+import type { ModelBreakdown } from "../types";
 
 /** Numeric fields of NormalizedEntry that statistics can be computed over */
 export type StatMetricKey =
@@ -8,6 +9,46 @@ export type StatMetricKey =
   | "outputTokens"
   | "cacheCreationTokens"
   | "cacheReadTokens";
+
+/** Map StatMetricKey to ModelBreakdown field (totalTokens is computed) */
+function getModelMetricValue(mb: ModelBreakdown, key: StatMetricKey): number {
+  if (key === "totalTokens") {
+    return mb.inputTokens + mb.outputTokens + mb.cacheCreationTokens + mb.cacheReadTokens;
+  }
+  return mb[key];
+}
+
+/**
+ * Extract a single metric's values for a specific model from entries.
+ * Only entries where the model appears in modelBreakdowns are included.
+ */
+export function extractMetricByModel(
+  entries: NormalizedEntry[],
+  key: StatMetricKey,
+  modelName: string,
+): number[] {
+  const values: number[] = [];
+  for (const e of entries) {
+    if (!e.modelBreakdowns) continue;
+    const mb = e.modelBreakdowns.find((m) => m.modelName === modelName);
+    if (mb) values.push(getModelMetricValue(mb, key));
+  }
+  return values;
+}
+
+/**
+ * Compute descriptive statistics for each metric, filtered to a specific model.
+ */
+export function computeAllStatsByModel(
+  entries: NormalizedEntry[],
+  modelName: string,
+): Record<StatMetricKey, DescriptiveStats> {
+  const result = {} as Record<StatMetricKey, DescriptiveStats>;
+  for (const key of STAT_METRIC_KEYS) {
+    result[key] = computeStats(extractMetricByModel(entries, key, modelName));
+  }
+  return result;
+}
 
 export const STAT_METRIC_KEYS: readonly StatMetricKey[] = [
   "cost",
@@ -160,15 +201,8 @@ export interface DistributionPoint {
   value: number;
 }
 
-/**
- * Build sorted distribution data for charting.
- * Each point maps a percentile rank (0–100) to the corresponding value.
- */
-export function buildDistribution(
-  entries: NormalizedEntry[],
-  key: StatMetricKey,
-): DistributionPoint[] {
-  const values = extractMetric(entries, key);
+/** Build sorted distribution data from raw values */
+export function buildDistributionFromValues(values: number[]): DistributionPoint[] {
   const sorted = values.toSorted((a, b) => a - b);
   const n = sorted.length;
   if (n === 0) return [];
@@ -177,4 +211,15 @@ export function buildDistribution(
     rank: n === 1 ? 100 : Math.round((i / (n - 1)) * 100),
     value,
   }));
+}
+
+/**
+ * Build sorted distribution data for charting.
+ * Each point maps a percentile rank (0–100) to the corresponding value.
+ */
+export function buildDistribution(
+  entries: NormalizedEntry[],
+  key: StatMetricKey,
+): DistributionPoint[] {
+  return buildDistributionFromValues(extractMetric(entries, key));
 }

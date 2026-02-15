@@ -9,6 +9,7 @@ import { ModelBreakdown } from "./ModelBreakdown";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { DataTable } from "./DataTable";
 import { StatisticsSummary } from "./StatisticsSummary";
+import { DayOfWeekChart } from "./DayOfWeekChart";
 import { CopyImageButton } from "./CopyImageButton";
 import { RangeSlider } from "./RangeSlider";
 
@@ -126,6 +127,7 @@ export function Dashboard({ data }: Props) {
         {filteredEntries.length > 0 && (
           <>
             {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
+            <DayOfWeekChart entries={filteredEntries} />
             <CostChart entries={filteredEntries} />
             <TokenChart entries={filteredEntries} />
             {hasModelBreakdowns && <ModelBreakdown entries={filteredEntries} />}
