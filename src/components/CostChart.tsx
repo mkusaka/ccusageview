@@ -104,10 +104,11 @@ export function CostChart({ entries }: Props) {
                   type="monotone"
                   dataKey={s.key}
                   name={s.label}
+                  stackId="1"
                   fill={s.color}
                   stroke={s.color}
-                  fillOpacity={0.1}
-                  strokeWidth={2}
+                  fillOpacity={0.6}
+                  strokeWidth={1}
                 />
               ))}
             </>
