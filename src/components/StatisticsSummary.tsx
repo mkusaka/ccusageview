@@ -172,6 +172,8 @@ function DistributionChart({
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
           <XAxis
             dataKey="rank"
+            type="number"
+            domain={[0, 100]}
             tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
             tickLine={false}
             axisLine={false}
