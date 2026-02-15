@@ -12,10 +12,14 @@ import {
 import type { NormalizedEntry } from "../utils/normalize";
 import {
   computeAllStats,
+  computeAllStatsByModel,
   buildDistribution,
+  buildDistributionFromValues,
+  extractMetricByModel,
   type StatMetricKey,
   type DescriptiveStats,
 } from "../utils/statistics";
+import { collectModels, shortenModelName } from "../utils/chart";
 import { formatCost, formatTokens, formatSkewness } from "../utils/format";
 import { CopyImageButton } from "./CopyImageButton";
 
@@ -88,8 +92,14 @@ function buildStatItems(stats: DescriptiveStats, fmt: (v: number) => string): St
 export function StatisticsSummary({ entries }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<StatMetricKey>("cost");
+  const [selectedModel, setSelectedModel] = useState<string | null>(null);
 
-  const allStats = useMemo(() => computeAllStats(entries), [entries]);
+  const models = useMemo(() => collectModels(entries), [entries]);
+
+  const allStats = useMemo(() => {
+    if (selectedModel) return computeAllStatsByModel(entries, selectedModel);
+    return computeAllStats(entries);
+  }, [entries, selectedModel]);
 
   if (entries.length < 2) {
     return (
@@ -112,20 +122,36 @@ export function StatisticsSummary({ entries }: Props) {
           <span className="text-xs text-text-secondary">({stats.count} entries)</span>
           <CopyImageButton targetRef={panelRef} />
         </div>
-        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 overflow-x-auto">
-          {METRIC_KEYS.map((key) => (
-            <button
-              key={key}
-              onClick={() => setMetric(key)}
-              className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
-                metric === key
-                  ? "bg-bg-card text-text-primary shadow-sm"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {models.length > 0 && (
+            <select
+              value={selectedModel ?? ""}
+              onChange={(e) => setSelectedModel(e.target.value || null)}
+              className="bg-bg-secondary text-text-primary text-xs rounded-md px-2 py-1 border border-border shrink-0"
             >
-              {METRICS[key].label}
-            </button>
-          ))}
+              <option value="">All Models</option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {shortenModelName(m)}
+                </option>
+              ))}
+            </select>
+          )}
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+            {METRIC_KEYS.map((key) => (
+              <button
+                key={key}
+                onClick={() => setMetric(key)}
+                className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
+                  metric === key
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {METRICS[key].label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -134,6 +160,7 @@ export function StatisticsSummary({ entries }: Props) {
         metric={metric}
         metricConfig={metricConfig}
         stats={stats}
+        selectedModel={selectedModel}
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
@@ -172,13 +199,20 @@ function DistributionChart({
   metric,
   metricConfig,
   stats,
+  selectedModel,
 }: {
   entries: NormalizedEntry[];
   metric: StatMetricKey;
   metricConfig: MetricConfig;
   stats: DescriptiveStats;
+  selectedModel: string | null;
 }) {
-  const chartData = useMemo(() => buildDistribution(entries, metric), [entries, metric]);
+  const chartData = useMemo(() => {
+    if (selectedModel) {
+      return buildDistributionFromValues(extractMetricByModel(entries, metric, selectedModel));
+    }
+    return buildDistribution(entries, metric);
+  }, [entries, metric, selectedModel]);
 
   if (chartData.length < 2) return null;
 
