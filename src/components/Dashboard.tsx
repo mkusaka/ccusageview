@@ -8,6 +8,7 @@ import { TokenChart } from "./TokenChart";
 import { ModelBreakdown } from "./ModelBreakdown";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { DataTable } from "./DataTable";
+import { StatisticsSummary } from "./StatisticsSummary";
 import { CopyImageButton } from "./CopyImageButton";
 
 interface Props {
@@ -85,6 +86,8 @@ export function Dashboard({ data }: Props) {
 
       <div ref={dashboardRef} className="space-y-4">
         <SummaryCards totals={totals} entryCount={entries.length} />
+
+        {entries.length >= 2 && <StatisticsSummary entries={entries} />}
 
         {entries.length > 0 && (
           <>
