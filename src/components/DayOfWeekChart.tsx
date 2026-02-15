@@ -1,7 +1,17 @@
 import { useMemo, useState, useRef } from "react";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
 import { formatCost, formatTokens } from "../utils/format";
+import { collectModels, buildModelSeries, shortenModelName, MODEL_COLORS } from "../utils/chart";
 import { CopyImageButton } from "./CopyImageButton";
 
 interface Props {
@@ -15,6 +25,8 @@ type Metric =
   | "outputTokens"
   | "cacheCreationTokens"
   | "cacheReadTokens";
+
+type ViewMode = "total" | "model";
 
 const METRICS: Record<Metric, { label: string; format: (v: number) => string }> = {
   cost: { label: "Cost", format: formatCost },
@@ -37,6 +49,14 @@ interface DayBucket {
   count: number;
 }
 
+function parseDayIndex(label: string): number | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(label)) return null;
+  const d = new Date(label + "T00:00:00");
+  if (isNaN(d.getTime())) return null;
+  const jsDay = d.getDay();
+  return jsDay === 0 ? 6 : jsDay - 1;
+}
+
 function buildDayOfWeekData(entries: NormalizedEntry[], metric: Metric): DayBucket[] {
   const buckets: { total: number; count: number }[] = Array.from({ length: 7 }, () => ({
     total: 0,
@@ -44,12 +64,8 @@ function buildDayOfWeekData(entries: NormalizedEntry[], metric: Metric): DayBuck
   }));
 
   for (const e of entries) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(e.label)) continue;
-    const d = new Date(e.label + "T00:00:00");
-    if (isNaN(d.getTime())) continue;
-    // JS getDay: 0=Sun..6=Sat -> Mon=0..Sun=6
-    const jsDay = d.getDay();
-    const dayIndex = jsDay === 0 ? 6 : jsDay - 1;
+    const dayIndex = parseDayIndex(e.label);
+    if (dayIndex === null) continue;
     buckets[dayIndex].total += e[metric];
     buckets[dayIndex].count += 1;
   }
@@ -62,16 +78,87 @@ function buildDayOfWeekData(entries: NormalizedEntry[], metric: Metric): DayBuck
   }));
 }
 
+/** Metric value from a ModelBreakdown-like object */
+function getBreakdownValue(
+  mb: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheCreationTokens: number;
+    cacheReadTokens: number;
+    cost: number;
+  },
+  metric: Metric,
+): number {
+  if (metric === "totalTokens") {
+    return mb.inputTokens + mb.outputTokens + mb.cacheCreationTokens + mb.cacheReadTokens;
+  }
+  return mb[metric];
+}
+
+function buildDayOfWeekByModel(
+  entries: NormalizedEntry[],
+  metric: Metric,
+  allModels: string[],
+): Record<string, string | number>[] {
+  // Per day: count of entries and total per model
+  const dayCounts = Array.from({ length: 7 }, () => 0);
+  const dayModelTotals = Array.from({ length: 7 }, () => new Map<string, number>());
+
+  for (const e of entries) {
+    const dayIndex = parseDayIndex(e.label);
+    if (dayIndex === null) continue;
+    dayCounts[dayIndex] += 1;
+
+    if (e.modelBreakdowns && e.modelBreakdowns.length > 0) {
+      for (const mb of e.modelBreakdowns) {
+        const prev = dayModelTotals[dayIndex].get(mb.modelName) ?? 0;
+        dayModelTotals[dayIndex].set(mb.modelName, prev + getBreakdownValue(mb, metric));
+      }
+    } else {
+      // No breakdown — attribute to "Other"
+      const prev = dayModelTotals[dayIndex].get("Other") ?? 0;
+      dayModelTotals[dayIndex].set("Other", prev + getBreakdownValue(e, metric));
+    }
+  }
+
+  return DAY_LABELS.map((day, i) => {
+    const row: Record<string, string | number> = { day };
+    const count = dayCounts[i];
+    if (count === 0) return row;
+    for (const model of allModels) {
+      row[model] = (dayModelTotals[i].get(model) ?? 0) / count;
+    }
+    if (dayModelTotals[i].has("Other")) {
+      row["Other"] = (dayModelTotals[i].get("Other") ?? 0) / count;
+    }
+    return row;
+  });
+}
+
 export function DayOfWeekChart({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<Metric>("cost");
+  const [viewMode, setViewMode] = useState<ViewMode>("total");
+
+  const allModels = useMemo(() => collectModels(entries), [entries]);
+  const hasModelData = allModels.length > 0;
 
   const data = useMemo(() => buildDayOfWeekData(entries, metric), [entries, metric]);
 
-  // Only render if we have date-parseable entries
+  const modelData = useMemo(
+    () => (hasModelData ? buildDayOfWeekByModel(entries, metric, allModels) : []),
+    [entries, metric, allModels, hasModelData],
+  );
+
+  const modelSeries = useMemo(
+    () => (hasModelData ? buildModelSeries(allModels, entries, MODEL_COLORS) : []),
+    [allModels, hasModelData, entries],
+  );
+
   const hasData = data.some((d) => d.count > 0);
   if (!hasData) return null;
 
+  const isModelView = viewMode === "model" && hasModelData;
   const metricConfig = METRICS[metric];
 
   return (
@@ -81,25 +168,54 @@ export function DayOfWeekChart({ entries }: Props) {
           <h3 className="text-sm font-medium text-text-secondary">Day of Week (avg)</h3>
           <CopyImageButton targetRef={chartRef} />
         </div>
-        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 overflow-x-auto">
-          {METRIC_KEYS.map((key) => (
-            <button
-              key={key}
-              onClick={() => setMetric(key)}
-              className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
-                metric === key
-                  ? "bg-bg-card text-text-primary shadow-sm"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {METRICS[key].label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {hasModelData && (
+            <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+              <button
+                onClick={() => setViewMode("total")}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === "total"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                Total
+              </button>
+              <button
+                onClick={() => setViewMode("model")}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === "model"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Model
+              </button>
+            </div>
+          )}
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+            {METRIC_KEYS.map((key) => (
+              <button
+                key={key}
+                onClick={() => setMetric(key)}
+                className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
+                  metric === key
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {METRICS[key].label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       <ResponsiveContainer width="100%" height={240}>
-        <BarChart data={data} margin={{ top: 10, right: 20, bottom: 0, left: 10 }}>
+        <BarChart
+          data={isModelView ? modelData : data}
+          margin={{ top: 10, right: 20, bottom: 0, left: 10 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis
             dataKey="day"
@@ -114,33 +230,56 @@ export function DayOfWeekChart({ entries }: Props) {
             tickFormatter={(v: number) => metricConfig.format(v)}
             width={80}
           />
-          <Tooltip
-            content={({ payload }) => {
-              if (!payload || payload.length === 0) return null;
-              const p = payload[0].payload as DayBucket;
-              if (p.count === 0) return null;
-              return (
-                <div
-                  className="px-2.5 py-1.5 rounded-md text-xs shadow-lg"
-                  style={{
-                    backgroundColor: "var(--color-bg-card)",
-                    border: "1px solid var(--color-border)",
-                  }}
-                >
-                  <p className="text-text-primary font-medium">{p.day}</p>
-                  <p className="text-text-secondary">Avg: {metricConfig.format(p.avg)}</p>
-                  <p className="text-text-secondary">Total: {metricConfig.format(p.total)}</p>
-                  <p className="text-text-secondary">{p.count} days</p>
-                </div>
-              );
-            }}
-          />
-          <Bar
-            dataKey="avg"
-            fill="var(--color-chart-blue)"
-            fillOpacity={0.7}
-            radius={[4, 4, 0, 0]}
-          />
+          {isModelView ? (
+            <>
+              <Tooltip
+                formatter={(value, name) => [
+                  metricConfig.format(Number(value ?? 0)),
+                  shortenModelName(String(name)),
+                ]}
+                contentStyle={{
+                  backgroundColor: "var(--color-bg-card)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "8px",
+                  fontSize: 12,
+                }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12 }} iconType="square" iconSize={10} />
+              {modelSeries.map((s) => (
+                <Bar key={s.key} dataKey={s.key} name={s.label} stackId="model" fill={s.color} />
+              ))}
+            </>
+          ) : (
+            <>
+              <Tooltip
+                content={({ payload }) => {
+                  if (!payload || payload.length === 0) return null;
+                  const p = payload[0].payload as DayBucket;
+                  if (p.count === 0) return null;
+                  return (
+                    <div
+                      className="px-2.5 py-1.5 rounded-md text-xs shadow-lg"
+                      style={{
+                        backgroundColor: "var(--color-bg-card)",
+                        border: "1px solid var(--color-border)",
+                      }}
+                    >
+                      <p className="text-text-primary font-medium">{p.day}</p>
+                      <p className="text-text-secondary">Avg: {metricConfig.format(p.avg)}</p>
+                      <p className="text-text-secondary">Total: {metricConfig.format(p.total)}</p>
+                      <p className="text-text-secondary">{p.count} days</p>
+                    </div>
+                  );
+                }}
+              />
+              <Bar
+                dataKey="avg"
+                fill="var(--color-chart-blue)"
+                fillOpacity={0.7}
+                radius={[4, 4, 0, 0]}
+              />
+            </>
+          )}
         </BarChart>
       </ResponsiveContainer>
     </div>
