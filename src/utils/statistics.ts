@@ -153,3 +153,28 @@ export function computeAllStats(
   }
   return result;
 }
+
+/** A single point on the distribution curve */
+export interface DistributionPoint {
+  rank: number; // percentile rank 0–100
+  value: number;
+}
+
+/**
+ * Build sorted distribution data for charting.
+ * Each point maps a percentile rank (0–100) to the corresponding value.
+ */
+export function buildDistribution(
+  entries: NormalizedEntry[],
+  key: StatMetricKey,
+): DistributionPoint[] {
+  const values = extractMetric(entries, key);
+  const sorted = values.toSorted((a, b) => a - b);
+  const n = sorted.length;
+  if (n === 0) return [];
+
+  return sorted.map((value, i) => ({
+    rank: n === 1 ? 100 : Math.round((i / (n - 1)) * 100),
+    value,
+  }));
+}

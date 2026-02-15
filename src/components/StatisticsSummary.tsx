@@ -1,6 +1,21 @@
 import { useMemo, useState, useRef } from "react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+} from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
-import { computeAllStats, type StatMetricKey, type DescriptiveStats } from "../utils/statistics";
+import {
+  computeAllStats,
+  buildDistribution,
+  type StatMetricKey,
+  type DescriptiveStats,
+} from "../utils/statistics";
 import { formatCost, formatTokens, formatSkewness } from "../utils/format";
 import { CopyImageButton } from "./CopyImageButton";
 
@@ -24,14 +39,23 @@ const METRICS: Record<StatMetricKey, MetricConfig> = {
 
 const METRIC_KEYS = Object.keys(METRICS) as StatMetricKey[];
 
+/** Color mapping for percentile labels that match chart reference lines */
+const STAT_LABEL_COLORS: Record<string, string> = {
+  "Median (P50)": "var(--color-chart-green)",
+  P90: "var(--color-chart-orange)",
+  P95: "var(--color-chart-purple)",
+  P99: "var(--color-chart-red)",
+};
+
 interface StatItem {
   label: string;
   value: string;
   subLabel?: string;
+  color?: string;
 }
 
 function buildStatItems(stats: DescriptiveStats, fmt: (v: number) => string): StatItem[] {
-  return [
+  const items: StatItem[] = [
     { label: "Mean", value: fmt(stats.mean) },
     { label: "Median (P50)", value: fmt(stats.median) },
     { label: "Min", value: fmt(stats.min) },
@@ -54,6 +78,11 @@ function buildStatItems(stats: DescriptiveStats, fmt: (v: number) => string): St
     },
     { label: "Skewness", value: formatSkewness(stats.skewness) },
   ];
+  for (const item of items) {
+    const c = STAT_LABEL_COLORS[item.label];
+    if (c) item.color = c;
+  }
+  return items;
 }
 
 export function StatisticsSummary({ entries }: Props) {
@@ -100,15 +129,128 @@ export function StatisticsSummary({ entries }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <DistributionChart
+        entries={entries}
+        metric={metric}
+        metricConfig={metricConfig}
+        stats={stats}
+      />
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
         {items.map((item) => (
           <div key={item.label}>
-            <p className="text-xs text-text-secondary uppercase tracking-wide">{item.label}</p>
+            <p
+              className="text-xs uppercase tracking-wide flex items-center gap-1.5"
+              style={{ color: item.color ?? "var(--color-text-secondary)" }}
+            >
+              {item.color && (
+                <span
+                  className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: item.color }}
+                />
+              )}
+              {item.label}
+            </p>
             <p className="text-lg font-semibold mt-0.5 text-text-primary">{item.value}</p>
             {item.subLabel && <p className="text-xs text-text-secondary mt-0.5">{item.subLabel}</p>}
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+const PERCENTILE_LINES = [
+  { rank: 50, label: "P50", color: "var(--color-chart-green)" },
+  { rank: 90, label: "P90", color: "var(--color-chart-orange)" },
+  { rank: 95, label: "P95", color: "var(--color-chart-purple)" },
+  { rank: 99, label: "P99", color: "var(--color-chart-red)" },
+] as const;
+
+function DistributionChart({
+  entries,
+  metric,
+  metricConfig,
+  stats,
+}: {
+  entries: NormalizedEntry[];
+  metric: StatMetricKey;
+  metricConfig: MetricConfig;
+  stats: DescriptiveStats;
+}) {
+  const chartData = useMemo(() => buildDistribution(entries, metric), [entries, metric]);
+
+  if (chartData.length < 2) return null;
+
+  const percentileValues: Record<number, number> = {
+    50: stats.median,
+    90: stats.p90,
+    95: stats.p95,
+    99: stats.p99,
+  };
+
+  return (
+    <div className="mb-2">
+      <p className="text-xs text-text-secondary mb-2">Distribution (sorted ascending)</p>
+      <ResponsiveContainer width="100%" height={240}>
+        <AreaChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+          <XAxis
+            dataKey="rank"
+            type="number"
+            domain={[0, 100]}
+            tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v: number) => `${v}%`}
+            label={{
+              value: "Percentile",
+              position: "insideBottomRight",
+              offset: -5,
+              style: { fontSize: 11, fill: "var(--color-text-secondary)" },
+            }}
+          />
+          <YAxis
+            tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v: number) => metricConfig.format(v)}
+            width={80}
+          />
+          <Tooltip
+            formatter={(value) => [metricConfig.format(Number(value ?? 0)), metricConfig.label]}
+            labelFormatter={(rank) => `Percentile: ${rank}%`}
+            contentStyle={{
+              backgroundColor: "var(--color-bg-card)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "8px",
+              fontSize: 12,
+            }}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            fill="var(--color-chart-blue)"
+            stroke="var(--color-chart-blue)"
+            fillOpacity={0.15}
+            strokeWidth={2}
+          />
+          {PERCENTILE_LINES.map(({ rank, label, color }) => (
+            <ReferenceLine
+              key={rank}
+              x={rank}
+              stroke={color}
+              strokeDasharray="4 3"
+              strokeWidth={1.5}
+              label={{
+                value: `${label} ${metricConfig.format(percentileValues[rank])}`,
+                position: "top",
+                style: { fontSize: 10, fill: color },
+              }}
+            />
+          ))}
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }

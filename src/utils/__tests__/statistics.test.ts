@@ -4,6 +4,7 @@ import {
   computeStats,
   extractMetric,
   computeAllStats,
+  buildDistribution,
   STAT_METRIC_KEYS,
 } from "../statistics";
 import type { NormalizedEntry } from "../normalize";
@@ -249,6 +250,46 @@ describe("computeAllStats", () => {
 
     for (const key of STAT_METRIC_KEYS) {
       expect(result[key].count).toBe(5);
+    }
+  });
+});
+
+describe("buildDistribution", () => {
+  it("returns empty array for empty entries", () => {
+    expect(buildDistribution([], "cost")).toEqual([]);
+  });
+
+  it("returns single point at rank 100 for one entry", () => {
+    const entries = [makeEntry("a", { cost: 5 })];
+    const result = buildDistribution(entries, "cost");
+    expect(result).toEqual([{ rank: 100, value: 5 }]);
+  });
+
+  it("returns sorted values with percentile ranks", () => {
+    const entries = [
+      makeEntry("a", { cost: 30 }),
+      makeEntry("b", { cost: 10 }),
+      makeEntry("c", { cost: 20 }),
+    ];
+    const result = buildDistribution(entries, "cost");
+
+    expect(result).toHaveLength(3);
+    expect(result[0]).toEqual({ rank: 0, value: 10 });
+    expect(result[1]).toEqual({ rank: 50, value: 20 });
+    expect(result[2]).toEqual({ rank: 100, value: 30 });
+  });
+
+  it("ranks range from 0 to 100", () => {
+    const entries = Array.from({ length: 5 }, (_, i) =>
+      makeEntry(`e${i}`, { totalTokens: (i + 1) * 100 }),
+    );
+    const result = buildDistribution(entries, "totalTokens");
+
+    expect(result[0].rank).toBe(0);
+    expect(result[result.length - 1].rank).toBe(100);
+    // values should be ascending
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i].value).toBeGreaterThanOrEqual(result[i - 1].value);
     }
   });
 });
