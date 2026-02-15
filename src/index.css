@@ -27,3 +27,66 @@
   --color-text-secondary: oklch(0.65 0 0);
   --color-border: oklch(0.3 0.01 260);
 }
+
+/* Range slider */
+.range-slider input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  height: 6px;
+  background: none;
+  outline: none;
+  margin: 0;
+}
+
+.range-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: grab;
+  border: 2px solid var(--color-bg-card);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.2);
+}
+
+.range-slider input[type="range"]::-webkit-slider-thumb:hover {
+  background: var(--color-accent-hover);
+}
+
+.range-slider input[type="range"]::-moz-range-thumb {
+  pointer-events: auto;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: grab;
+  border: 2px solid var(--color-bg-card);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.2);
+}
+
+.range-slider input[type="range"]::-moz-range-thumb:hover {
+  background: var(--color-accent-hover);
+}
+
+.range-slider input[type="range"]::-moz-range-track {
+  background: none;
+  border: none;
+}
+
+.range-slider .range-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-bg-secondary);
+}
+
+.range-slider .range-filled {
+  position: absolute;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-accent);
+  opacity: 0.4;
+}

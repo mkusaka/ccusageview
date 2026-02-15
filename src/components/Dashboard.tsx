@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { ReportType } from "../types";
 import type { DashboardData } from "../utils/normalize";
-import { aggregateToMonthly } from "../utils/normalize";
+import { aggregateToMonthly, computeTotalsFromEntries } from "../utils/normalize";
 import { SummaryCards } from "./SummaryCards";
 import { CostChart } from "./CostChart";
 import { TokenChart } from "./TokenChart";
@@ -10,6 +10,7 @@ import { ActivityHeatmap } from "./ActivityHeatmap";
 import { DataTable } from "./DataTable";
 import { StatisticsSummary } from "./StatisticsSummary";
 import { CopyImageButton } from "./CopyImageButton";
+import { RangeSlider } from "./RangeSlider";
 
 interface Props {
   data: DashboardData;
@@ -41,7 +42,29 @@ export function Dashboard({ data }: Props) {
   // Pick entries based on the active granularity
   const entries = canToggleGranularity && granularity === "monthly" ? monthlyEntries : dailyEntries;
 
-  const hasModelBreakdowns = entries.some((e) => e.modelBreakdowns && e.modelBreakdowns.length > 0);
+  // Range slider state — reset when entries change (render-time reset pattern)
+  const [range, setRange] = useState<[number, number]>([0, Math.max(0, entries.length - 1)]);
+  const [prevEntries, setPrevEntries] = useState(entries);
+  if (entries !== prevEntries) {
+    setPrevEntries(entries);
+    setRange([0, Math.max(0, entries.length - 1)]);
+  }
+
+  const isFullRange = range[0] === 0 && range[1] === entries.length - 1;
+
+  const filteredEntries = useMemo(
+    () => (isFullRange ? entries : entries.slice(range[0], range[1] + 1)),
+    [entries, range, isFullRange],
+  );
+
+  const filteredTotals = useMemo(
+    () => (isFullRange ? totals : computeTotalsFromEntries(filteredEntries)),
+    [isFullRange, totals, filteredEntries],
+  );
+
+  const hasModelBreakdowns = filteredEntries.some(
+    (e) => e.modelBreakdowns && e.modelBreakdowns.length > 0,
+  );
 
   const showHeatmap = reportType === "daily" || reportType === "weekly";
 
@@ -57,7 +80,7 @@ export function Dashboard({ data }: Props) {
         <span className="inline-block px-2.5 py-0.5 text-xs font-medium bg-accent/10 text-accent rounded-full">
           {displayLabel}
         </span>
-        <span className="text-sm text-text-secondary">{entries.length} entries</span>
+        <span className="text-sm text-text-secondary">{filteredEntries.length} entries</span>
         {sourceLabels.length > 0 && (
           <span className="text-xs text-text-secondary">Sources: {sourceLabels.join(", ")}</span>
         )}
@@ -84,22 +107,33 @@ export function Dashboard({ data }: Props) {
         )}
       </div>
 
+      {entries.length > 1 && (
+        <RangeSlider
+          count={entries.length}
+          start={range[0]}
+          end={range[1]}
+          startLabel={entries[range[0]]?.label ?? ""}
+          endLabel={entries[range[1]]?.label ?? ""}
+          onChange={(s, e) => setRange([s, e])}
+        />
+      )}
+
       <div ref={dashboardRef} className="space-y-4">
-        <SummaryCards totals={totals} entryCount={entries.length} />
+        <SummaryCards totals={filteredTotals} entryCount={filteredEntries.length} />
 
-        {entries.length >= 2 && <StatisticsSummary entries={entries} />}
+        {filteredEntries.length >= 2 && <StatisticsSummary entries={filteredEntries} />}
 
-        {entries.length > 0 && (
+        {filteredEntries.length > 0 && (
           <>
             {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
-            <CostChart entries={entries} />
-            <TokenChart entries={entries} />
-            {hasModelBreakdowns && <ModelBreakdown entries={entries} />}
+            <CostChart entries={filteredEntries} />
+            <TokenChart entries={filteredEntries} />
+            {hasModelBreakdowns && <ModelBreakdown entries={filteredEntries} />}
           </>
         )}
       </div>
 
-      {entries.length > 0 && <DataTable entries={entries} />}
+      {filteredEntries.length > 0 && <DataTable entries={filteredEntries} />}
     </div>
   );
 }
