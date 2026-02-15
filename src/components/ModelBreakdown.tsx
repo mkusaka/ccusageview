@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef } from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { ModelBreakdown as ModelBreakdownType } from "../types";
 import { aggregateModelBreakdowns } from "../utils/aggregate";
 import { formatCost, formatTokens } from "../utils/format";
 import { CopyImageButton } from "./CopyImageButton";
@@ -19,6 +20,7 @@ const COLORS = [
 ];
 
 type Metric = keyof typeof METRICS;
+type SortDir = "asc" | "desc";
 
 const METRICS = {
   cost: { label: "Cost", format: (v: number) => formatCost(v), key: "cost" as const },
@@ -43,6 +45,59 @@ const METRICS = {
     key: "cacheReadTokens" as const,
   },
 } as const;
+
+interface TableColumn {
+  key: string;
+  label: string;
+  align: "left" | "right";
+  render: (m: ModelBreakdownType) => string;
+  sortValue: (m: ModelBreakdownType) => number | string;
+}
+
+const TABLE_COLUMNS: TableColumn[] = [
+  {
+    key: "modelName",
+    label: "Model",
+    align: "left",
+    render: (m) => m.modelName,
+    sortValue: (m) => m.modelName,
+  },
+  {
+    key: "inputTokens",
+    label: "Input",
+    align: "right",
+    render: (m) => formatTokens(m.inputTokens),
+    sortValue: (m) => m.inputTokens,
+  },
+  {
+    key: "outputTokens",
+    label: "Output",
+    align: "right",
+    render: (m) => formatTokens(m.outputTokens),
+    sortValue: (m) => m.outputTokens,
+  },
+  {
+    key: "cacheCreationTokens",
+    label: "Cache Create",
+    align: "right",
+    render: (m) => formatTokens(m.cacheCreationTokens),
+    sortValue: (m) => m.cacheCreationTokens,
+  },
+  {
+    key: "cacheReadTokens",
+    label: "Cache Read",
+    align: "right",
+    render: (m) => formatTokens(m.cacheReadTokens),
+    sortValue: (m) => m.cacheReadTokens,
+  },
+  {
+    key: "cost",
+    label: "Cost",
+    align: "right",
+    render: (m) => formatCost(m.cost),
+    sortValue: (m) => m.cost,
+  },
+];
 
 interface PieDataItem {
   name: string;
@@ -79,14 +134,35 @@ function CustomPieTooltip({
 export function ModelBreakdown({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<Metric>("cost");
+  const [sortCol, setSortCol] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const models = useMemo(() => aggregateModelBreakdowns(entries), [entries]);
 
-  // Sort by the selected metric (descending)
-  const sortedModels = useMemo(
-    () => models.toSorted((a, b) => b[metric] - a[metric]),
-    [models, metric],
-  );
+  // Sort by clicked column, or by selected metric (descending) as default
+  const sortedModels = useMemo(() => {
+    if (sortCol) {
+      const col = TABLE_COLUMNS.find((c) => c.key === sortCol);
+      if (col) {
+        return models.toSorted((a, b) => {
+          const va = col.sortValue(a);
+          const vb = col.sortValue(b);
+          const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+          return sortDir === "asc" ? cmp : -cmp;
+        });
+      }
+    }
+    return models.toSorted((a, b) => b[metric] - a[metric]);
+  }, [models, metric, sortCol, sortDir]);
+
+  function handleSort(key: string) {
+    if (sortCol === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortCol(key);
+      setSortDir("asc");
+    }
+  }
 
   if (sortedModels.length === 0) return null;
 
@@ -110,7 +186,10 @@ export function ModelBreakdown({ entries }: Props) {
           {(Object.keys(METRICS) as Metric[]).map((key) => (
             <button
               key={key}
-              onClick={() => setMetric(key)}
+              onClick={() => {
+                setMetric(key);
+                setSortCol(null);
+              }}
               className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
                 metric === key
                   ? "bg-bg-card text-text-primary shadow-sm"
@@ -168,24 +247,36 @@ export function ModelBreakdown({ entries }: Props) {
         <div className="flex-1 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-text-secondary">
-                <th className="py-2 pr-4 font-medium">Model</th>
-                <th className="py-2 pr-4 font-medium text-right">Input</th>
-                <th className="py-2 pr-4 font-medium text-right">Output</th>
-                <th className="py-2 pr-4 font-medium text-right">Cache Create</th>
-                <th className="py-2 pr-4 font-medium text-right">Cache Read</th>
-                <th className="py-2 font-medium text-right">Cost</th>
+              <tr className="border-b border-border">
+                {TABLE_COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    onClick={() => handleSort(col.key)}
+                    className={`py-2 pr-4 font-medium text-text-secondary cursor-pointer hover:text-text-primary select-none whitespace-nowrap ${
+                      col.align === "right" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {col.label}
+                    {sortCol === col.key && (
+                      <span className="ml-1">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
+                    )}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {sortedModels.map((m) => (
                 <tr key={m.modelName} className="border-b border-border/50 text-text-primary">
-                  <td className="py-2 pr-4 font-mono text-xs">{m.modelName}</td>
-                  <td className="py-2 pr-4 text-right">{formatTokens(m.inputTokens)}</td>
-                  <td className="py-2 pr-4 text-right">{formatTokens(m.outputTokens)}</td>
-                  <td className="py-2 pr-4 text-right">{formatTokens(m.cacheCreationTokens)}</td>
-                  <td className="py-2 pr-4 text-right">{formatTokens(m.cacheReadTokens)}</td>
-                  <td className="py-2 text-right font-medium">{formatCost(m.cost)}</td>
+                  {TABLE_COLUMNS.map((col) => (
+                    <td
+                      key={col.key}
+                      className={`py-2 pr-4 whitespace-nowrap ${
+                        col.align === "right" ? "text-right" : "text-left"
+                      } ${col.key === "modelName" ? "font-mono text-xs" : ""} ${col.key === "cost" ? "font-medium" : ""}`}
+                    >
+                      {col.render(m)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
