@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "preview": "vite preview",
     "cf:dev": "pnpm build && wrangler dev",
+    "cf:upload": "pnpm build && wrangler versions upload",
     "cf:deploy": "pnpm build && wrangler deploy",
     "prepublishOnly": "pnpm build:cli"
   },

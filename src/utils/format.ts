@@ -27,3 +27,19 @@ export function formatMonth(monthStr: string): string {
   if (isNaN(d.getTime())) return monthStr;
   return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
+
+// Format a generic stat value with locale-aware commas and up to `decimals` fractional digits
+export function formatStatValue(value: number, decimals = 2): string {
+  if (!Number.isFinite(value)) return "N/A";
+  return value.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimals,
+  });
+}
+
+// Format skewness with a directional label
+export function formatSkewness(value: number): string {
+  if (!Number.isFinite(value)) return "N/A";
+  const label = Math.abs(value) < 0.1 ? "symmetric" : value > 0 ? "right-skewed" : "left-skewed";
+  return `${value.toFixed(2)} (${label})`;
+}

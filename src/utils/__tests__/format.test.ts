@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { formatCost, formatTokens, formatDate, formatMonth } from "../format";
+import {
+  formatCost,
+  formatTokens,
+  formatDate,
+  formatMonth,
+  formatStatValue,
+  formatSkewness,
+} from "../format";
 
 describe("formatCost", () => {
   it("formats small values with 2 decimal places", () => {
@@ -57,5 +64,55 @@ describe("formatMonth", () => {
 
   it("returns input for invalid month strings", () => {
     expect(formatMonth("invalid")).toBe("invalid");
+  });
+});
+
+describe("formatStatValue", () => {
+  it("formats integers with commas", () => {
+    expect(formatStatValue(1234)).toBe("1,234");
+    expect(formatStatValue(1000000)).toBe("1,000,000");
+  });
+
+  it("formats decimals with specified precision", () => {
+    expect(formatStatValue(3.14159, 2)).toBe("3.14");
+    expect(formatStatValue(3.14159, 4)).toBe("3.1416");
+  });
+
+  it("handles zero", () => {
+    expect(formatStatValue(0)).toBe("0");
+  });
+
+  it("handles negative values", () => {
+    expect(formatStatValue(-1234.5, 1)).toBe("-1,234.5");
+  });
+
+  it("returns N/A for NaN", () => {
+    expect(formatStatValue(NaN)).toBe("N/A");
+  });
+
+  it("returns N/A for Infinity", () => {
+    expect(formatStatValue(Infinity)).toBe("N/A");
+    expect(formatStatValue(-Infinity)).toBe("N/A");
+  });
+});
+
+describe("formatSkewness", () => {
+  it("labels positive values as right-skewed", () => {
+    expect(formatSkewness(0.85)).toBe("0.85 (right-skewed)");
+    expect(formatSkewness(2.1)).toBe("2.10 (right-skewed)");
+  });
+
+  it("labels negative values as left-skewed", () => {
+    expect(formatSkewness(-0.85)).toBe("-0.85 (left-skewed)");
+  });
+
+  it("labels near-zero as symmetric", () => {
+    expect(formatSkewness(0)).toBe("0.00 (symmetric)");
+    expect(formatSkewness(0.05)).toBe("0.05 (symmetric)");
+    expect(formatSkewness(-0.09)).toBe("-0.09 (symmetric)");
+  });
+
+  it("handles NaN", () => {
+    expect(formatSkewness(NaN)).toBe("N/A");
   });
 });
