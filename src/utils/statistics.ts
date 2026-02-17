@@ -83,6 +83,65 @@ export function extractMetric(entries: NormalizedEntry[], key: StatMetricKey): n
   return entries.map((e) => e[key]);
 }
 
+/** A metric value paired with the entry label (date) it came from */
+export interface LabeledValue {
+  label: string;
+  value: number;
+}
+
+/** Extract a single metric's values with their source labels */
+export function extractMetricWithLabels(
+  entries: NormalizedEntry[],
+  key: StatMetricKey,
+): LabeledValue[] {
+  return entries.map((e) => ({ label: e.label, value: e[key] }));
+}
+
+/** Extract a single metric's values with labels, filtered by model */
+export function extractMetricByModelWithLabels(
+  entries: NormalizedEntry[],
+  key: StatMetricKey,
+  modelName: string,
+): LabeledValue[] {
+  const result: LabeledValue[] = [];
+  for (const e of entries) {
+    if (!e.modelBreakdowns) continue;
+    const mb = e.modelBreakdowns.find((m) => m.modelName === modelName);
+    if (mb) result.push({ label: e.label, value: getModelMetricValue(mb, key) });
+  }
+  return result;
+}
+
+/**
+ * Find source labels (dates) for stat values that correspond to actual entries.
+ * Returns a map from stat field name to matching labels.
+ */
+export function findStatSourceLabels(
+  labeledValues: LabeledValue[],
+  stats: DescriptiveStats,
+): Partial<Record<string, string[]>> {
+  if (stats.count === 0) return {};
+
+  const fieldsToCheck: { field: string; value: number }[] = [
+    { field: "min", value: stats.min },
+    { field: "max", value: stats.max },
+    { field: "median", value: stats.median },
+    { field: "p75", value: stats.p75 },
+    { field: "p90", value: stats.p90 },
+    { field: "p95", value: stats.p95 },
+    { field: "p99", value: stats.p99 },
+  ];
+
+  const result: Partial<Record<string, string[]>> = {};
+  for (const { field, value } of fieldsToCheck) {
+    const matches = labeledValues.filter((v) => v.value === value).map((v) => v.label);
+    if (matches.length > 0) {
+      result[field] = matches;
+    }
+  }
+  return result;
+}
+
 /**
  * Compute percentile using linear interpolation (PERCENTILE.INC method).
  * Expects a PRE-SORTED ascending array. p must be in [0, 1].
