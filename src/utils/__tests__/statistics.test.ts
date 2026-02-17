@@ -7,10 +7,29 @@ import {
   buildDistribution,
   findStatSources,
   findRankForValue,
+  extractMetricForVisibleModels,
+  extractMetricForVisibleModelsWithLabels,
+  computeAllStatsForVisibleModels,
   STAT_METRIC_KEYS,
 } from "../statistics";
 import type { LabeledValue } from "../statistics";
 import type { NormalizedEntry } from "../normalize";
+import type { ModelBreakdown } from "../../types";
+
+function makeBreakdown(
+  modelName: string,
+  overrides?: Partial<Omit<ModelBreakdown, "modelName">>,
+): ModelBreakdown {
+  return {
+    modelName,
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 0,
+    cost: 0,
+    ...overrides,
+  };
+}
 
 function makeEntry(label: string, overrides?: Partial<NormalizedEntry>): NormalizedEntry {
   return {
@@ -464,5 +483,233 @@ describe("findRankForValue", () => {
     expect(findRankForValue(single, 42)).toBe(100);
     expect(findRankForValue(single, 0)).toBe(100);
     expect(findRankForValue(single, 999)).toBe(100);
+  });
+});
+
+describe("extractMetricForVisibleModels", () => {
+  const entries: NormalizedEntry[] = [
+    makeEntry("day1", {
+      cost: 10,
+      modelBreakdowns: [makeBreakdown("modelA", { cost: 6 }), makeBreakdown("modelB", { cost: 4 })],
+    }),
+    makeEntry("day2", {
+      cost: 20,
+      modelBreakdowns: [
+        makeBreakdown("modelA", { cost: 12 }),
+        makeBreakdown("modelB", { cost: 8 }),
+      ],
+    }),
+    makeEntry("day3", { cost: 5 }), // no breakdowns ("Other")
+  ];
+
+  it("returns all visible models' values summed per entry", () => {
+    const visible = new Set(["modelA", "modelB"]);
+    const result = extractMetricForVisibleModels(entries, "cost", visible, false);
+    // day1: 6+4=10, day2: 12+8=20, day3 skipped (no breakdowns, Other=false)
+    expect(result).toEqual([10, 20]);
+  });
+
+  it("filters to a single model", () => {
+    const visible = new Set(["modelA"]);
+    const result = extractMetricForVisibleModels(entries, "cost", visible, false);
+    expect(result).toEqual([6, 12]);
+  });
+
+  it("includes Other entries when includeOther is true", () => {
+    const visible = new Set(["modelA"]);
+    const result = extractMetricForVisibleModels(entries, "cost", visible, true);
+    // day1: modelA=6, day2: modelA=12, day3: Other=5
+    expect(result).toEqual([6, 12, 5]);
+  });
+
+  it("returns only Other entries when no model names match", () => {
+    const visible = new Set(["nonexistent"]);
+    const result = extractMetricForVisibleModels(entries, "cost", visible, true);
+    // day1 & day2: no match, day3: Other=5
+    expect(result).toEqual([5]);
+  });
+
+  it("returns empty array when nothing matches", () => {
+    const visible = new Set(["nonexistent"]);
+    const result = extractMetricForVisibleModels(entries, "cost", visible, false);
+    expect(result).toEqual([]);
+  });
+
+  it("sums totalTokens from model breakdown fields", () => {
+    const ents = [
+      makeEntry("x", {
+        totalTokens: 999, // aggregate (should not be used)
+        modelBreakdowns: [
+          makeBreakdown("modelA", {
+            inputTokens: 10,
+            outputTokens: 20,
+            cacheCreationTokens: 5,
+            cacheReadTokens: 3,
+          }),
+        ],
+      }),
+    ];
+    const visible = new Set(["modelA"]);
+    const result = extractMetricForVisibleModels(ents, "totalTokens", visible, false);
+    // totalTokens = input + output + cacheCreation + cacheRead = 10+20+5+3 = 38
+    expect(result).toEqual([38]);
+  });
+
+  it("skips entries where no visible model appears in breakdowns", () => {
+    const ents = [
+      makeEntry("a", {
+        cost: 10,
+        modelBreakdowns: [makeBreakdown("modelA", { cost: 10 })],
+      }),
+      makeEntry("b", {
+        cost: 20,
+        modelBreakdowns: [makeBreakdown("modelB", { cost: 20 })],
+      }),
+    ];
+    const visible = new Set(["modelA"]);
+    const result = extractMetricForVisibleModels(ents, "cost", visible, false);
+    // Only entry "a" has modelA
+    expect(result).toEqual([10]);
+  });
+});
+
+describe("extractMetricForVisibleModelsWithLabels", () => {
+  const entries: NormalizedEntry[] = [
+    makeEntry("day1", {
+      cost: 10,
+      modelBreakdowns: [makeBreakdown("modelA", { cost: 6 }), makeBreakdown("modelB", { cost: 4 })],
+    }),
+    makeEntry("day2", {
+      cost: 20,
+      modelBreakdowns: [makeBreakdown("modelA", { cost: 12 })],
+    }),
+    makeEntry("day3", { cost: 5 }),
+  ];
+
+  it("returns labeled values for visible models", () => {
+    const visible = new Set(["modelA"]);
+    const result = extractMetricForVisibleModelsWithLabels(entries, "cost", visible, false);
+    expect(result).toEqual([
+      { label: "day1", value: 6 },
+      { label: "day2", value: 12 },
+    ]);
+  });
+
+  it("includes Other entries with labels", () => {
+    const visible = new Set(["modelA"]);
+    const result = extractMetricForVisibleModelsWithLabels(entries, "cost", visible, true);
+    expect(result).toEqual([
+      { label: "day1", value: 6 },
+      { label: "day2", value: 12 },
+      { label: "day3", value: 5 },
+    ]);
+  });
+
+  it("sums multiple visible models per entry", () => {
+    const visible = new Set(["modelA", "modelB"]);
+    const result = extractMetricForVisibleModelsWithLabels(entries, "cost", visible, false);
+    expect(result).toEqual([
+      { label: "day1", value: 10 }, // 6+4
+      { label: "day2", value: 12 }, // only modelA
+    ]);
+  });
+});
+
+describe("computeAllStatsForVisibleModels", () => {
+  const entries: NormalizedEntry[] = [
+    makeEntry("day1", {
+      cost: 10,
+      inputTokens: 100,
+      modelBreakdowns: [
+        makeBreakdown("modelA", { cost: 6, inputTokens: 60 }),
+        makeBreakdown("modelB", { cost: 4, inputTokens: 40 }),
+      ],
+    }),
+    makeEntry("day2", {
+      cost: 20,
+      inputTokens: 200,
+      modelBreakdowns: [
+        makeBreakdown("modelA", { cost: 12, inputTokens: 120 }),
+        makeBreakdown("modelB", { cost: 8, inputTokens: 80 }),
+      ],
+    }),
+    makeEntry("day3", {
+      cost: 30,
+      inputTokens: 300,
+      modelBreakdowns: [
+        makeBreakdown("modelA", { cost: 18, inputTokens: 180 }),
+        makeBreakdown("modelB", { cost: 12, inputTokens: 120 }),
+      ],
+    }),
+  ];
+
+  it("returns stats for all 6 metrics filtered to visible models", () => {
+    const visible = new Set(["modelA"]);
+    const result = computeAllStatsForVisibleModels(entries, visible, false);
+
+    for (const key of STAT_METRIC_KEYS) {
+      expect(result[key]).toBeDefined();
+      expect(result[key].count).toBe(3);
+    }
+
+    // modelA cost: [6, 12, 18] → mean = 12
+    expect(result.cost.mean).toBe(12);
+    expect(result.cost.min).toBe(6);
+    expect(result.cost.max).toBe(18);
+
+    // modelA inputTokens: [60, 120, 180] → mean = 120
+    expect(result.inputTokens.mean).toBe(120);
+  });
+
+  it("computes correct stats when filtering to single model", () => {
+    const visible = new Set(["modelB"]);
+    const result = computeAllStatsForVisibleModels(entries, visible, false);
+
+    // modelB cost: [4, 8, 12] → mean = 8
+    expect(result.cost.mean).toBe(8);
+    expect(result.cost.min).toBe(4);
+    expect(result.cost.max).toBe(12);
+  });
+
+  it("sums multiple visible models per entry", () => {
+    const visible = new Set(["modelA", "modelB"]);
+    const result = computeAllStatsForVisibleModels(entries, visible, false);
+
+    // Combined cost: [10, 20, 30] → mean = 20
+    expect(result.cost.mean).toBe(20);
+    expect(result.cost.min).toBe(10);
+    expect(result.cost.max).toBe(30);
+  });
+
+  it("includes Other entries when includeOther is true", () => {
+    const entriesWithOther = [
+      ...entries,
+      makeEntry("day4", { cost: 50, inputTokens: 500 }), // no breakdowns
+    ];
+    const visible = new Set(["modelA"]);
+    const result = computeAllStatsForVisibleModels(entriesWithOther, visible, true);
+
+    // modelA costs: [6, 12, 18] + Other: [50] = 4 entries
+    expect(result.cost.count).toBe(4);
+    // mean = (6 + 12 + 18 + 50) / 4 = 21.5
+    expect(result.cost.mean).toBe(21.5);
+  });
+
+  it("excludes Other entries when includeOther is false", () => {
+    const entriesWithOther = [...entries, makeEntry("day4", { cost: 50, inputTokens: 500 })];
+    const visible = new Set(["modelA"]);
+    const result = computeAllStatsForVisibleModels(entriesWithOther, visible, false);
+
+    expect(result.cost.count).toBe(3);
+    expect(result.cost.mean).toBe(12);
+  });
+
+  it("returns zero-stats when no models match", () => {
+    const visible = new Set(["nonexistent"]);
+    const result = computeAllStatsForVisibleModels(entries, visible, false);
+
+    for (const key of STAT_METRIC_KEYS) {
+      expect(result[key].count).toBe(0);
+    }
   });
 });

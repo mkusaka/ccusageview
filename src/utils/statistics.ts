@@ -50,6 +50,79 @@ export function computeAllStatsByModel(
   return result;
 }
 
+/**
+ * Extract a single metric's values from entries, filtered to a set of visible models.
+ * Sums the visible models' breakdown values per entry.
+ * Entries without breakdowns are included when includeOther is true.
+ */
+export function extractMetricForVisibleModels(
+  entries: NormalizedEntry[],
+  key: StatMetricKey,
+  visibleModels: Set<string>,
+  includeOther: boolean,
+): number[] {
+  const values: number[] = [];
+  for (const e of entries) {
+    if (!e.modelBreakdowns || e.modelBreakdowns.length === 0) {
+      if (includeOther) values.push(e[key]);
+      continue;
+    }
+    let sum = 0;
+    let found = false;
+    for (const mb of e.modelBreakdowns) {
+      if (visibleModels.has(mb.modelName)) {
+        sum += getModelMetricValue(mb, key);
+        found = true;
+      }
+    }
+    if (found) values.push(sum);
+  }
+  return values;
+}
+
+/** Extract metric values with labels for a set of visible models */
+export function extractMetricForVisibleModelsWithLabels(
+  entries: NormalizedEntry[],
+  key: StatMetricKey,
+  visibleModels: Set<string>,
+  includeOther: boolean,
+): LabeledValue[] {
+  const result: LabeledValue[] = [];
+  for (const e of entries) {
+    if (!e.modelBreakdowns || e.modelBreakdowns.length === 0) {
+      if (includeOther) result.push({ label: e.label, value: e[key] });
+      continue;
+    }
+    let sum = 0;
+    let found = false;
+    for (const mb of e.modelBreakdowns) {
+      if (visibleModels.has(mb.modelName)) {
+        sum += getModelMetricValue(mb, key);
+        found = true;
+      }
+    }
+    if (found) result.push({ label: e.label, value: sum });
+  }
+  return result;
+}
+
+/**
+ * Compute descriptive statistics for each metric, filtered to visible models.
+ */
+export function computeAllStatsForVisibleModels(
+  entries: NormalizedEntry[],
+  visibleModels: Set<string>,
+  includeOther: boolean,
+): Record<StatMetricKey, DescriptiveStats> {
+  const result = {} as Record<StatMetricKey, DescriptiveStats>;
+  for (const key of STAT_METRIC_KEYS) {
+    result[key] = computeStats(
+      extractMetricForVisibleModels(entries, key, visibleModels, includeOther),
+    );
+  }
+  return result;
+}
+
 export const STAT_METRIC_KEYS: readonly StatMetricKey[] = [
   "cost",
   "totalTokens",
