@@ -112,13 +112,10 @@ export function extractMetricByModelWithLabels(
   return result;
 }
 
-/** Source info for a stat value: either an exact match or interpolated between two entries */
-export interface StatSource {
-  /** "exact" when the stat value matches an actual entry, "interpolated" when between two */
-  type: "exact" | "interpolated";
-  /** For exact: all entries matching this value. For interpolated: the two bounding entries [lo, hi]. */
-  labels: string[];
-}
+/** Source info for a stat value: either an exact match or interpolated between two value groups */
+export type StatSource =
+  | { type: "exact"; labels: string[] }
+  | { type: "interpolated"; loLabels: string[]; hiLabels: string[] };
 
 /**
  * Find source labels (dates) for stat values.
@@ -160,18 +157,21 @@ export function findStatSources(
     const lo = Math.floor(rank);
     const hi = Math.ceil(rank);
 
-    if (lo === hi) {
-      // Exact: percentile lands on a specific entry
-      const val = sorted[lo].value;
+    const loVal = sorted[lo].value;
+    const hiVal = sorted[hi].value;
+
+    if (lo === hi || loVal === hiVal) {
+      // Exact: percentile lands on a specific value (or interpolation between same values)
       result[field] = {
         type: "exact",
-        labels: sorted.filter((v) => v.value === val).map((v) => v.label),
+        labels: sorted.filter((v) => v.value === loVal).map((v) => v.label),
       };
     } else {
-      // Interpolated: between two entries
+      // Interpolated: between two distinct value groups
       result[field] = {
         type: "interpolated",
-        labels: [sorted[lo].label, sorted[hi].label],
+        loLabels: sorted.filter((v) => v.value === loVal).map((v) => v.label),
+        hiLabels: sorted.filter((v) => v.value === hiVal).map((v) => v.label),
       };
     }
   }

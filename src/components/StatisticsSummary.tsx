@@ -47,13 +47,17 @@ const METRICS: Record<StatMetricKey, MetricConfig> = {
 
 const METRIC_KEYS = Object.keys(METRICS) as StatMetricKey[];
 
+function truncateLabels(labels: string[]): string {
+  if (labels.length <= 3) return labels.join(", ");
+  return `${labels.slice(0, 3).join(", ")} (+${labels.length - 3})`;
+}
+
 /** Format source info for tooltip display */
 function formatStatSource(source: StatSource): string {
   if (source.type === "interpolated") {
-    return `${source.labels[0]} 〜 ${source.labels[1]}`;
+    return `${truncateLabels(source.loLabels)} 〜 ${truncateLabels(source.hiLabels)}`;
   }
-  if (source.labels.length <= 3) return source.labels.join(", ");
-  return `${source.labels.slice(0, 3).join(", ")} (+${source.labels.length - 3})`;
+  return truncateLabels(source.labels);
 }
 
 /** Color mapping for percentile labels that match chart reference lines */
