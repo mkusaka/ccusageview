@@ -52,6 +52,7 @@ export function TokenChart({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("type");
   const [tokenType, setTokenType] = useState<ModelTokenType>("inputTokens");
+  const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
 
   const toggleSeries = (key: string) => {
@@ -85,30 +86,45 @@ export function TokenChart({ entries }: Props) {
           <h3 className="text-sm font-medium text-text-secondary">Token Breakdown</h3>
           <CopyImageButton targetRef={chartRef} />
         </div>
-        {hasModelData && (
+        <div className="flex items-center gap-1">
+          {hasModelData && (
+            <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+              <button
+                onClick={() => setViewMode("type")}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === "type"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Type
+              </button>
+              <button
+                onClick={() => setViewMode("model")}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === "model"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Model
+              </button>
+            </div>
+          )}
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
             <button
-              onClick={() => setViewMode("type")}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                viewMode === "type"
+              onClick={() => setShowPercent((p) => !p)}
+              className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
+                showPercent
                   ? "bg-bg-card text-text-primary shadow-sm"
                   : "text-text-secondary hover:text-text-primary"
               }`}
+              title="Show as percentage"
             >
-              By Type
-            </button>
-            <button
-              onClick={() => setViewMode("model")}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                viewMode === "model"
-                  ? "bg-bg-card text-text-primary shadow-sm"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              By Model
+              %
             </button>
           </div>
-        )}
+        </div>
       </div>
       {isModelView && (
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 mb-3 w-fit">
@@ -128,7 +144,10 @@ export function TokenChart({ entries }: Props) {
         </div>
       )}
       <ResponsiveContainer width="100%" height={380}>
-        <BarChart data={isModelView ? modelChartData : entries}>
+        <BarChart
+          data={isModelView ? modelChartData : entries}
+          stackOffset={showPercent ? "expand" : undefined}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
           <XAxis
             dataKey="label"
@@ -140,16 +159,61 @@ export function TokenChart({ entries }: Props) {
             tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(v: number) => formatTokens(v)}
+            tickFormatter={
+              showPercent
+                ? (v: number) => `${(v * 100).toFixed(0)}%`
+                : (v: number) => formatTokens(v)
+            }
+            domain={showPercent ? [0, 1] : undefined}
           />
           <Tooltip
-            formatter={(value, name) => [formatTokens(Number(value ?? 0)), String(name)]}
-            contentStyle={{
-              backgroundColor: "var(--color-bg-card)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "8px",
-              fontSize: 12,
-            }}
+            content={
+              showPercent
+                ? ({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null;
+                    const total = payload.reduce(
+                      (s, p) => s + Number(p.payload?.[String(p.dataKey)] ?? 0),
+                      0,
+                    );
+                    return (
+                      <div
+                        className="px-2.5 py-1.5 rounded-lg text-xs shadow-lg"
+                        style={{
+                          backgroundColor: "var(--color-bg-card)",
+                          border: "1px solid var(--color-border)",
+                        }}
+                      >
+                        <p className="text-text-primary font-medium mb-0.5">{label}</p>
+                        {payload.map((p) => {
+                          const raw = Number(p.payload?.[String(p.dataKey)] ?? 0);
+                          const pct = total > 0 ? (raw / total) * 100 : 0;
+                          return (
+                            <p key={String(p.dataKey)} className="text-text-secondary">
+                              <span style={{ color: p.color }}>■</span> {p.name}: {pct.toFixed(1)}%
+                              ({formatTokens(raw)})
+                            </p>
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+                : undefined
+            }
+            formatter={
+              showPercent
+                ? undefined
+                : (value, name) => [formatTokens(Number(value ?? 0)), String(name)]
+            }
+            contentStyle={
+              showPercent
+                ? undefined
+                : {
+                    backgroundColor: "var(--color-bg-card)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "8px",
+                    fontSize: 12,
+                  }
+            }
           />
           <Legend
             content={() => {
