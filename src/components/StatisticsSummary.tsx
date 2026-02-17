@@ -12,18 +12,18 @@ import {
 import type { NormalizedEntry } from "../utils/normalize";
 import {
   computeAllStats,
-  computeAllStatsByModel,
+  computeAllStatsForVisibleModels,
   buildDistribution,
   buildDistributionFromValues,
-  extractMetricByModel,
+  extractMetricForVisibleModels,
   extractMetricWithLabels,
-  extractMetricByModelWithLabels,
+  extractMetricForVisibleModelsWithLabels,
   findStatSources,
   findRankForValue,
   type StatMetricKey,
   type DescriptiveStats,
 } from "../utils/statistics";
-import { collectModels, shortenModelName } from "../utils/chart";
+import { collectModels, buildModelSeries, MODEL_COLORS } from "../utils/chart";
 import { formatCost, formatTokens, formatSkewness } from "../utils/format";
 import { CopyImageButton } from "./CopyImageButton";
 
@@ -124,14 +124,33 @@ function buildStatItems(
 export function StatisticsSummary({ entries }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<StatMetricKey>("cost");
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
+  const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
+
+  const toggleModel = (key: string) => {
+    setHiddenModels((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const models = useMemo(() => collectModels(entries), [entries]);
+  const modelSeries = useMemo(
+    () => buildModelSeries(models, entries, MODEL_COLORS),
+    [models, entries],
+  );
+
+  const visibleModelNames = useMemo(
+    () => new Set(models.filter((m) => !hiddenModels.has(m))),
+    [models, hiddenModels],
+  );
+  const includeOther = !hiddenModels.has("Other");
 
   const allStats = useMemo(() => {
-    if (selectedModel) return computeAllStatsByModel(entries, selectedModel);
-    return computeAllStats(entries);
-  }, [entries, selectedModel]);
+    if (hiddenModels.size === 0) return computeAllStats(entries);
+    return computeAllStatsForVisibleModels(entries, visibleModelNames, includeOther);
+  }, [entries, hiddenModels, visibleModelNames, includeOther]);
 
   if (entries.length < 2) {
     return (
@@ -146,11 +165,12 @@ export function StatisticsSummary({ entries }: Props) {
   const metricConfig = METRICS[metric];
 
   const sourceMap = useMemo(() => {
-    const labeled = selectedModel
-      ? extractMetricByModelWithLabels(entries, metric, selectedModel)
-      : extractMetricWithLabels(entries, metric);
+    const labeled =
+      hiddenModels.size === 0
+        ? extractMetricWithLabels(entries, metric)
+        : extractMetricForVisibleModelsWithLabels(entries, metric, visibleModelNames, includeOther);
     return findStatSources(labeled, stats);
-  }, [entries, metric, selectedModel, stats]);
+  }, [entries, metric, hiddenModels, visibleModelNames, includeOther, stats]);
 
   const items = buildStatItems(stats, metricConfig.format, sourceMap);
 
@@ -162,45 +182,59 @@ export function StatisticsSummary({ entries }: Props) {
           <span className="text-xs text-text-secondary">({stats.count} entries)</span>
           <CopyImageButton targetRef={panelRef} />
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {models.length > 0 && (
-            <select
-              value={selectedModel ?? ""}
-              onChange={(e) => setSelectedModel(e.target.value || null)}
-              className="bg-bg-secondary text-text-primary text-xs rounded-md px-2 py-1 border border-border shrink-0"
+        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+          {METRIC_KEYS.map((key) => (
+            <button
+              key={key}
+              onClick={() => setMetric(key)}
+              className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
+                metric === key
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
             >
-              <option value="">All Models</option>
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {shortenModelName(m)}
-                </option>
-              ))}
-            </select>
-          )}
-          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
-            {METRIC_KEYS.map((key) => (
-              <button
-                key={key}
-                onClick={() => setMetric(key)}
-                className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
-                  metric === key
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                {METRICS[key].label}
-              </button>
-            ))}
-          </div>
+              {METRICS[key].label}
+            </button>
+          ))}
         </div>
       </div>
+
+      {modelSeries.length > 0 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-3">
+          {modelSeries.map((s) => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => toggleModel(s.key)}
+              className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+              style={{
+                opacity: hiddenModels.has(s.key) ? 0.3 : 1,
+                fontSize: "inherit",
+                color: "inherit",
+                textDecoration: hiddenModels.has(s.key) ? "line-through" : "none",
+              }}
+            >
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  backgroundColor: s.color,
+                  display: "inline-block",
+                }}
+              />
+              <span style={{ color: "var(--color-text-secondary)" }}>{s.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <DistributionChart
         entries={entries}
         metric={metric}
         metricConfig={metricConfig}
         stats={stats}
-        selectedModel={selectedModel}
+        hiddenModels={hiddenModels}
+        models={models}
       />
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
@@ -254,20 +288,26 @@ function DistributionChart({
   metric,
   metricConfig,
   stats,
-  selectedModel,
+  hiddenModels,
+  models,
 }: {
   entries: NormalizedEntry[];
   metric: StatMetricKey;
   metricConfig: MetricConfig;
   stats: DescriptiveStats;
-  selectedModel: string | null;
+  hiddenModels: Set<string>;
+  models: string[];
 }) {
   const chartData = useMemo(() => {
-    if (selectedModel) {
-      return buildDistributionFromValues(extractMetricByModel(entries, metric, selectedModel));
+    if (hiddenModels.size === 0) {
+      return buildDistribution(entries, metric);
     }
-    return buildDistribution(entries, metric);
-  }, [entries, metric, selectedModel]);
+    const visibleNames = new Set(models.filter((m) => !hiddenModels.has(m)));
+    const otherVisible = !hiddenModels.has("Other");
+    return buildDistributionFromValues(
+      extractMetricForVisibleModels(entries, metric, visibleNames, otherVisible),
+    );
+  }, [entries, metric, hiddenModels, models]);
 
   const meanRank = useMemo(() => findRankForValue(chartData, stats.mean), [chartData, stats.mean]);
 
