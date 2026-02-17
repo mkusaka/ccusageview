@@ -112,33 +112,70 @@ export function extractMetricByModelWithLabels(
   return result;
 }
 
+/** Source info for a stat value: either an exact match or interpolated between two entries */
+export interface StatSource {
+  /** "exact" when the stat value matches an actual entry, "interpolated" when between two */
+  type: "exact" | "interpolated";
+  /** For exact: all entries matching this value. For interpolated: the two bounding entries [lo, hi]. */
+  labels: string[];
+}
+
 /**
- * Find source labels (dates) for stat values that correspond to actual entries.
- * Returns a map from stat field name to matching labels.
+ * Find source labels (dates) for stat values.
+ * For min/max: always exact matches.
+ * For percentiles: exact if the percentile lands on an entry, otherwise the two bounding entries.
  */
-export function findStatSourceLabels(
+export function findStatSources(
   labeledValues: LabeledValue[],
   stats: DescriptiveStats,
-): Partial<Record<string, string[]>> {
+): Partial<Record<string, StatSource>> {
   if (stats.count === 0) return {};
 
-  const fieldsToCheck: { field: string; value: number }[] = [
-    { field: "min", value: stats.min },
-    { field: "max", value: stats.max },
-    { field: "median", value: stats.median },
-    { field: "p75", value: stats.p75 },
-    { field: "p90", value: stats.p90 },
-    { field: "p95", value: stats.p95 },
-    { field: "p99", value: stats.p99 },
+  const sorted = labeledValues.toSorted((a, b) => a.value - b.value);
+  const n = sorted.length;
+
+  const result: Partial<Record<string, StatSource>> = {};
+
+  // Min and Max are always exact
+  result.min = {
+    type: "exact",
+    labels: sorted.filter((v) => v.value === sorted[0].value).map((v) => v.label),
+  };
+  result.max = {
+    type: "exact",
+    labels: sorted.filter((v) => v.value === sorted[n - 1].value).map((v) => v.label),
+  };
+
+  // Percentiles: check if exact or interpolated
+  const percentiles: { field: string; p: number }[] = [
+    { field: "median", p: 0.5 },
+    { field: "p75", p: 0.75 },
+    { field: "p90", p: 0.9 },
+    { field: "p95", p: 0.95 },
+    { field: "p99", p: 0.99 },
   ];
 
-  const result: Partial<Record<string, string[]>> = {};
-  for (const { field, value } of fieldsToCheck) {
-    const matches = labeledValues.filter((v) => v.value === value).map((v) => v.label);
-    if (matches.length > 0) {
-      result[field] = matches;
+  for (const { field, p } of percentiles) {
+    const rank = p * (n - 1);
+    const lo = Math.floor(rank);
+    const hi = Math.ceil(rank);
+
+    if (lo === hi) {
+      // Exact: percentile lands on a specific entry
+      const val = sorted[lo].value;
+      result[field] = {
+        type: "exact",
+        labels: sorted.filter((v) => v.value === val).map((v) => v.label),
+      };
+    } else {
+      // Interpolated: between two entries
+      result[field] = {
+        type: "interpolated",
+        labels: [sorted[lo].label, sorted[hi].label],
+      };
     }
   }
+
   return result;
 }
 

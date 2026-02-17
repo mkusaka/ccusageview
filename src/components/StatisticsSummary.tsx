@@ -18,9 +18,10 @@ import {
   extractMetricByModel,
   extractMetricWithLabels,
   extractMetricByModelWithLabels,
-  findStatSourceLabels,
+  findStatSources,
   type StatMetricKey,
   type DescriptiveStats,
+  type StatSource,
 } from "../utils/statistics";
 import { collectModels, shortenModelName } from "../utils/chart";
 import { formatCost, formatTokens, formatSkewness } from "../utils/format";
@@ -46,10 +47,13 @@ const METRICS: Record<StatMetricKey, MetricConfig> = {
 
 const METRIC_KEYS = Object.keys(METRICS) as StatMetricKey[];
 
-/** Format source labels for tooltip, truncating if too many */
-function formatSourceLabels(labels: string[]): string {
-  if (labels.length <= 3) return labels.join(", ");
-  return `${labels.slice(0, 3).join(", ")} (+${labels.length - 3})`;
+/** Format source info for tooltip display */
+function formatStatSource(source: StatSource): string {
+  if (source.type === "interpolated") {
+    return `${source.labels[0]} 〜 ${source.labels[1]}`;
+  }
+  if (source.labels.length <= 3) return source.labels.join(", ");
+  return `${source.labels.slice(0, 3).join(", ")} (+${source.labels.length - 3})`;
 }
 
 /** Color mapping for percentile labels that match chart reference lines */
@@ -65,8 +69,8 @@ interface StatItem {
   value: string;
   subLabel?: string;
   color?: string;
-  /** Source labels (dates) for stats that correspond to actual data entries */
-  sourceLabels?: string[];
+  /** Source info for stats that correspond to actual data entries */
+  source?: StatSource;
 }
 
 /** Map from StatItem label to the DescriptiveStats source field name */
@@ -83,7 +87,7 @@ const STAT_SOURCE_FIELD: Record<string, string> = {
 function buildStatItems(
   stats: DescriptiveStats,
   fmt: (v: number) => string,
-  sourceLabelMap: Partial<Record<string, string[]>>,
+  sourceMap: Partial<Record<string, StatSource>>,
 ): StatItem[] {
   const items: StatItem[] = [
     { label: "Mean", value: fmt(stats.mean) },
@@ -112,8 +116,8 @@ function buildStatItems(
     const c = STAT_LABEL_COLORS[item.label];
     if (c) item.color = c;
     const field = STAT_SOURCE_FIELD[item.label];
-    if (field && sourceLabelMap[field]) {
-      item.sourceLabels = sourceLabelMap[field];
+    if (field && sourceMap[field]) {
+      item.source = sourceMap[field];
     }
   }
   return items;
@@ -143,14 +147,14 @@ export function StatisticsSummary({ entries }: Props) {
   const stats = allStats[metric];
   const metricConfig = METRICS[metric];
 
-  const sourceLabelMap = useMemo(() => {
+  const sourceMap = useMemo(() => {
     const labeled = selectedModel
       ? extractMetricByModelWithLabels(entries, metric, selectedModel)
       : extractMetricWithLabels(entries, metric);
-    return findStatSourceLabels(labeled, stats);
+    return findStatSources(labeled, stats);
   }, [entries, metric, selectedModel, stats]);
 
-  const items = buildStatItems(stats, metricConfig.format, sourceLabelMap);
+  const items = buildStatItems(stats, metricConfig.format, sourceMap);
 
   return (
     <div ref={panelRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -203,7 +207,7 @@ export function StatisticsSummary({ entries }: Props) {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
         {items.map((item) => (
-          <div key={item.label} className={item.sourceLabels ? "group/stat relative" : ""}>
+          <div key={item.label} className={item.source ? "group/stat relative" : ""}>
             <p
               className="text-xs uppercase tracking-wide flex items-center gap-1.5"
               style={{ color: item.color ?? "var(--color-text-secondary)" }}
@@ -218,16 +222,16 @@ export function StatisticsSummary({ entries }: Props) {
             </p>
             <p
               className={`text-lg font-semibold mt-0.5 text-text-primary${
-                item.sourceLabels
+                item.source
                   ? " cursor-help underline decoration-dashed decoration-1 decoration-text-secondary/40 underline-offset-4"
                   : ""
               }`}
             >
               {item.value}
             </p>
-            {item.sourceLabels && (
+            {item.source && (
               <div className="pointer-events-none absolute bottom-full left-0 mb-1 hidden group-hover/stat:block z-10 bg-bg-secondary border border-border rounded-md px-2.5 py-1.5 text-xs text-text-secondary whitespace-nowrap shadow-lg">
-                {formatSourceLabels(item.sourceLabels)}
+                {formatStatSource(item.source)}
               </div>
             )}
             {item.subLabel && <p className="text-xs text-text-secondary mt-0.5">{item.subLabel}</p>}
