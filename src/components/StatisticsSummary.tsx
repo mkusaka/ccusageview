@@ -199,8 +199,17 @@ export function StatisticsSummary({ entries }: Props) {
         </div>
       </div>
 
+      <DistributionChart
+        entries={entries}
+        metric={metric}
+        metricConfig={metricConfig}
+        stats={stats}
+        hiddenModels={hiddenModels}
+        models={models}
+      />
+
       {modelSeries.length > 0 && (
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mb-3">
+        <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 text-xs mt-1 mb-3">
           {modelSeries.map((s) => (
             <button
               key={s.key}
@@ -227,15 +236,6 @@ export function StatisticsSummary({ entries }: Props) {
           ))}
         </div>
       )}
-
-      <DistributionChart
-        entries={entries}
-        metric={metric}
-        metricConfig={metricConfig}
-        stats={stats}
-        hiddenModels={hiddenModels}
-        models={models}
-      />
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
         {items.map((item) => (
