@@ -52,6 +52,16 @@ export function TokenChart({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("type");
   const [tokenType, setTokenType] = useState<ModelTokenType>("inputTokens");
+  const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
+
+  const toggleSeries = (key: string) => {
+    setHiddenSeries((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const allModels = useMemo(() => collectModels(entries), [entries]);
   const hasModelData = allModels.length > 0;
@@ -141,19 +151,55 @@ export function TokenChart({ entries }: Props) {
               fontSize: 12,
             }}
           />
-          <Legend wrapperStyle={{ fontSize: 12 }} iconType="square" iconSize={10} />
+          <Legend
+            content={() => {
+              const items = isModelView
+                ? modelSeries.map((s) => ({ key: s.key, name: s.label, color: s.color }))
+                : TYPE_SERIES.map((s) => ({ key: s.key, name: s.name, color: s.color }));
+              return (
+                <div className="flex justify-center gap-4 text-xs mt-1">
+                  {items.map((entry) => (
+                    <button
+                      key={entry.key}
+                      type="button"
+                      onClick={() => toggleSeries(entry.key)}
+                      className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+                      style={{
+                        opacity: hiddenSeries.has(entry.key) ? 0.3 : 1,
+                        fontSize: "inherit",
+                        color: "inherit",
+                        textDecoration: hiddenSeries.has(entry.key) ? "line-through" : "none",
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 10,
+                          height: 10,
+                          backgroundColor: entry.color,
+                          display: "inline-block",
+                        }}
+                      />
+                      <span style={{ color: "var(--color-text-secondary)" }}>{entry.name}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            }}
+          />
           {isModelView
-            ? modelSeries.map((s) => (
-                <Bar
-                  key={s.key}
-                  dataKey={s.key}
-                  name={s.label}
-                  stackId="tokens"
-                  fill={s.color}
-                  fillOpacity={0.85}
-                />
-              ))
-            : TYPE_SERIES.map((s) => (
+            ? modelSeries
+                .filter((s) => !hiddenSeries.has(s.key))
+                .map((s) => (
+                  <Bar
+                    key={s.key}
+                    dataKey={s.key}
+                    name={s.label}
+                    stackId="tokens"
+                    fill={s.color}
+                    fillOpacity={0.85}
+                  />
+                ))
+            : TYPE_SERIES.filter((s) => !hiddenSeries.has(s.key)).map((s) => (
                 <Bar
                   key={s.key}
                   dataKey={s.key}
