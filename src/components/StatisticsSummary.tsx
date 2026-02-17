@@ -54,6 +54,7 @@ function formatSourceLabels(labels: string[]): string {
 
 /** Color mapping for percentile labels that match chart reference lines */
 const STAT_LABEL_COLORS: Record<string, string> = {
+  Mean: "var(--color-chart-teal)",
   "Median (P50)": "var(--color-chart-green)",
   P90: "var(--color-chart-orange)",
   P95: "var(--color-chart-purple)",
@@ -238,12 +239,34 @@ export function StatisticsSummary({ entries }: Props) {
   );
 }
 
+const MEAN_COLOR = "var(--color-chart-teal)";
+
 const PERCENTILE_LINES = [
   { rank: 50, label: "P50", color: "var(--color-chart-green)" },
   { rank: 90, label: "P90", color: "var(--color-chart-orange)" },
   { rank: 95, label: "P95", color: "var(--color-chart-purple)" },
   { rank: 99, label: "P99", color: "var(--color-chart-red)" },
 ] as const;
+
+/** Find the percentile rank for a given value by interpolating through chart data */
+function findRankForValue(
+  chartData: { rank: number; value: number }[],
+  value: number,
+): number | null {
+  if (chartData.length === 0) return null;
+  if (value <= chartData[0].value) return chartData[0].rank;
+  if (value >= chartData[chartData.length - 1].value) return chartData[chartData.length - 1].rank;
+
+  for (let i = 0; i < chartData.length - 1; i++) {
+    if (chartData[i].value <= value && value <= chartData[i + 1].value) {
+      const range = chartData[i + 1].value - chartData[i].value;
+      if (range === 0) return chartData[i].rank;
+      const frac = (value - chartData[i].value) / range;
+      return chartData[i].rank + frac * (chartData[i + 1].rank - chartData[i].rank);
+    }
+  }
+  return null;
+}
 
 function DistributionChart({
   entries,
@@ -264,6 +287,8 @@ function DistributionChart({
     }
     return buildDistribution(entries, metric);
   }, [entries, metric, selectedModel]);
+
+  const meanRank = useMemo(() => findRankForValue(chartData, stats.mean), [chartData, stats.mean]);
 
   if (chartData.length < 2) return null;
 
@@ -320,6 +345,19 @@ function DistributionChart({
             fillOpacity={0.15}
             strokeWidth={2}
           />
+          {meanRank != null && (
+            <ReferenceLine
+              x={meanRank}
+              stroke={MEAN_COLOR}
+              strokeDasharray="4 3"
+              strokeWidth={1.5}
+              label={{
+                value: `Mean ${metricConfig.format(stats.mean)}`,
+                position: "top",
+                style: { fontSize: 10, fill: MEAN_COLOR },
+              }}
+            />
+          )}
           {PERCENTILE_LINES.map(({ rank, label, color }) => (
             <ReferenceLine
               key={rank}
