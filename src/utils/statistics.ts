@@ -83,6 +83,66 @@ export function extractMetric(entries: NormalizedEntry[], key: StatMetricKey): n
   return entries.map((e) => e[key]);
 }
 
+/** A metric value paired with the entry label (date) it came from */
+export interface LabeledValue {
+  label: string;
+  value: number;
+}
+
+/** Extract a single metric's values with their source labels */
+export function extractMetricWithLabels(
+  entries: NormalizedEntry[],
+  key: StatMetricKey,
+): LabeledValue[] {
+  return entries.map((e) => ({ label: e.label, value: e[key] }));
+}
+
+/** Extract a single metric's values with labels, filtered by model */
+export function extractMetricByModelWithLabels(
+  entries: NormalizedEntry[],
+  key: StatMetricKey,
+  modelName: string,
+): LabeledValue[] {
+  const result: LabeledValue[] = [];
+  for (const e of entries) {
+    if (!e.modelBreakdowns) continue;
+    const mb = e.modelBreakdowns.find((m) => m.modelName === modelName);
+    if (mb) result.push({ label: e.label, value: getModelMetricValue(mb, key) });
+  }
+  return result;
+}
+
+/**
+ * Find source labels (dates) for stat values that exactly match actual entries.
+ * Returns a map from stat field name to matching labels.
+ * Only includes entries where the stat value is an exact match (not interpolated).
+ */
+export function findStatSources(
+  labeledValues: LabeledValue[],
+  stats: DescriptiveStats,
+): Partial<Record<string, string[]>> {
+  if (stats.count === 0) return {};
+
+  const fieldsToCheck: { field: string; value: number }[] = [
+    { field: "min", value: stats.min },
+    { field: "max", value: stats.max },
+    { field: "median", value: stats.median },
+    { field: "p75", value: stats.p75 },
+    { field: "p90", value: stats.p90 },
+    { field: "p95", value: stats.p95 },
+    { field: "p99", value: stats.p99 },
+  ];
+
+  const result: Partial<Record<string, string[]>> = {};
+  for (const { field, value } of fieldsToCheck) {
+    const matches = labeledValues.filter((v) => v.value === value).map((v) => v.label);
+    if (matches.length > 0) {
+      result[field] = matches;
+    }
+  }
+  return result;
+}
+
 /**
  * Compute percentile using linear interpolation (PERCENTILE.INC method).
  * Expects a PRE-SORTED ascending array. p must be in [0, 1].
@@ -199,6 +259,23 @@ export function computeAllStats(
 export interface DistributionPoint {
   rank: number; // percentile rank 0–100
   value: number;
+}
+
+/** Find the percentile rank for a given value by interpolating through distribution data */
+export function findRankForValue(chartData: DistributionPoint[], value: number): number | null {
+  if (chartData.length === 0) return null;
+  if (value <= chartData[0].value) return chartData[0].rank;
+  if (value >= chartData[chartData.length - 1].value) return chartData[chartData.length - 1].rank;
+
+  for (let i = 0; i < chartData.length - 1; i++) {
+    if (chartData[i].value <= value && value <= chartData[i + 1].value) {
+      const range = chartData[i + 1].value - chartData[i].value;
+      if (range === 0) return chartData[i].rank;
+      const frac = (value - chartData[i].value) / range;
+      return chartData[i].rank + frac * (chartData[i + 1].rank - chartData[i].rank);
+    }
+  }
+  return null;
 }
 
 /** Build sorted distribution data from raw values */
