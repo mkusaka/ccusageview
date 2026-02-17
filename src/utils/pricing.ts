@@ -102,9 +102,7 @@ export function calculateCostByTokenType(entry: NormalizedEntry): CostByTokenTyp
 }
 
 // Build chart data for cost-by-token-type view
-export function buildCostByTokenType(
-  entries: NormalizedEntry[],
-): {
+export function buildCostByTokenType(entries: NormalizedEntry[]): {
   label: string;
   inputCost: number;
   outputCost: number;
