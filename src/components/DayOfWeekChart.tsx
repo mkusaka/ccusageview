@@ -139,6 +139,7 @@ export function DayOfWeekChart({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<Metric>("cost");
   const [viewMode, setViewMode] = useState<ViewMode>("total");
+  const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
 
   const toggleSeries = (key: string) => {
@@ -182,7 +183,10 @@ export function DayOfWeekChart({ entries }: Props) {
           {hasModelData && (
             <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
               <button
-                onClick={() => setViewMode("total")}
+                onClick={() => {
+                  setViewMode("total");
+                  setShowPercent(false);
+                }}
                 className={`px-2 py-0.5 text-xs rounded transition-colors ${
                   viewMode === "total"
                     ? "bg-bg-card text-text-primary shadow-sm"
@@ -201,6 +205,19 @@ export function DayOfWeekChart({ entries }: Props) {
               >
                 By Model
               </button>
+              {viewMode === "model" && (
+                <button
+                  onClick={() => setShowPercent((p) => !p)}
+                  className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
+                    showPercent
+                      ? "bg-bg-card text-text-primary shadow-sm"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                  title="Show as percentage"
+                >
+                  %
+                </button>
+              )}
             </div>
           )}
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
@@ -225,6 +242,7 @@ export function DayOfWeekChart({ entries }: Props) {
         <BarChart
           data={isModelView ? modelData : data}
           margin={{ top: 10, right: 20, bottom: 0, left: 10 }}
+          stackOffset={isModelView && showPercent ? "expand" : undefined}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis
@@ -237,22 +255,67 @@ export function DayOfWeekChart({ entries }: Props) {
             tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(v: number) => metricConfig.format(v)}
+            tickFormatter={
+              isModelView && showPercent
+                ? (v: number) => `${(v * 100).toFixed(0)}%`
+                : (v: number) => metricConfig.format(v)
+            }
             width={80}
+            domain={isModelView && showPercent ? [0, 1] : undefined}
           />
           {isModelView ? (
             <>
               <Tooltip
-                formatter={(value, name) => [
-                  metricConfig.format(Number(value ?? 0)),
-                  shortenModelName(String(name)),
-                ]}
-                contentStyle={{
-                  backgroundColor: "var(--color-bg-card)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: "8px",
-                  fontSize: 12,
-                }}
+                content={
+                  showPercent
+                    ? ({ active, payload, label }) => {
+                        if (!active || !payload?.length) return null;
+                        const total = payload.reduce(
+                          (s, p) => s + Number(p.payload?.[String(p.dataKey)] ?? 0),
+                          0,
+                        );
+                        return (
+                          <div
+                            className="px-2.5 py-1.5 rounded-lg text-xs shadow-lg"
+                            style={{
+                              backgroundColor: "var(--color-bg-card)",
+                              border: "1px solid var(--color-border)",
+                            }}
+                          >
+                            <p className="text-text-primary font-medium mb-0.5">{label}</p>
+                            {payload.map((p) => {
+                              const raw = Number(p.payload?.[String(p.dataKey)] ?? 0);
+                              const pct = total > 0 ? (raw / total) * 100 : 0;
+                              return (
+                                <p key={String(p.dataKey)} className="text-text-secondary">
+                                  <span style={{ color: p.color }}>■</span> {p.name}:{" "}
+                                  {pct.toFixed(1)}% ({metricConfig.format(raw)})
+                                </p>
+                              );
+                            })}
+                          </div>
+                        );
+                      }
+                    : undefined
+                }
+                formatter={
+                  showPercent
+                    ? undefined
+                    : (value, name) => [
+                        metricConfig.format(Number(value ?? 0)),
+                        shortenModelName(String(name)),
+                      ]
+                }
+                contentStyle={
+                  showPercent
+                    ? undefined
+                    : {
+                        backgroundColor: "var(--color-bg-card)",
+                        border: "1px solid var(--color-border)",
+                        borderRadius: "8px",
+                        fontSize: 12,
+                      }
+                }
               />
               <Legend
                 content={() => (
