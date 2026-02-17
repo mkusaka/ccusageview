@@ -5,8 +5,11 @@ import {
   extractMetric,
   computeAllStats,
   buildDistribution,
+  findStatSources,
+  findRankForValue,
   STAT_METRIC_KEYS,
 } from "../statistics";
+import type { LabeledValue } from "../statistics";
 import type { NormalizedEntry } from "../normalize";
 
 function makeEntry(label: string, overrides?: Partial<NormalizedEntry>): NormalizedEntry {
@@ -291,5 +294,175 @@ describe("buildDistribution", () => {
     for (let i = 1; i < result.length; i++) {
       expect(result[i].value).toBeGreaterThanOrEqual(result[i - 1].value);
     }
+  });
+});
+
+describe("findStatSources", () => {
+  it("returns empty object for empty stats", () => {
+    const stats = computeStats([]);
+    expect(findStatSources([], stats)).toEqual({});
+  });
+
+  it("returns min and max labels for simple case", () => {
+    const labeled: LabeledValue[] = [
+      { label: "2025-01-01", value: 10 },
+      { label: "2025-01-02", value: 20 },
+      { label: "2025-01-03", value: 30 },
+    ];
+    const stats = computeStats(labeled.map((v) => v.value));
+    const sources = findStatSources(labeled, stats);
+
+    expect(sources.min).toEqual(["2025-01-01"]);
+    expect(sources.max).toEqual(["2025-01-03"]);
+  });
+
+  it("returns all labels when multiple entries share min/max", () => {
+    const labeled: LabeledValue[] = [
+      { label: "2025-01-01", value: 5 },
+      { label: "2025-01-02", value: 5 },
+      { label: "2025-01-03", value: 10 },
+      { label: "2025-01-04", value: 10 },
+    ];
+    const stats = computeStats(labeled.map((v) => v.value));
+    const sources = findStatSources(labeled, stats);
+
+    expect(sources.min).toEqual(["2025-01-01", "2025-01-02"]);
+    expect(sources.max).toEqual(["2025-01-03", "2025-01-04"]);
+  });
+
+  it("returns median label when it matches an exact entry (odd count)", () => {
+    const labeled: LabeledValue[] = [
+      { label: "a", value: 1 },
+      { label: "b", value: 2 },
+      { label: "c", value: 3 },
+    ];
+    const stats = computeStats(labeled.map((v) => v.value));
+    const sources = findStatSources(labeled, stats);
+
+    // median of [1,2,3] = 2, which matches entry "b"
+    expect(sources.median).toEqual(["b"]);
+  });
+
+  it("does not return median when interpolated (even count)", () => {
+    const labeled: LabeledValue[] = [
+      { label: "a", value: 1 },
+      { label: "b", value: 2 },
+      { label: "c", value: 3 },
+      { label: "d", value: 4 },
+    ];
+    const stats = computeStats(labeled.map((v) => v.value));
+    const sources = findStatSources(labeled, stats);
+
+    // median of [1,2,3,4] = 2.5, no exact match
+    expect(sources.median).toBeUndefined();
+  });
+
+  it("returns percentile label when it lands on an exact entry", () => {
+    // 5 entries: P75 rank = 0.75 * 4 = 3 (exact, sorted[3])
+    const labeled: LabeledValue[] = [
+      { label: "a", value: 10 },
+      { label: "b", value: 20 },
+      { label: "c", value: 30 },
+      { label: "d", value: 40 },
+      { label: "e", value: 50 },
+    ];
+    const stats = computeStats(labeled.map((v) => v.value));
+    const sources = findStatSources(labeled, stats);
+
+    // P75 of [10,20,30,40,50] = sorted[3] = 40
+    expect(sources.p75).toEqual(["d"]);
+  });
+
+  it("does not return percentile label when interpolated", () => {
+    // 4 entries: P75 rank = 0.75 * 3 = 2.25 (interpolated)
+    const labeled: LabeledValue[] = [
+      { label: "a", value: 10 },
+      { label: "b", value: 20 },
+      { label: "c", value: 30 },
+      { label: "d", value: 40 },
+    ];
+    const stats = computeStats(labeled.map((v) => v.value));
+    const sources = findStatSources(labeled, stats);
+
+    // P75 of [10,20,30,40] = 32.5, no exact match
+    expect(sources.p75).toBeUndefined();
+  });
+
+  it("handles single entry (all stats point to same label)", () => {
+    const labeled: LabeledValue[] = [{ label: "only", value: 42 }];
+    const stats = computeStats([42]);
+    const sources = findStatSources(labeled, stats);
+
+    expect(sources.min).toEqual(["only"]);
+    expect(sources.max).toEqual(["only"]);
+    expect(sources.median).toEqual(["only"]);
+  });
+});
+
+describe("findRankForValue", () => {
+  const chartData = [
+    { rank: 0, value: 10 },
+    { rank: 25, value: 20 },
+    { rank: 50, value: 30 },
+    { rank: 75, value: 40 },
+    { rank: 100, value: 50 },
+  ];
+
+  it("returns null for empty data", () => {
+    expect(findRankForValue([], 10)).toBeNull();
+  });
+
+  it("returns first rank when value equals min", () => {
+    expect(findRankForValue(chartData, 10)).toBe(0);
+  });
+
+  it("returns last rank when value equals max", () => {
+    expect(findRankForValue(chartData, 50)).toBe(100);
+  });
+
+  it("returns first rank when value is below min", () => {
+    expect(findRankForValue(chartData, 5)).toBe(0);
+  });
+
+  it("returns last rank when value is above max", () => {
+    expect(findRankForValue(chartData, 100)).toBe(100);
+  });
+
+  it("returns exact rank when value matches a data point", () => {
+    expect(findRankForValue(chartData, 30)).toBe(50);
+  });
+
+  it("interpolates rank between two data points", () => {
+    // 25 is between 20 (rank 25) and 30 (rank 50)
+    // frac = (25 - 20) / (30 - 20) = 0.5
+    // rank = 25 + 0.5 * (50 - 25) = 37.5
+    expect(findRankForValue(chartData, 25)).toBe(37.5);
+  });
+
+  it("interpolates at quarter point", () => {
+    // 15 is between 10 (rank 0) and 20 (rank 25)
+    // frac = (15 - 10) / (20 - 10) = 0.5
+    // rank = 0 + 0.5 * 25 = 12.5
+    expect(findRankForValue(chartData, 15)).toBe(12.5);
+  });
+
+  it("handles consecutive equal values", () => {
+    const data = [
+      { rank: 0, value: 10 },
+      { rank: 33, value: 10 },
+      { rank: 67, value: 20 },
+      { rank: 100, value: 30 },
+    ];
+    // Value 10 matches first point
+    expect(findRankForValue(data, 10)).toBe(0);
+    // Value 15 is between 10 (rank 33) and 20 (rank 67)
+    expect(findRankForValue(data, 15)).toBe(50);
+  });
+
+  it("handles single data point", () => {
+    const single = [{ rank: 100, value: 42 }];
+    expect(findRankForValue(single, 42)).toBe(100);
+    expect(findRankForValue(single, 0)).toBe(100);
+    expect(findRankForValue(single, 999)).toBe(100);
   });
 });

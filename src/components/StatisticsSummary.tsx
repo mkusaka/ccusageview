@@ -19,6 +19,7 @@ import {
   extractMetricWithLabels,
   extractMetricByModelWithLabels,
   findStatSources,
+  findRankForValue,
   type StatMetricKey,
   type DescriptiveStats,
 } from "../utils/statistics";
@@ -247,26 +248,6 @@ const PERCENTILE_LINES = [
   { rank: 95, label: "P95", color: "var(--color-chart-purple)" },
   { rank: 99, label: "P99", color: "var(--color-chart-red)" },
 ] as const;
-
-/** Find the percentile rank for a given value by interpolating through chart data */
-function findRankForValue(
-  chartData: { rank: number; value: number }[],
-  value: number,
-): number | null {
-  if (chartData.length === 0) return null;
-  if (value <= chartData[0].value) return chartData[0].rank;
-  if (value >= chartData[chartData.length - 1].value) return chartData[chartData.length - 1].rank;
-
-  for (let i = 0; i < chartData.length - 1; i++) {
-    if (chartData[i].value <= value && value <= chartData[i + 1].value) {
-      const range = chartData[i + 1].value - chartData[i].value;
-      if (range === 0) return chartData[i].rank;
-      const frac = (value - chartData[i].value) / range;
-      return chartData[i].rank + frac * (chartData[i + 1].rank - chartData[i].rank);
-    }
-  }
-  return null;
-}
 
 function DistributionChart({
   entries,

@@ -261,6 +261,23 @@ export interface DistributionPoint {
   value: number;
 }
 
+/** Find the percentile rank for a given value by interpolating through distribution data */
+export function findRankForValue(chartData: DistributionPoint[], value: number): number | null {
+  if (chartData.length === 0) return null;
+  if (value <= chartData[0].value) return chartData[0].rank;
+  if (value >= chartData[chartData.length - 1].value) return chartData[chartData.length - 1].rank;
+
+  for (let i = 0; i < chartData.length - 1; i++) {
+    if (chartData[i].value <= value && value <= chartData[i + 1].value) {
+      const range = chartData[i + 1].value - chartData[i].value;
+      if (range === 0) return chartData[i].rank;
+      const frac = (value - chartData[i].value) / range;
+      return chartData[i].rank + frac * (chartData[i + 1].rank - chartData[i].rank);
+    }
+  }
+  return null;
+}
+
 /** Build sorted distribution data from raw values */
 export function buildDistributionFromValues(values: number[]): DistributionPoint[] {
   const sorted = values.toSorted((a, b) => a - b);
