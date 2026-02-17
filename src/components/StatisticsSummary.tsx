@@ -21,7 +21,6 @@ import {
   findStatSources,
   type StatMetricKey,
   type DescriptiveStats,
-  type StatSource,
 } from "../utils/statistics";
 import { collectModels, shortenModelName } from "../utils/chart";
 import { formatCost, formatTokens, formatSkewness } from "../utils/format";
@@ -47,17 +46,10 @@ const METRICS: Record<StatMetricKey, MetricConfig> = {
 
 const METRIC_KEYS = Object.keys(METRICS) as StatMetricKey[];
 
-function truncateLabels(labels: string[]): string {
+/** Format source labels for tooltip, truncating if too many */
+function formatSourceLabels(labels: string[]): string {
   if (labels.length <= 3) return labels.join(", ");
   return `${labels.slice(0, 3).join(", ")} (+${labels.length - 3})`;
-}
-
-/** Format source info for tooltip display */
-function formatStatSource(source: StatSource): string {
-  if (source.type === "interpolated") {
-    return `${truncateLabels(source.loLabels)} 〜 ${truncateLabels(source.hiLabels)}`;
-  }
-  return truncateLabels(source.labels);
 }
 
 /** Color mapping for percentile labels that match chart reference lines */
@@ -73,8 +65,8 @@ interface StatItem {
   value: string;
   subLabel?: string;
   color?: string;
-  /** Source info for stats that correspond to actual data entries */
-  source?: StatSource;
+  /** Source labels (dates) for stats that exactly match actual data entries */
+  sourceLabels?: string[];
 }
 
 /** Map from StatItem label to the DescriptiveStats source field name */
@@ -91,7 +83,7 @@ const STAT_SOURCE_FIELD: Record<string, string> = {
 function buildStatItems(
   stats: DescriptiveStats,
   fmt: (v: number) => string,
-  sourceMap: Partial<Record<string, StatSource>>,
+  sourceMap: Partial<Record<string, string[]>>,
 ): StatItem[] {
   const items: StatItem[] = [
     { label: "Mean", value: fmt(stats.mean) },
@@ -121,7 +113,7 @@ function buildStatItems(
     if (c) item.color = c;
     const field = STAT_SOURCE_FIELD[item.label];
     if (field && sourceMap[field]) {
-      item.source = sourceMap[field];
+      item.sourceLabels = sourceMap[field];
     }
   }
   return items;
@@ -211,7 +203,7 @@ export function StatisticsSummary({ entries }: Props) {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
         {items.map((item) => (
-          <div key={item.label} className={item.source ? "group/stat relative" : ""}>
+          <div key={item.label} className={item.sourceLabels ? "group/stat relative" : ""}>
             <p
               className="text-xs uppercase tracking-wide flex items-center gap-1.5"
               style={{ color: item.color ?? "var(--color-text-secondary)" }}
@@ -226,16 +218,16 @@ export function StatisticsSummary({ entries }: Props) {
             </p>
             <p
               className={`text-lg font-semibold mt-0.5 text-text-primary${
-                item.source
+                item.sourceLabels
                   ? " cursor-help underline decoration-dashed decoration-1 decoration-text-secondary/40 underline-offset-4"
                   : ""
               }`}
             >
               {item.value}
             </p>
-            {item.source && (
+            {item.sourceLabels && (
               <div className="pointer-events-none absolute bottom-full left-0 mb-1 hidden group-hover/stat:block z-10 bg-bg-secondary border border-border rounded-md px-2.5 py-1.5 text-xs text-text-secondary whitespace-nowrap shadow-lg">
-                {formatStatSource(item.source)}
+                {formatSourceLabels(item.sourceLabels)}
               </div>
             )}
             {item.subLabel && <p className="text-xs text-text-secondary mt-0.5">{item.subLabel}</p>}

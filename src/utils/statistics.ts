@@ -112,70 +112,34 @@ export function extractMetricByModelWithLabels(
   return result;
 }
 
-/** Source info for a stat value: either an exact match or interpolated between two value groups */
-export type StatSource =
-  | { type: "exact"; labels: string[] }
-  | { type: "interpolated"; loLabels: string[]; hiLabels: string[] };
-
 /**
- * Find source labels (dates) for stat values.
- * For min/max: always exact matches.
- * For percentiles: exact if the percentile lands on an entry, otherwise the two bounding entries.
+ * Find source labels (dates) for stat values that exactly match actual entries.
+ * Returns a map from stat field name to matching labels.
+ * Only includes entries where the stat value is an exact match (not interpolated).
  */
 export function findStatSources(
   labeledValues: LabeledValue[],
   stats: DescriptiveStats,
-): Partial<Record<string, StatSource>> {
+): Partial<Record<string, string[]>> {
   if (stats.count === 0) return {};
 
-  const sorted = labeledValues.toSorted((a, b) => a.value - b.value);
-  const n = sorted.length;
-
-  const result: Partial<Record<string, StatSource>> = {};
-
-  // Min and Max are always exact
-  result.min = {
-    type: "exact",
-    labels: sorted.filter((v) => v.value === sorted[0].value).map((v) => v.label),
-  };
-  result.max = {
-    type: "exact",
-    labels: sorted.filter((v) => v.value === sorted[n - 1].value).map((v) => v.label),
-  };
-
-  // Percentiles: check if exact or interpolated
-  const percentiles: { field: string; p: number }[] = [
-    { field: "median", p: 0.5 },
-    { field: "p75", p: 0.75 },
-    { field: "p90", p: 0.9 },
-    { field: "p95", p: 0.95 },
-    { field: "p99", p: 0.99 },
+  const fieldsToCheck: { field: string; value: number }[] = [
+    { field: "min", value: stats.min },
+    { field: "max", value: stats.max },
+    { field: "median", value: stats.median },
+    { field: "p75", value: stats.p75 },
+    { field: "p90", value: stats.p90 },
+    { field: "p95", value: stats.p95 },
+    { field: "p99", value: stats.p99 },
   ];
 
-  for (const { field, p } of percentiles) {
-    const rank = p * (n - 1);
-    const lo = Math.floor(rank);
-    const hi = Math.ceil(rank);
-
-    const loVal = sorted[lo].value;
-    const hiVal = sorted[hi].value;
-
-    if (lo === hi || loVal === hiVal) {
-      // Exact: percentile lands on a specific value (or interpolation between same values)
-      result[field] = {
-        type: "exact",
-        labels: sorted.filter((v) => v.value === loVal).map((v) => v.label),
-      };
-    } else {
-      // Interpolated: between two distinct value groups
-      result[field] = {
-        type: "interpolated",
-        loLabels: sorted.filter((v) => v.value === loVal).map((v) => v.label),
-        hiLabels: sorted.filter((v) => v.value === hiVal).map((v) => v.label),
-      };
+  const result: Partial<Record<string, string[]>> = {};
+  for (const { field, value } of fieldsToCheck) {
+    const matches = labeledValues.filter((v) => v.value === value).map((v) => v.label);
+    if (matches.length > 0) {
+      result[field] = matches;
     }
   }
-
   return result;
 }
 
