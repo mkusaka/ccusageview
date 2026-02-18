@@ -43,6 +43,11 @@ describe("getTokenPricing", () => {
     expect(pricing).toEqual({ input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 });
   });
 
+  it("returns pricing for sonnet 4.6", () => {
+    const pricing = getTokenPricing("claude-sonnet-4-6-20260217");
+    expect(pricing).toEqual({ input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 });
+  });
+
   it("returns pricing for opus 4.6", () => {
     const pricing = getTokenPricing("claude-opus-4-6-20260101");
     expect(pricing).toEqual({ input: 5, output: 25, cacheWrite: 6.25, cacheRead: 0.5 });
