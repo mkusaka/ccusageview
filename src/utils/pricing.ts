@@ -19,6 +19,8 @@ const PRICING_MAP: ReadonlyMap<string, TokenPricing> = new Map([
   ["opus-4-1", { input: 15, output: 75, cacheWrite: 18.75, cacheRead: 1.5 }],
   // Opus 4
   ["opus-4", { input: 15, output: 75, cacheWrite: 18.75, cacheRead: 1.5 }],
+  // Sonnet 4.6
+  ["sonnet-4-6", { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 }],
   // Sonnet 4.5
   ["sonnet-4-5", { input: 3, output: 15, cacheWrite: 3.75, cacheRead: 0.3 }],
   // Sonnet 4
