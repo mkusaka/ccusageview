@@ -38,6 +38,7 @@ const METRICS: Record<Metric, { label: string; format: (v: number) => string }> 
 };
 
 const METRIC_KEYS = Object.keys(METRICS) as Metric[];
+const TOOLTIP_WRAPPER_STYLE = { zIndex: 20 };
 
 // Mon=0 .. Sun=6 display order
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -266,6 +267,8 @@ export function DayOfWeekChart({ entries }: Props) {
           {isModelView ? (
             <>
               <Tooltip
+                allowEscapeViewBox={{ x: true, y: true }}
+                wrapperStyle={TOOLTIP_WRAPPER_STYLE}
                 content={
                   showPercent
                     ? ({ active, payload, label }) => {
@@ -356,6 +359,8 @@ export function DayOfWeekChart({ entries }: Props) {
           ) : (
             <>
               <Tooltip
+                allowEscapeViewBox={{ x: true, y: true }}
+                wrapperStyle={TOOLTIP_WRAPPER_STYLE}
                 content={({ payload }) => {
                   if (!payload || payload.length === 0) return null;
                   const p = payload[0].payload as DayBucket;
