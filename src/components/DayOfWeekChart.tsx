@@ -319,7 +319,7 @@ export function DayOfWeekChart({ entries }: Props) {
               />
               <Legend
                 content={() => (
-                  <div className="flex justify-center gap-4 text-xs mt-1">
+                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
                     {modelSeries.map((s) => (
                       <button
                         key={s.key}

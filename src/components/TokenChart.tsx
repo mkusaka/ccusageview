@@ -221,7 +221,7 @@ export function TokenChart({ entries }: Props) {
                 ? modelSeries.map((s) => ({ key: s.key, name: s.label, color: s.color }))
                 : TYPE_SERIES.map((s) => ({ key: s.key, name: s.name, color: s.color }));
               return (
-                <div className="flex justify-center gap-4 text-xs mt-1">
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
                   {items.map((entry) => (
                     <button
                       key={entry.key}
