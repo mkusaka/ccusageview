@@ -1,4 +1,12 @@
 import type { NormalizedEntry } from "./normalize";
+import {
+  collectBreakdownKeys,
+  formatBreakdownLabel,
+  getBreakdownMetricValue,
+  groupBreakdowns,
+  OTHER_BREAKDOWN_KEY,
+  type BreakdownMode,
+} from "./breakdown";
 
 export const MODEL_COLORS = [
   "var(--color-chart-blue)",
@@ -9,19 +17,10 @@ export const MODEL_COLORS = [
   "var(--color-chart-red)",
 ];
 
-export function shortenModelName(name: string): string {
-  const match = name.match(/^claude-(.+)-\d{8}$/);
-  return match ? match[1] : name;
-}
+export { shortenModelName } from "./breakdown";
 
-export function collectModels(entries: NormalizedEntry[]): string[] {
-  const set = new Set<string>();
-  for (const e of entries) {
-    if (e.modelBreakdowns) {
-      for (const mb of e.modelBreakdowns) set.add(mb.modelName);
-    }
-  }
-  return Array.from(set).toSorted();
+export function collectModels(entries: NormalizedEntry[], mode: BreakdownMode = "model"): string[] {
+  return collectBreakdownKeys(entries, mode);
 }
 
 export interface SeriesItem {
@@ -34,34 +33,52 @@ export function buildModelSeries(
   allModels: string[],
   entries: NormalizedEntry[],
   colors: string[] = MODEL_COLORS,
+  mode: BreakdownMode = "model",
 ): SeriesItem[] {
   const result = allModels.map((m, i) => ({
     key: m,
-    label: shortenModelName(m),
+    label: formatBreakdownLabel(m, mode),
     color: colors[i % colors.length],
   }));
   if (entries.some((e) => !e.modelBreakdowns || e.modelBreakdowns.length === 0)) {
     result.push({
-      key: "Other",
-      label: "Other",
+      key: OTHER_BREAKDOWN_KEY,
+      label: OTHER_BREAKDOWN_KEY,
       color: colors[result.length % colors.length],
     });
   }
   return result;
 }
 
-export function buildCostByModel(entries: NormalizedEntry[]): Record<string, string | number>[] {
-  return entries.map((e) => {
-    const d: Record<string, string | number> = { label: e.label };
-    if (e.modelBreakdowns && e.modelBreakdowns.length > 0) {
-      for (const mb of e.modelBreakdowns) {
-        d[mb.modelName] = mb.cost;
-      }
-    } else {
-      d["Other"] = e.cost;
+type ChartBreakdownMetricKey = "cost" | ModelTokenType;
+
+function buildMetricByBreakdown(
+  entries: NormalizedEntry[],
+  metric: ChartBreakdownMetricKey,
+  mode: BreakdownMode,
+): Record<string, string | number>[] {
+  return entries.map((entry) => {
+    const row: Record<string, string | number> = { label: entry.label };
+    const grouped = groupBreakdowns(entry.modelBreakdowns, mode);
+
+    if (grouped.size === 0) {
+      row[OTHER_BREAKDOWN_KEY] = metric === "cost" ? entry.cost : entry[metric];
+      return row;
     }
-    return d;
+
+    for (const [key, metrics] of grouped.entries()) {
+      row[key] = getBreakdownMetricValue(metrics, metric);
+    }
+
+    return row;
   });
+}
+
+export function buildCostByModel(
+  entries: NormalizedEntry[],
+  mode: BreakdownMode = "model",
+): Record<string, string | number>[] {
+  return buildMetricByBreakdown(entries, "cost", mode);
 }
 
 export type ModelTokenType =
@@ -73,16 +90,7 @@ export type ModelTokenType =
 export function buildTokenTypeByModel(
   entries: NormalizedEntry[],
   tokenType: ModelTokenType,
+  mode: BreakdownMode = "model",
 ): Record<string, string | number>[] {
-  return entries.map((e) => {
-    const d: Record<string, string | number> = { label: e.label };
-    if (e.modelBreakdowns && e.modelBreakdowns.length > 0) {
-      for (const mb of e.modelBreakdowns) {
-        d[mb.modelName] = mb[tokenType];
-      }
-    } else {
-      d["Other"] = e[tokenType];
-    }
-    return d;
-  });
+  return buildMetricByBreakdown(entries, tokenType, mode);
 }

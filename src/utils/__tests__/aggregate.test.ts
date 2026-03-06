@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { groupEntries, sumEntries, aggregateModelBreakdowns } from "../aggregate";
+import {
+  groupEntries,
+  sumEntries,
+  aggregateModelBreakdowns,
+  aggregateBreakdowns,
+} from "../aggregate";
 import type { NormalizedEntry } from "../normalize";
 import type { ModelBreakdown } from "../../types";
 
@@ -33,6 +38,15 @@ const MB_HAIKU: ModelBreakdown = {
   cacheCreationTokens: 10,
   cacheReadTokens: 40,
   cost: 0.2,
+};
+
+const MB_GPT: ModelBreakdown = {
+  modelName: "gpt-5-codex",
+  inputTokens: 250,
+  outputTokens: 75,
+  cacheCreationTokens: 0,
+  cacheReadTokens: 125,
+  cost: 0.6,
 };
 
 describe("groupEntries", () => {
@@ -221,5 +235,42 @@ describe("aggregateModelBreakdowns", () => {
 
     expect(result).toHaveLength(1);
     expect(result[0].modelName).toBe(MB_SONNET.modelName);
+  });
+});
+
+describe("aggregateBreakdowns", () => {
+  it("aggregates model data by provider", () => {
+    const entries = [
+      makeEntry("a", { modelBreakdowns: [MB_SONNET, MB_HAIKU, MB_GPT] }),
+      makeEntry("b", {
+        modelBreakdowns: [{ ...MB_SONNET, inputTokens: 100, cost: 0.5 }],
+      }),
+    ];
+
+    const result = aggregateBreakdowns(entries, "provider");
+
+    expect(result).toHaveLength(2);
+    const anthropic = result.find((entry) => entry.key === "Anthropic");
+    expect(anthropic).toMatchObject({
+      label: "Anthropic",
+      inputTokens: 700,
+      outputTokens: 220,
+      cacheCreationTokens: 110,
+      cacheReadTokens: 440,
+      cost: 1.7,
+    });
+    const openai = result.find((entry) => entry.key === "OpenAI");
+    expect(openai).toMatchObject({
+      label: "OpenAI",
+      inputTokens: 250,
+      outputTokens: 75,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 125,
+      cost: 0.6,
+    });
+  });
+
+  it("returns empty array when no entries have breakdowns", () => {
+    expect(aggregateBreakdowns([makeEntry("a"), makeEntry("b")], "provider")).toEqual([]);
   });
 });

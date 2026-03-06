@@ -1,12 +1,12 @@
 # ccusageview
 
-A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppippi/ccusage) JSON reports — tokens, costs, and model breakdown at a glance.
+A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppippi/ccusage) JSON reports — tokens, costs, and model/provider breakdown at a glance.
 
 **Live:** https://ccusageview.polyfill.workers.dev/
 
 ## Features
 
-- **Interactive dashboard** — cost chart, token chart, model breakdown, activity heatmap, and data table
+- **Interactive dashboard** — cost chart, token chart, model/provider breakdown, activity heatmap, and data table
 - **Multiple report types** — daily, weekly, monthly, session, and blocks
 - **Multi-source comparison** — load multiple JSON files with labels and toggle them on/off
 - **Shareable URLs** — data is compressed into the URL hash, or use short URLs via `/s/:id`

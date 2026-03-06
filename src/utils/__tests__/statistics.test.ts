@@ -713,3 +713,59 @@ describe("computeAllStatsForVisibleModels", () => {
     }
   });
 });
+
+describe("provider-aware visible breakdown helpers", () => {
+  const entries: NormalizedEntry[] = [
+    makeEntry("day1", {
+      cost: 20,
+      inputTokens: 200,
+      modelBreakdowns: [
+        makeBreakdown("claude-sonnet-4-20250514", { cost: 6, inputTokens: 60 }),
+        makeBreakdown("claude-haiku-3-20240307", { cost: 4, inputTokens: 40 }),
+        makeBreakdown("gpt-5-codex", { cost: 10, inputTokens: 100 }),
+      ],
+    }),
+    makeEntry("day2", {
+      cost: 15,
+      inputTokens: 150,
+      modelBreakdowns: [
+        makeBreakdown("claude-sonnet-4-20250514", { cost: 9, inputTokens: 90 }),
+        makeBreakdown("gpt-5-codex", { cost: 6, inputTokens: 60 }),
+      ],
+    }),
+    makeEntry("day3", { cost: 5, inputTokens: 50 }),
+  ];
+
+  it("extracts provider totals per entry", () => {
+    const visible = new Set(["Anthropic"]);
+    const result = extractMetricForVisibleModels(entries, "cost", visible, false, "provider");
+
+    expect(result).toEqual([10, 9]);
+  });
+
+  it("includes Other when provider filtering requests it", () => {
+    const visible = new Set(["OpenAI"]);
+    const result = extractMetricForVisibleModelsWithLabels(
+      entries,
+      "cost",
+      visible,
+      true,
+      "provider",
+    );
+
+    expect(result).toEqual([
+      { label: "day1", value: 10 },
+      { label: "day2", value: 6 },
+      { label: "day3", value: 5 },
+    ]);
+  });
+
+  it("computes stats from provider-filtered values", () => {
+    const visible = new Set(["Anthropic"]);
+    const result = computeAllStatsForVisibleModels(entries, visible, true, "provider");
+
+    expect(result.cost.count).toBe(3);
+    expect(result.cost.mean).toBe(8);
+    expect(result.inputTokens.mean).toBe(80);
+  });
+});

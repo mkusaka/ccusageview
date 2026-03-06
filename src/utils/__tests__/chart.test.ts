@@ -63,6 +63,15 @@ const HAIKU: ModelBreakdown = {
   cost: 0.3,
 };
 
+const GPT: ModelBreakdown = {
+  modelName: "gpt-5-codex",
+  inputTokens: 300_000,
+  outputTokens: 15_000,
+  cacheCreationTokens: 0,
+  cacheReadTokens: 120_000,
+  cost: 0.8,
+};
+
 describe("shortenModelName", () => {
   it("shortens new-format claude names", () => {
     expect(shortenModelName("claude-sonnet-4-20250514")).toBe("sonnet-4");
@@ -98,6 +107,11 @@ describe("collectModels", () => {
 
   it("returns empty array for empty entries", () => {
     expect(collectModels([])).toEqual([]);
+  });
+
+  it("returns unique sorted provider names when requested", () => {
+    const entries = [makeEntry("2025-07-01", [SONNET, HAIKU, GPT]), makeEntry("2025-07-02", [GPT])];
+    expect(collectModels(entries, "provider")).toEqual(["Anthropic", "OpenAI"]);
   });
 });
 
@@ -150,6 +164,16 @@ describe("buildModelSeries", () => {
 
     expect(series[0].color).toBe("red");
   });
+
+  it("uses provider labels without shortening in provider mode", () => {
+    const entries = [makeEntry("2025-07-01", [SONNET, GPT])];
+    const series = buildModelSeries(["Anthropic", "OpenAI"], entries, MODEL_COLORS, "provider");
+
+    expect(series).toEqual([
+      { key: "Anthropic", label: "Anthropic", color: MODEL_COLORS[0] },
+      { key: "OpenAI", label: "OpenAI", color: MODEL_COLORS[1] },
+    ]);
+  });
 });
 
 describe("buildCostByModel", () => {
@@ -185,6 +209,17 @@ describe("buildCostByModel", () => {
 
   it("returns empty array for empty entries", () => {
     expect(buildCostByModel([])).toEqual([]);
+  });
+
+  it("aggregates costs by provider in provider mode", () => {
+    const entries = [makeEntry("2025-07-01", [SONNET, HAIKU, GPT])];
+    const result = buildCostByModel(entries, "provider");
+
+    expect(result[0]).toEqual({
+      label: "2025-07-01",
+      Anthropic: 2.8,
+      OpenAI: 0.8,
+    });
   });
 });
 
@@ -243,5 +278,16 @@ describe("buildTokenTypeByModel", () => {
 
   it("returns empty array for empty entries", () => {
     expect(buildTokenTypeByModel([], "inputTokens")).toEqual([]);
+  });
+
+  it("aggregates token metrics by provider in provider mode", () => {
+    const entries = [makeEntry("2025-07-01", [SONNET, HAIKU, GPT])];
+    const result = buildTokenTypeByModel(entries, "cacheReadTokens", "provider");
+
+    expect(result[0]).toEqual({
+      label: "2025-07-01",
+      Anthropic: 1_000_000,
+      OpenAI: 120_000,
+    });
   });
 });

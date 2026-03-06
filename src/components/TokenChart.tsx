@@ -10,6 +10,7 @@ import {
   Legend,
 } from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { BreakdownMode } from "../utils/breakdown";
 import { formatTokens } from "../utils/format";
 import {
   collectModels,
@@ -46,7 +47,7 @@ const TOKEN_TYPE_TABS: { key: ModelTokenType; label: string }[] = [
   { key: "cacheReadTokens", label: "Cache Read" },
 ];
 
-type ViewMode = "type" | "model";
+type ViewMode = "type" | "model" | "provider";
 
 export function TokenChart({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -54,6 +55,7 @@ export function TokenChart({ entries }: Props) {
   const [tokenType, setTokenType] = useState<ModelTokenType>("inputTokens");
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
+  const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
 
   const toggleSeries = (key: string) => {
     setHiddenSeries((prev) => {
@@ -64,20 +66,25 @@ export function TokenChart({ entries }: Props) {
     });
   };
 
-  const allModels = useMemo(() => collectModels(entries), [entries]);
-  const hasModelData = allModels.length > 0;
+  const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
 
-  const modelChartData = useMemo(
-    () => (hasModelData ? buildTokenTypeByModel(entries, tokenType) : []),
-    [entries, hasModelData, tokenType],
+  const breakdownKeys = useMemo(
+    () => (hasBreakdownData ? collectModels(entries, breakdownMode) : []),
+    [entries, hasBreakdownData, breakdownMode],
   );
 
-  const modelSeries = useMemo(
-    () => (hasModelData ? buildModelSeries(allModels, entries, MODEL_COLORS) : []),
-    [allModels, hasModelData, entries],
+  const breakdownChartData = useMemo(
+    () => (hasBreakdownData ? buildTokenTypeByModel(entries, tokenType, breakdownMode) : []),
+    [entries, hasBreakdownData, tokenType, breakdownMode],
   );
 
-  const isModelView = viewMode === "model" && hasModelData;
+  const breakdownSeries = useMemo(
+    () =>
+      hasBreakdownData ? buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode) : [],
+    [breakdownKeys, entries, hasBreakdownData, breakdownMode],
+  );
+
+  const isBreakdownView = (viewMode === "model" || viewMode === "provider") && hasBreakdownData;
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -87,10 +94,13 @@ export function TokenChart({ entries }: Props) {
           <CopyImageButton targetRef={chartRef} />
         </div>
         <div className="flex items-center gap-1">
-          {hasModelData && (
+          {hasBreakdownData && (
             <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
               <button
-                onClick={() => setViewMode("type")}
+                onClick={() => {
+                  setViewMode("type");
+                  setHiddenSeries(new Set());
+                }}
                 className={`px-2 py-0.5 text-xs rounded transition-colors ${
                   viewMode === "type"
                     ? "bg-bg-card text-text-primary shadow-sm"
@@ -100,7 +110,10 @@ export function TokenChart({ entries }: Props) {
                 By Type
               </button>
               <button
-                onClick={() => setViewMode("model")}
+                onClick={() => {
+                  setViewMode("model");
+                  setHiddenSeries(new Set());
+                }}
                 className={`px-2 py-0.5 text-xs rounded transition-colors ${
                   viewMode === "model"
                     ? "bg-bg-card text-text-primary shadow-sm"
@@ -108,6 +121,19 @@ export function TokenChart({ entries }: Props) {
                 }`}
               >
                 By Model
+              </button>
+              <button
+                onClick={() => {
+                  setViewMode("provider");
+                  setHiddenSeries(new Set());
+                }}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === "provider"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Provider
               </button>
             </div>
           )}
@@ -126,7 +152,7 @@ export function TokenChart({ entries }: Props) {
           </div>
         </div>
       </div>
-      {isModelView && (
+      {isBreakdownView && (
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 mb-3 w-fit">
           {TOKEN_TYPE_TABS.map((tab) => (
             <button
@@ -145,7 +171,7 @@ export function TokenChart({ entries }: Props) {
       )}
       <ResponsiveContainer width="100%" height={380}>
         <BarChart
-          data={isModelView ? modelChartData : entries}
+          data={isBreakdownView ? breakdownChartData : entries}
           stackOffset={showPercent ? "expand" : undefined}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
@@ -217,8 +243,8 @@ export function TokenChart({ entries }: Props) {
           />
           <Legend
             content={() => {
-              const items = isModelView
-                ? modelSeries.map((s) => ({ key: s.key, name: s.label, color: s.color }))
+              const items = isBreakdownView
+                ? breakdownSeries.map((s) => ({ key: s.key, name: s.label, color: s.color }))
                 : TYPE_SERIES.map((s) => ({ key: s.key, name: s.name, color: s.color }));
               return (
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
@@ -250,8 +276,8 @@ export function TokenChart({ entries }: Props) {
               );
             }}
           />
-          {isModelView
-            ? modelSeries
+          {isBreakdownView
+            ? breakdownSeries
                 .filter((s) => !hiddenSeries.has(s.key))
                 .map((s) => (
                   <Bar
