@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
 import { formatCost } from "../utils/format";
+import type { BreakdownMode } from "../utils/breakdown";
 import { collectModels, buildModelSeries, buildCostByModel, MODEL_COLORS } from "../utils/chart";
 import { buildCostByTokenType } from "../utils/pricing";
 import { CopyImageButton } from "./CopyImageButton";
@@ -19,7 +20,7 @@ interface Props {
   entries: NormalizedEntry[];
 }
 
-type ViewMode = "total" | "model" | "tokenType";
+type ViewMode = "total" | "model" | "provider" | "tokenType";
 
 const TOKEN_TYPE_COST_SERIES = [
   { key: "inputCost", name: "Input", color: "var(--color-chart-blue)" },
@@ -33,6 +34,7 @@ export function CostChart({ entries }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
+  const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
 
   const toggleSeries = (key: string) => {
     setHiddenSeries((prev) => {
@@ -43,17 +45,22 @@ export function CostChart({ entries }: Props) {
     });
   };
 
-  const allModels = useMemo(() => collectModels(entries), [entries]);
-  const hasModelData = allModels.length > 0;
+  const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
 
-  const modelChartData = useMemo(
-    () => (hasModelData ? buildCostByModel(entries) : []),
-    [entries, hasModelData],
+  const breakdownKeys = useMemo(
+    () => (hasBreakdownData ? collectModels(entries, breakdownMode) : []),
+    [entries, hasBreakdownData, breakdownMode],
   );
 
-  const modelSeries = useMemo(
-    () => (hasModelData ? buildModelSeries(allModels, entries, MODEL_COLORS) : []),
-    [allModels, hasModelData, entries],
+  const breakdownChartData = useMemo(
+    () => (hasBreakdownData ? buildCostByModel(entries, breakdownMode) : []),
+    [entries, hasBreakdownData, breakdownMode],
+  );
+
+  const breakdownSeries = useMemo(
+    () =>
+      hasBreakdownData ? buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode) : [],
+    [breakdownKeys, entries, hasBreakdownData, breakdownMode],
   );
 
   const tokenTypeCostData = useMemo(() => buildCostByTokenType(entries), [entries]);
@@ -61,7 +68,7 @@ export function CostChart({ entries }: Props) {
     (d) => d.inputCost > 0 || d.outputCost > 0 || d.cacheWriteCost > 0 || d.cacheReadCost > 0,
   );
 
-  const isModelView = viewMode === "model" && hasModelData;
+  const isBreakdownView = (viewMode === "model" || viewMode === "provider") && hasBreakdownData;
   const isTokenTypeView = viewMode === "tokenType" && hasTokenTypeCostData;
 
   return (
@@ -71,12 +78,13 @@ export function CostChart({ entries }: Props) {
           <h3 className="text-sm font-medium text-text-secondary">Cost Over Time</h3>
           <CopyImageButton targetRef={chartRef} />
         </div>
-        {(hasModelData || hasTokenTypeCostData) && (
+        {(hasBreakdownData || hasTokenTypeCostData) && (
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
             <button
               onClick={() => {
                 setViewMode("total");
                 setShowPercent(false);
+                setHiddenSeries(new Set());
               }}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 viewMode === "total"
@@ -86,9 +94,12 @@ export function CostChart({ entries }: Props) {
             >
               Total
             </button>
-            {hasModelData && (
+            {hasBreakdownData && (
               <button
-                onClick={() => setViewMode("model")}
+                onClick={() => {
+                  setViewMode("model");
+                  setHiddenSeries(new Set());
+                }}
                 className={`px-2 py-0.5 text-xs rounded transition-colors ${
                   viewMode === "model"
                     ? "bg-bg-card text-text-primary shadow-sm"
@@ -98,9 +109,27 @@ export function CostChart({ entries }: Props) {
                 By Model
               </button>
             )}
+            {hasBreakdownData && (
+              <button
+                onClick={() => {
+                  setViewMode("provider");
+                  setHiddenSeries(new Set());
+                }}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === "provider"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Provider
+              </button>
+            )}
             {hasTokenTypeCostData && (
               <button
-                onClick={() => setViewMode("tokenType")}
+                onClick={() => {
+                  setViewMode("tokenType");
+                  setHiddenSeries(new Set());
+                }}
                 className={`px-2 py-0.5 text-xs rounded transition-colors ${
                   viewMode === "tokenType"
                     ? "bg-bg-card text-text-primary shadow-sm"
@@ -110,7 +139,7 @@ export function CostChart({ entries }: Props) {
                 By Token Type
               </button>
             )}
-            {(isModelView || isTokenTypeView) && (
+            {(isBreakdownView || isTokenTypeView) && (
               <button
                 onClick={() => setShowPercent((p) => !p)}
                 className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
@@ -128,8 +157,10 @@ export function CostChart({ entries }: Props) {
       </div>
       <ResponsiveContainer width="100%" height={320}>
         <AreaChart
-          data={isTokenTypeView ? tokenTypeCostData : isModelView ? modelChartData : entries}
-          stackOffset={(isModelView || isTokenTypeView) && showPercent ? "expand" : undefined}
+          data={
+            isTokenTypeView ? tokenTypeCostData : isBreakdownView ? breakdownChartData : entries
+          }
+          stackOffset={(isBreakdownView || isTokenTypeView) && showPercent ? "expand" : undefined}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
           <XAxis
@@ -143,15 +174,15 @@ export function CostChart({ entries }: Props) {
             tickLine={false}
             axisLine={false}
             tickFormatter={
-              (isModelView || isTokenTypeView) && showPercent
+              (isBreakdownView || isTokenTypeView) && showPercent
                 ? (v: number) => `${(v * 100).toFixed(0)}%`
                 : (v: number) => `$${v}`
             }
-            domain={(isModelView || isTokenTypeView) && showPercent ? [0, 1] : undefined}
+            domain={(isBreakdownView || isTokenTypeView) && showPercent ? [0, 1] : undefined}
           />
           <Tooltip
             content={
-              (isModelView || isTokenTypeView) && showPercent
+              (isBreakdownView || isTokenTypeView) && showPercent
                 ? ({ active, payload, label }) => {
                     if (!active || !payload?.length) return null;
                     const total = payload.reduce(
@@ -183,12 +214,12 @@ export function CostChart({ entries }: Props) {
                 : undefined
             }
             formatter={
-              (isModelView || isTokenTypeView) && showPercent
+              (isBreakdownView || isTokenTypeView) && showPercent
                 ? undefined
                 : (value, name) => [formatCost(Number(value ?? 0)), String(name)]
             }
             contentStyle={
-              (isModelView || isTokenTypeView) && showPercent
+              (isBreakdownView || isTokenTypeView) && showPercent
                 ? undefined
                 : {
                     backgroundColor: "var(--color-bg-card)",
@@ -244,12 +275,12 @@ export function CostChart({ entries }: Props) {
                 />
               ))}
             </>
-          ) : isModelView ? (
+          ) : isBreakdownView ? (
             <>
               <Legend
                 content={() => (
                   <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
-                    {modelSeries.map((s) => (
+                    {breakdownSeries.map((s) => (
                       <button
                         key={s.key}
                         type="button"
@@ -276,7 +307,7 @@ export function CostChart({ entries }: Props) {
                   </div>
                 )}
               />
-              {modelSeries
+              {breakdownSeries
                 .filter((s) => !hiddenSeries.has(s.key))
                 .map((s) => (
                   <Area

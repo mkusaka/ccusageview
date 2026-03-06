@@ -1,5 +1,11 @@
 import type { ModelBreakdown } from "../types";
 import type { NormalizedEntry, NormalizedTotals } from "./normalize";
+import {
+  formatBreakdownLabel,
+  groupBreakdowns,
+  type BreakdownMetrics,
+  type BreakdownMode,
+} from "./breakdown";
 
 /** 合算対象の数値フィールド（型安全に検証） */
 const NUMERIC_KEYS = [
@@ -21,6 +27,19 @@ const MB_NUMERIC_KEYS = [
   "cacheReadTokens",
   "cost",
 ] as const satisfies ReadonlyArray<keyof ModelBreakdown>;
+
+const BREAKDOWN_NUMERIC_KEYS = [
+  "inputTokens",
+  "outputTokens",
+  "cacheCreationTokens",
+  "cacheReadTokens",
+  "cost",
+] as const satisfies ReadonlyArray<keyof BreakdownMetrics>;
+
+export interface AggregatedBreakdown extends BreakdownMetrics {
+  key: string;
+  label: string;
+}
 
 /**
  * entries を keyFn でグループ化し、数値フィールドを合算、
@@ -119,4 +138,34 @@ export function aggregateModelBreakdowns(entries: NormalizedEntry[]): ModelBreak
     }
   }
   return Array.from(map.values());
+}
+
+export function aggregateBreakdowns(
+  entries: NormalizedEntry[],
+  mode: BreakdownMode,
+): AggregatedBreakdown[] {
+  const map = new Map<string, BreakdownMetrics>();
+
+  for (const entry of entries) {
+    for (const [key, metrics] of groupBreakdowns(entry.modelBreakdowns, mode).entries()) {
+      const existing = map.get(key);
+      if (existing) {
+        for (const metric of BREAKDOWN_NUMERIC_KEYS) {
+          existing[metric] += metrics[metric];
+        }
+        continue;
+      }
+
+      map.set(key, { ...metrics });
+    }
+  }
+
+  return Array.from(map.entries())
+    .toSorted(([a], [b]) => a.localeCompare(b))
+    .map(([key, metrics]) =>
+      Object.assign({}, metrics, {
+        key,
+        label: formatBreakdownLabel(key, mode),
+      }),
+    );
 }

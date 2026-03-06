@@ -1,8 +1,8 @@
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
-import type { ModelBreakdown as ModelBreakdownType } from "../types";
-import { aggregateModelBreakdowns } from "../utils/aggregate";
+import { aggregateBreakdowns, type AggregatedBreakdown } from "../utils/aggregate";
+import type { BreakdownMode } from "../utils/breakdown";
 import { formatCost, formatTokens } from "../utils/format";
 import { CopyImageButton } from "./CopyImageButton";
 
@@ -23,81 +23,67 @@ type Metric = keyof typeof METRICS;
 type SortDir = "asc" | "desc";
 
 const METRICS = {
-  cost: { label: "Cost", format: (v: number) => formatCost(v), key: "cost" as const },
-  inputTokens: {
-    label: "Input",
-    format: (v: number) => formatTokens(v),
-    key: "inputTokens" as const,
-  },
-  outputTokens: {
-    label: "Output",
-    format: (v: number) => formatTokens(v),
-    key: "outputTokens" as const,
-  },
-  cacheCreationTokens: {
-    label: "Cache Create",
-    format: (v: number) => formatTokens(v),
-    key: "cacheCreationTokens" as const,
-  },
-  cacheReadTokens: {
-    label: "Cache Read",
-    format: (v: number) => formatTokens(v),
-    key: "cacheReadTokens" as const,
-  },
+  cost: { label: "Cost", format: (v: number) => formatCost(v) },
+  inputTokens: { label: "Input", format: (v: number) => formatTokens(v) },
+  outputTokens: { label: "Output", format: (v: number) => formatTokens(v) },
+  cacheCreationTokens: { label: "Cache Create", format: (v: number) => formatTokens(v) },
+  cacheReadTokens: { label: "Cache Read", format: (v: number) => formatTokens(v) },
 } as const;
 
 interface TableColumn {
   key: string;
   label: string;
   align: "left" | "right";
-  render: (m: ModelBreakdownType) => string;
-  sortValue: (m: ModelBreakdownType) => number | string;
+  render: (row: AggregatedBreakdown) => string;
+  sortValue: (row: AggregatedBreakdown) => number | string;
 }
 
-const TABLE_COLUMNS: TableColumn[] = [
-  {
-    key: "modelName",
-    label: "Model",
-    align: "left",
-    render: (m) => m.modelName,
-    sortValue: (m) => m.modelName,
-  },
-  {
-    key: "inputTokens",
-    label: "Input",
-    align: "right",
-    render: (m) => formatTokens(m.inputTokens),
-    sortValue: (m) => m.inputTokens,
-  },
-  {
-    key: "outputTokens",
-    label: "Output",
-    align: "right",
-    render: (m) => formatTokens(m.outputTokens),
-    sortValue: (m) => m.outputTokens,
-  },
-  {
-    key: "cacheCreationTokens",
-    label: "Cache Create",
-    align: "right",
-    render: (m) => formatTokens(m.cacheCreationTokens),
-    sortValue: (m) => m.cacheCreationTokens,
-  },
-  {
-    key: "cacheReadTokens",
-    label: "Cache Read",
-    align: "right",
-    render: (m) => formatTokens(m.cacheReadTokens),
-    sortValue: (m) => m.cacheReadTokens,
-  },
-  {
-    key: "cost",
-    label: "Cost",
-    align: "right",
-    render: (m) => formatCost(m.cost),
-    sortValue: (m) => m.cost,
-  },
-];
+function getTableColumns(mode: BreakdownMode): TableColumn[] {
+  return [
+    {
+      key: "label",
+      label: mode === "model" ? "Model" : "Provider",
+      align: "left",
+      render: (row) => row.label,
+      sortValue: (row) => row.label,
+    },
+    {
+      key: "inputTokens",
+      label: "Input",
+      align: "right",
+      render: (row) => formatTokens(row.inputTokens),
+      sortValue: (row) => row.inputTokens,
+    },
+    {
+      key: "outputTokens",
+      label: "Output",
+      align: "right",
+      render: (row) => formatTokens(row.outputTokens),
+      sortValue: (row) => row.outputTokens,
+    },
+    {
+      key: "cacheCreationTokens",
+      label: "Cache Create",
+      align: "right",
+      render: (row) => formatTokens(row.cacheCreationTokens),
+      sortValue: (row) => row.cacheCreationTokens,
+    },
+    {
+      key: "cacheReadTokens",
+      label: "Cache Read",
+      align: "right",
+      render: (row) => formatTokens(row.cacheReadTokens),
+      sortValue: (row) => row.cacheReadTokens,
+    },
+    {
+      key: "cost",
+      label: "Cost",
+      align: "right",
+      render: (row) => formatCost(row.cost),
+      sortValue: (row) => row.cost,
+    },
+  ];
+}
 
 interface PieDataItem {
   name: string;
@@ -105,7 +91,6 @@ interface PieDataItem {
   value: number;
 }
 
-// Custom tooltip showing model name and the selected metric value
 function CustomPieTooltip({
   active,
   payload,
@@ -116,6 +101,7 @@ function CustomPieTooltip({
   formatValue: (v: number) => string;
 }) {
   if (!active || !payload || payload.length === 0) return null;
+
   const data = payload[0].payload;
   return (
     <div
@@ -133,77 +119,107 @@ function CustomPieTooltip({
 
 export function ModelBreakdown({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
+  const [mode, setMode] = useState<BreakdownMode>("model");
   const [metric, setMetric] = useState<Metric>("cost");
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  const models = useMemo(() => aggregateModelBreakdowns(entries), [entries]);
+  const rows = useMemo(() => aggregateBreakdowns(entries, mode), [entries, mode]);
+  const columns = useMemo(() => getTableColumns(mode), [mode]);
 
-  // Sort by clicked column, or by selected metric (descending) as default
-  const sortedModels = useMemo(() => {
+  const sortedRows = useMemo(() => {
     if (sortCol) {
-      const col = TABLE_COLUMNS.find((c) => c.key === sortCol);
-      if (col) {
-        return models.toSorted((a, b) => {
-          const va = col.sortValue(a);
-          const vb = col.sortValue(b);
-          const cmp = va < vb ? -1 : va > vb ? 1 : 0;
-          return sortDir === "asc" ? cmp : -cmp;
+      const column = columns.find((candidate) => candidate.key === sortCol);
+      if (column) {
+        return rows.toSorted((a, b) => {
+          const left = column.sortValue(a);
+          const right = column.sortValue(b);
+          const comparison = left < right ? -1 : left > right ? 1 : 0;
+          return sortDir === "asc" ? comparison : -comparison;
         });
       }
     }
-    return models.toSorted((a, b) => b[metric] - a[metric]);
-  }, [models, metric, sortCol, sortDir]);
+
+    return rows.toSorted((a, b) => b[metric] - a[metric]);
+  }, [rows, columns, metric, sortCol, sortDir]);
 
   function handleSort(key: string) {
     if (sortCol === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortCol(key);
-      setSortDir("asc");
+      setSortDir((direction) => (direction === "asc" ? "desc" : "asc"));
+      return;
     }
+
+    setSortCol(key);
+    setSortDir("asc");
   }
 
-  if (sortedModels.length === 0) return null;
+  if (sortedRows.length === 0) return null;
 
   const metricConfig = METRICS[metric];
-
-  const pieData: PieDataItem[] = sortedModels.map((m) => ({
-    name: m.modelName.replace(/^claude-/, ""),
-    fullName: m.modelName,
-    value: m[metric],
+  const pieData: PieDataItem[] = sortedRows.map((row) => ({
+    name: row.label,
+    fullName: mode === "model" ? row.key : row.label,
+    value: row[metric],
   }));
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
-      {/* Header with metric tabs */}
       <div className="flex items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-1 shrink-0">
-          <h3 className="text-sm font-medium text-text-secondary">Model Breakdown</h3>
+          <h3 className="text-sm font-medium text-text-secondary">Breakdown</h3>
           <CopyImageButton targetRef={chartRef} />
         </div>
-        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 overflow-x-auto">
-          {(Object.keys(METRICS) as Metric[]).map((key) => (
+        <div className="flex items-center gap-2 overflow-x-auto">
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
             <button
-              key={key}
               onClick={() => {
-                setMetric(key);
+                setMode("model");
                 setSortCol(null);
               }}
-              className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
-                metric === key
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                mode === "model"
                   ? "bg-bg-card text-text-primary shadow-sm"
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              {METRICS[key].label}
+              By Model
             </button>
-          ))}
+            <button
+              onClick={() => {
+                setMode("provider");
+                setSortCol(null);
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                mode === "provider"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Provider
+            </button>
+          </div>
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+            {(Object.keys(METRICS) as Metric[]).map((key) => (
+              <button
+                key={key}
+                onClick={() => {
+                  setMetric(key);
+                  setSortCol(null);
+                }}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  metric === key
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {METRICS[key].label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Donut chart */}
         <div className="flex-shrink-0 w-full lg:w-80">
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
@@ -219,21 +235,20 @@ export function ModelBreakdown({ entries }: Props) {
                 stroke="var(--color-bg-card)"
                 strokeWidth={2}
               >
-                {pieData.map((_, i) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} fillOpacity={0.85} />
+                {pieData.map((_, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} fillOpacity={0.85} />
                 ))}
               </Pie>
               <Tooltip content={<CustomPieTooltip formatValue={metricConfig.format} />} />
             </PieChart>
           </ResponsiveContainer>
-          {/* Legend */}
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 px-2">
-            {pieData.map((item, i) => (
-              <div key={item.name} className="flex items-center gap-1.5">
+            {pieData.map((item, index) => (
+              <div key={item.fullName} className="flex items-center gap-1.5">
                 <span
                   className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                   style={{
-                    backgroundColor: COLORS[i % COLORS.length],
+                    backgroundColor: COLORS[index % COLORS.length],
                     opacity: 0.85,
                   }}
                 />
@@ -243,21 +258,20 @@ export function ModelBreakdown({ entries }: Props) {
           </div>
         </div>
 
-        {/* Table */}
         <div className="flex-1 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                {TABLE_COLUMNS.map((col) => (
+                {columns.map((column) => (
                   <th
-                    key={col.key}
-                    onClick={() => handleSort(col.key)}
+                    key={column.key}
+                    onClick={() => handleSort(column.key)}
                     className={`py-2 pr-4 font-medium text-text-secondary cursor-pointer hover:text-text-primary select-none whitespace-nowrap ${
-                      col.align === "right" ? "text-right" : "text-left"
+                      column.align === "right" ? "text-right" : "text-left"
                     }`}
                   >
-                    {col.label}
-                    {sortCol === col.key && (
+                    {column.label}
+                    {sortCol === column.key && (
                       <span className="ml-1">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
                     )}
                   </th>
@@ -265,16 +279,18 @@ export function ModelBreakdown({ entries }: Props) {
               </tr>
             </thead>
             <tbody>
-              {sortedModels.map((m) => (
-                <tr key={m.modelName} className="border-b border-border/50 text-text-primary">
-                  {TABLE_COLUMNS.map((col) => (
+              {sortedRows.map((row) => (
+                <tr key={row.key} className="border-b border-border/50 text-text-primary">
+                  {columns.map((column) => (
                     <td
-                      key={col.key}
+                      key={column.key}
                       className={`py-2 pr-4 whitespace-nowrap ${
-                        col.align === "right" ? "text-right" : "text-left"
-                      } ${col.key === "modelName" ? "font-mono text-xs" : ""} ${col.key === "cost" ? "font-medium" : ""}`}
+                        column.align === "right" ? "text-right" : "text-left"
+                      } ${column.key === "label" ? "font-mono text-xs" : ""} ${
+                        column.key === "cost" ? "font-medium" : ""
+                      }`}
                     >
-                      {col.render(m)}
+                      {column.render(row)}
                     </td>
                   ))}
                 </tr>

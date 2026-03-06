@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -10,6 +10,7 @@ import {
   ReferenceLine,
 } from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { BreakdownMode } from "../utils/breakdown";
 import {
   computeAllStats,
   computeAllStatsForVisibleModels,
@@ -47,13 +48,11 @@ const METRICS: Record<StatMetricKey, MetricConfig> = {
 
 const METRIC_KEYS = Object.keys(METRICS) as StatMetricKey[];
 
-/** Format source labels for tooltip, truncating if too many */
 function formatSourceLabels(labels: string[]): string {
   if (labels.length <= 3) return labels.join(", ");
   return `${labels.slice(0, 3).join(", ")} (+${labels.length - 3})`;
 }
 
-/** Color mapping for percentile labels that match chart reference lines */
 const STAT_LABEL_COLORS: Record<string, string> = {
   Mean: "var(--color-chart-teal)",
   "Median (P50)": "var(--color-chart-green)",
@@ -67,11 +66,9 @@ interface StatItem {
   value: string;
   subLabel?: string;
   color?: string;
-  /** Source labels (dates) for stats that exactly match actual data entries */
   sourceLabels?: string[];
 }
 
-/** Map from StatItem label to the DescriptiveStats source field name */
 const STAT_SOURCE_FIELD: Record<string, string> = {
   "Median (P50)": "median",
   Min: "min",
@@ -84,23 +81,23 @@ const STAT_SOURCE_FIELD: Record<string, string> = {
 
 function buildStatItems(
   stats: DescriptiveStats,
-  fmt: (v: number) => string,
+  format: (v: number) => string,
   sourceMap: Partial<Record<string, string[]>>,
 ): StatItem[] {
   const items: StatItem[] = [
-    { label: "Mean", value: fmt(stats.mean) },
-    { label: "Median (P50)", value: fmt(stats.median) },
-    { label: "Min", value: fmt(stats.min) },
-    { label: "Max", value: fmt(stats.max) },
-    { label: "P75", value: fmt(stats.p75) },
-    { label: "P90", value: fmt(stats.p90) },
-    { label: "P95", value: fmt(stats.p95) },
-    { label: "P99", value: fmt(stats.p99) },
-    { label: "Std Dev", value: fmt(stats.standardDeviation) },
+    { label: "Mean", value: format(stats.mean) },
+    { label: "Median (P50)", value: format(stats.median) },
+    { label: "Min", value: format(stats.min) },
+    { label: "Max", value: format(stats.max) },
+    { label: "P75", value: format(stats.p75) },
+    { label: "P90", value: format(stats.p90) },
+    { label: "P95", value: format(stats.p95) },
+    { label: "P99", value: format(stats.p99) },
+    { label: "Std Dev", value: format(stats.standardDeviation) },
     {
       label: "IQR",
-      value: fmt(stats.iqr),
-      subLabel: `P25: ${fmt(stats.p25)} – P75: ${fmt(stats.p75)}`,
+      value: format(stats.iqr),
+      subLabel: `P25: ${format(stats.p25)} - P75: ${format(stats.p75)}`,
     },
     {
       label: "CV",
@@ -110,47 +107,57 @@ function buildStatItems(
     },
     { label: "Skewness", value: formatSkewness(stats.skewness) },
   ];
+
   for (const item of items) {
-    const c = STAT_LABEL_COLORS[item.label];
-    if (c) item.color = c;
+    const color = STAT_LABEL_COLORS[item.label];
+    if (color) item.color = color;
     const field = STAT_SOURCE_FIELD[item.label];
     if (field && sourceMap[field]) {
       item.sourceLabels = sourceMap[field];
     }
   }
+
   return items;
 }
 
 export function StatisticsSummary({ entries }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<StatMetricKey>("cost");
-  const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
+  const [breakdownMode, setBreakdownMode] = useState<"total" | BreakdownMode>("total");
+  const [hiddenBreakdowns, setHiddenBreakdowns] = useState<Set<string>>(new Set());
 
-  const toggleModel = (key: string) => {
-    setHiddenModels((prev) => {
-      const next = new Set(prev);
+  const toggleBreakdown = (key: string) => {
+    setHiddenBreakdowns((previous) => {
+      const next = new Set(previous);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
   };
 
-  const models = useMemo(() => collectModels(entries), [entries]);
-  const modelSeries = useMemo(
-    () => buildModelSeries(models, entries, MODEL_COLORS),
-    [models, entries],
-  );
+  const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
+  const breakdownKeys = useMemo(() => {
+    if (breakdownMode === "total" || !hasBreakdownData) return [];
+    return collectModels(entries, breakdownMode);
+  }, [entries, breakdownMode, hasBreakdownData]);
 
-  const visibleModelNames = useMemo(
-    () => new Set(models.filter((m) => !hiddenModels.has(m))),
-    [models, hiddenModels],
+  const breakdownSeries = useMemo(() => {
+    if (breakdownMode === "total" || !hasBreakdownData) return [];
+    return buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode);
+  }, [breakdownKeys, entries, breakdownMode, hasBreakdownData]);
+
+  const visibleBreakdowns = useMemo(
+    () => new Set(breakdownKeys.filter((key) => !hiddenBreakdowns.has(key))),
+    [breakdownKeys, hiddenBreakdowns],
   );
-  const includeOther = !hiddenModels.has("Other");
+  const includeOther = !hiddenBreakdowns.has("Other");
 
   const allStats = useMemo(() => {
-    if (hiddenModels.size === 0) return computeAllStats(entries);
-    return computeAllStatsForVisibleModels(entries, visibleModelNames, includeOther);
-  }, [entries, hiddenModels, visibleModelNames, includeOther]);
+    if (breakdownMode === "total") {
+      return computeAllStats(entries);
+    }
+    return computeAllStatsForVisibleModels(entries, visibleBreakdowns, includeOther, breakdownMode);
+  }, [entries, breakdownMode, visibleBreakdowns, includeOther]);
 
   if (entries.length < 2) {
     return (
@@ -165,12 +172,18 @@ export function StatisticsSummary({ entries }: Props) {
   const metricConfig = METRICS[metric];
 
   const sourceMap = useMemo(() => {
-    const labeled =
-      hiddenModels.size === 0
+    const labeledValues =
+      breakdownMode === "total"
         ? extractMetricWithLabels(entries, metric)
-        : extractMetricForVisibleModelsWithLabels(entries, metric, visibleModelNames, includeOther);
-    return findStatSources(labeled, stats);
-  }, [entries, metric, hiddenModels, visibleModelNames, includeOther, stats]);
+        : extractMetricForVisibleModelsWithLabels(
+            entries,
+            metric,
+            visibleBreakdowns,
+            includeOther,
+            breakdownMode,
+          );
+    return findStatSources(labeledValues, stats);
+  }, [entries, metric, breakdownMode, visibleBreakdowns, includeOther, stats]);
 
   const items = buildStatItems(stats, metricConfig.format, sourceMap);
 
@@ -182,20 +195,65 @@ export function StatisticsSummary({ entries }: Props) {
           <span className="text-xs text-text-secondary">({stats.count} entries)</span>
           <CopyImageButton targetRef={panelRef} />
         </div>
-        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
-          {METRIC_KEYS.map((key) => (
-            <button
-              key={key}
-              onClick={() => setMetric(key)}
-              className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
-                metric === key
-                  ? "bg-bg-card text-text-primary shadow-sm"
-                  : "text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {METRICS[key].label}
-            </button>
-          ))}
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {hasBreakdownData && (
+            <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+              <button
+                onClick={() => {
+                  setBreakdownMode("total");
+                  setHiddenBreakdowns(new Set());
+                }}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  breakdownMode === "total"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                Total
+              </button>
+              <button
+                onClick={() => {
+                  setBreakdownMode("model");
+                  setHiddenBreakdowns(new Set());
+                }}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  breakdownMode === "model"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Model
+              </button>
+              <button
+                onClick={() => {
+                  setBreakdownMode("provider");
+                  setHiddenBreakdowns(new Set());
+                }}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  breakdownMode === "provider"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Provider
+              </button>
+            </div>
+          )}
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+            {METRIC_KEYS.map((key) => (
+              <button
+                key={key}
+                onClick={() => setMetric(key)}
+                className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
+                  metric === key
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {METRICS[key].label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -204,34 +262,35 @@ export function StatisticsSummary({ entries }: Props) {
         metric={metric}
         metricConfig={metricConfig}
         stats={stats}
-        hiddenModels={hiddenModels}
-        models={models}
+        breakdownMode={breakdownMode}
+        hiddenBreakdowns={hiddenBreakdowns}
+        breakdownKeys={breakdownKeys}
       />
 
-      {modelSeries.length > 0 && (
+      {breakdownMode !== "total" && breakdownSeries.length > 0 && (
         <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 text-xs mt-1 mb-3">
-          {modelSeries.map((s) => (
+          {breakdownSeries.map((series) => (
             <button
-              key={s.key}
+              key={series.key}
               type="button"
-              onClick={() => toggleModel(s.key)}
+              onClick={() => toggleBreakdown(series.key)}
               className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
               style={{
-                opacity: hiddenModels.has(s.key) ? 0.3 : 1,
+                opacity: hiddenBreakdowns.has(series.key) ? 0.3 : 1,
                 fontSize: "inherit",
                 color: "inherit",
-                textDecoration: hiddenModels.has(s.key) ? "line-through" : "none",
+                textDecoration: hiddenBreakdowns.has(series.key) ? "line-through" : "none",
               }}
             >
               <span
                 style={{
                   width: 10,
                   height: 10,
-                  backgroundColor: s.color,
+                  backgroundColor: series.color,
                   display: "inline-block",
                 }}
               />
-              <span style={{ color: "var(--color-text-secondary)" }}>{s.label}</span>
+              <span style={{ color: "var(--color-text-secondary)" }}>{series.label}</span>
             </button>
           ))}
         </div>
@@ -288,26 +347,35 @@ function DistributionChart({
   metric,
   metricConfig,
   stats,
-  hiddenModels,
-  models,
+  breakdownMode,
+  hiddenBreakdowns,
+  breakdownKeys,
 }: {
   entries: NormalizedEntry[];
   metric: StatMetricKey;
   metricConfig: MetricConfig;
   stats: DescriptiveStats;
-  hiddenModels: Set<string>;
-  models: string[];
+  breakdownMode: "total" | BreakdownMode;
+  hiddenBreakdowns: Set<string>;
+  breakdownKeys: string[];
 }) {
   const chartData = useMemo(() => {
-    if (hiddenModels.size === 0) {
+    if (breakdownMode === "total") {
       return buildDistribution(entries, metric);
     }
-    const visibleNames = new Set(models.filter((m) => !hiddenModels.has(m)));
-    const otherVisible = !hiddenModels.has("Other");
+
+    const visibleBreakdowns = new Set(breakdownKeys.filter((key) => !hiddenBreakdowns.has(key)));
+    const includeOther = !hiddenBreakdowns.has("Other");
     return buildDistributionFromValues(
-      extractMetricForVisibleModels(entries, metric, visibleNames, otherVisible),
+      extractMetricForVisibleModels(
+        entries,
+        metric,
+        visibleBreakdowns,
+        includeOther,
+        breakdownMode,
+      ),
     );
-  }, [entries, metric, hiddenModels, models]);
+  }, [entries, metric, breakdownMode, hiddenBreakdowns, breakdownKeys]);
 
   const meanRank = useMemo(() => findRankForValue(chartData, stats.mean), [chartData, stats.mean]);
 
@@ -333,7 +401,7 @@ function DistributionChart({
             tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(v: number) => `${v}%`}
+            tickFormatter={(value: number) => `${value}%`}
             label={{
               value: "Percentile",
               position: "insideBottomRight",
@@ -345,7 +413,7 @@ function DistributionChart({
             tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(v: number) => metricConfig.format(v)}
+            tickFormatter={(value: number) => metricConfig.format(value)}
             width={80}
           />
           <Tooltip

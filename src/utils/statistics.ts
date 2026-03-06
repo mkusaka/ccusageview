@@ -1,5 +1,5 @@
 import type { NormalizedEntry } from "./normalize";
-import type { ModelBreakdown } from "../types";
+import { getBreakdownMetricValue, groupBreakdowns, type BreakdownMode } from "./breakdown";
 
 /** Numeric fields of NormalizedEntry that statistics can be computed over */
 export type StatMetricKey =
@@ -9,14 +9,6 @@ export type StatMetricKey =
   | "outputTokens"
   | "cacheCreationTokens"
   | "cacheReadTokens";
-
-/** Map StatMetricKey to ModelBreakdown field (totalTokens is computed) */
-function getModelMetricValue(mb: ModelBreakdown, key: StatMetricKey): number {
-  if (key === "totalTokens") {
-    return mb.inputTokens + mb.outputTokens + mb.cacheCreationTokens + mb.cacheReadTokens;
-  }
-  return mb[key];
-}
 
 /**
  * Extract a single metric's values for a specific model from entries.
@@ -31,7 +23,7 @@ export function extractMetricByModel(
   for (const e of entries) {
     if (!e.modelBreakdowns) continue;
     const mb = e.modelBreakdowns.find((m) => m.modelName === modelName);
-    if (mb) values.push(getModelMetricValue(mb, key));
+    if (mb) values.push(getBreakdownMetricValue(mb, key));
   }
   return values;
 }
@@ -60,18 +52,21 @@ export function extractMetricForVisibleModels(
   key: StatMetricKey,
   visibleModels: Set<string>,
   includeOther: boolean,
+  mode: BreakdownMode = "model",
 ): number[] {
   const values: number[] = [];
   for (const e of entries) {
-    if (!e.modelBreakdowns || e.modelBreakdowns.length === 0) {
+    const grouped = groupBreakdowns(e.modelBreakdowns, mode);
+    if (grouped.size === 0) {
       if (includeOther) values.push(e[key]);
       continue;
     }
+
     let sum = 0;
     let found = false;
-    for (const mb of e.modelBreakdowns) {
-      if (visibleModels.has(mb.modelName)) {
-        sum += getModelMetricValue(mb, key);
+    for (const [name, metrics] of grouped.entries()) {
+      if (visibleModels.has(name)) {
+        sum += getBreakdownMetricValue(metrics, key);
         found = true;
       }
     }
@@ -86,18 +81,21 @@ export function extractMetricForVisibleModelsWithLabels(
   key: StatMetricKey,
   visibleModels: Set<string>,
   includeOther: boolean,
+  mode: BreakdownMode = "model",
 ): LabeledValue[] {
   const result: LabeledValue[] = [];
   for (const e of entries) {
-    if (!e.modelBreakdowns || e.modelBreakdowns.length === 0) {
+    const grouped = groupBreakdowns(e.modelBreakdowns, mode);
+    if (grouped.size === 0) {
       if (includeOther) result.push({ label: e.label, value: e[key] });
       continue;
     }
+
     let sum = 0;
     let found = false;
-    for (const mb of e.modelBreakdowns) {
-      if (visibleModels.has(mb.modelName)) {
-        sum += getModelMetricValue(mb, key);
+    for (const [name, metrics] of grouped.entries()) {
+      if (visibleModels.has(name)) {
+        sum += getBreakdownMetricValue(metrics, key);
         found = true;
       }
     }
@@ -113,11 +111,12 @@ export function computeAllStatsForVisibleModels(
   entries: NormalizedEntry[],
   visibleModels: Set<string>,
   includeOther: boolean,
+  mode: BreakdownMode = "model",
 ): Record<StatMetricKey, DescriptiveStats> {
   const result = {} as Record<StatMetricKey, DescriptiveStats>;
   for (const key of STAT_METRIC_KEYS) {
     result[key] = computeStats(
-      extractMetricForVisibleModels(entries, key, visibleModels, includeOther),
+      extractMetricForVisibleModels(entries, key, visibleModels, includeOther, mode),
     );
   }
   return result;
@@ -180,7 +179,7 @@ export function extractMetricByModelWithLabels(
   for (const e of entries) {
     if (!e.modelBreakdowns) continue;
     const mb = e.modelBreakdowns.find((m) => m.modelName === modelName);
-    if (mb) result.push({ label: e.label, value: getModelMetricValue(mb, key) });
+    if (mb) result.push({ label: e.label, value: getBreakdownMetricValue(mb, key) });
   }
   return result;
 }
