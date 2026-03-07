@@ -15,6 +15,7 @@
     "lint": "oxlint .",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
+    "pricing:update": "bash ./scripts/update_offline_pricing.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",
