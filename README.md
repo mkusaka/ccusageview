@@ -63,10 +63,14 @@ Requires Node.js >= 22 and pnpm.
 ```sh
 pnpm install
 pnpm dev          # Start Vite dev server
+pnpm pricing:update # Refresh offline Claude/Codex pricing assets
 pnpm test         # Run tests
 pnpm lint         # Lint with oxlint
 pnpm format       # Format with oxfmt
 ```
+
+Pricing lookup data is sourced from `assets/claude_pricing.json` and `assets/codex_pricing.json`.
+Run `pnpm pricing:update` to refresh those filtered LiteLLM datasets.
 
 ### Cloudflare Workers (local)
 

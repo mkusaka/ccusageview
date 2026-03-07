@@ -88,6 +88,21 @@ describe("getTokenPricing", () => {
     expect(pricing).toEqual({ input: 15, output: 75, cacheWrite: 18.75, cacheRead: 1.5 });
   });
 
+  it("returns pricing for gpt-5 codex models", () => {
+    const pricing = getTokenPricing("gpt-5-codex");
+    expect(pricing).toEqual({ input: 1.25, output: 10, cacheWrite: 1.25, cacheRead: 0.125 });
+  });
+
+  it("returns pricing for provider-prefixed codex models", () => {
+    const pricing = getTokenPricing("azure/gpt-5.2-codex");
+    expect(pricing).toEqual({ input: 1.75, output: 14, cacheWrite: 1.75, cacheRead: 0.175 });
+  });
+
+  it("returns pricing for dated codex variants", () => {
+    const pricing = getTokenPricing("azure/gpt-5.1-codex-mini-2025-11-13");
+    expect(pricing).toEqual({ input: 0.25, output: 2, cacheWrite: 0.25, cacheRead: 0.025 });
+  });
+
   it("returns null for unknown models", () => {
     expect(getTokenPricing("gpt-4")).toBeNull();
     expect(getTokenPricing("unknown-model")).toBeNull();
@@ -143,6 +158,25 @@ describe("calculateCostByTokenType", () => {
     expect(result).not.toBeNull();
     // sonnet: 1M * $3 = $3, opus: 1M * $5 = $5
     expect(result!.inputCost).toBeCloseTo(8);
+  });
+
+  it("calculates cost for codex models loaded from pricing json", () => {
+    const entry = makeEntry("2025-07-01", [
+      {
+        modelName: "gpt-5.1-codex-max",
+        inputTokens: 1_000_000,
+        outputTokens: 100_000,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 2_000_000,
+        cost: 2.5,
+      },
+    ]);
+
+    const result = calculateCostByTokenType(entry);
+    expect(result).not.toBeNull();
+    expect(result!.inputCost).toBeCloseTo(1.25);
+    expect(result!.outputCost).toBeCloseTo(1);
+    expect(result!.cacheReadCost).toBeCloseTo(0.25);
   });
 
   it("skips unknown models in breakdowns but uses known ones", () => {
