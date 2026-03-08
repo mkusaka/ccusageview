@@ -92,6 +92,7 @@ jobs:
               --title "$TITLE" \
               --body-file "$BODY_FILE" \
               --base main \
-              --head "$BRANCH" \
-              --reviewer "mkusaka"
+              --head "$BRANCH"
+            # Requesting reviewers may fail if the token lacks permission; don't block the workflow.
+            gh pr edit --add-reviewer "mkusaka" || true
           fi
