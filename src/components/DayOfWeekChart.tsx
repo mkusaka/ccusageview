@@ -41,8 +41,10 @@ const METRICS: Record<Metric, { label: string; format: (v: number) => string }> 
 const METRIC_KEYS = Object.keys(METRICS) as Metric[];
 const TOOLTIP_WRAPPER_STYLE = { zIndex: 20 };
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+type DayChartRow = Record<string, string | number>;
 
 interface DayBucket {
+  [key: string]: string | number;
   day: string;
   avg: number;
   total: number;
@@ -146,7 +148,7 @@ export function DayOfWeekChart({ entries }: Props) {
   );
 
   const data = useMemo(() => buildDayOfWeekData(entries, metric), [entries, metric]);
-  const breakdownData = useMemo(
+  const breakdownData = useMemo<DayChartRow[]>(
     () =>
       hasBreakdownData
         ? buildDayOfWeekByBreakdown(entries, metric, breakdownKeys, breakdownMode)
@@ -164,6 +166,7 @@ export function DayOfWeekChart({ entries }: Props) {
 
   const isBreakdownView = (viewMode === "model" || viewMode === "provider") && hasBreakdownData;
   const metricConfig = METRICS[metric];
+  const chartData = isBreakdownView ? breakdownData : data;
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -249,8 +252,8 @@ export function DayOfWeekChart({ entries }: Props) {
       </div>
 
       <ResponsiveContainer width="100%" height={240}>
-        <BarChart
-          data={isBreakdownView ? breakdownData : data}
+        <BarChart<DayChartRow>
+          data={chartData}
           margin={{ top: 10, right: 20, bottom: 0, left: 10 }}
           stackOffset={isBreakdownView && showPercent ? "expand" : undefined}
         >
