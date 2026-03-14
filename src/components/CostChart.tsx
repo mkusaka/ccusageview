@@ -21,6 +21,7 @@ interface Props {
 }
 
 type ViewMode = "total" | "model" | "provider" | "tokenType";
+type CostChartRow = Record<string, string | number>;
 
 const TOKEN_TYPE_COST_SERIES = [
   { key: "inputCost", name: "Input", color: "var(--color-chart-blue)" },
@@ -63,13 +64,37 @@ export function CostChart({ entries }: Props) {
     [breakdownKeys, entries, hasBreakdownData, breakdownMode],
   );
 
-  const tokenTypeCostData = useMemo(() => buildCostByTokenType(entries), [entries]);
+  const totalCostData = useMemo<CostChartRow[]>(
+    () => entries.map((entry) => ({ label: entry.label, cost: entry.cost })),
+    [entries],
+  );
+
+  const tokenTypeCostData = useMemo<CostChartRow[]>(
+    () =>
+      buildCostByTokenType(entries).map((costs) => ({
+        label: costs.label,
+        inputCost: costs.inputCost,
+        outputCost: costs.outputCost,
+        cacheWriteCost: costs.cacheWriteCost,
+        cacheReadCost: costs.cacheReadCost,
+      })),
+    [entries],
+  );
   const hasTokenTypeCostData = tokenTypeCostData.some(
-    (d) => d.inputCost > 0 || d.outputCost > 0 || d.cacheWriteCost > 0 || d.cacheReadCost > 0,
+    (d) =>
+      Number(d.inputCost) > 0 ||
+      Number(d.outputCost) > 0 ||
+      Number(d.cacheWriteCost) > 0 ||
+      Number(d.cacheReadCost) > 0,
   );
 
   const isBreakdownView = (viewMode === "model" || viewMode === "provider") && hasBreakdownData;
   const isTokenTypeView = viewMode === "tokenType" && hasTokenTypeCostData;
+  const chartData = isTokenTypeView
+    ? tokenTypeCostData
+    : isBreakdownView
+      ? breakdownChartData
+      : totalCostData;
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -156,10 +181,8 @@ export function CostChart({ entries }: Props) {
         )}
       </div>
       <ResponsiveContainer width="100%" height={320}>
-        <AreaChart
-          data={
-            isTokenTypeView ? tokenTypeCostData : isBreakdownView ? breakdownChartData : entries
-          }
+        <AreaChart<CostChartRow>
+          data={chartData}
           stackOffset={(isBreakdownView || isTokenTypeView) && showPercent ? "expand" : undefined}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />

@@ -48,6 +48,7 @@ const TOKEN_TYPE_TABS: { key: ModelTokenType; label: string }[] = [
 ];
 
 type ViewMode = "type" | "model" | "provider";
+type TokenChartRow = Record<string, string | number>;
 
 export function TokenChart({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -85,6 +86,18 @@ export function TokenChart({ entries }: Props) {
   );
 
   const isBreakdownView = (viewMode === "model" || viewMode === "provider") && hasBreakdownData;
+  const totalChartData = useMemo<TokenChartRow[]>(
+    () =>
+      entries.map((entry) => ({
+        label: entry.label,
+        inputTokens: entry.inputTokens,
+        outputTokens: entry.outputTokens,
+        cacheCreationTokens: entry.cacheCreationTokens,
+        cacheReadTokens: entry.cacheReadTokens,
+      })),
+    [entries],
+  );
+  const chartData = isBreakdownView ? breakdownChartData : totalChartData;
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -170,10 +183,7 @@ export function TokenChart({ entries }: Props) {
         </div>
       )}
       <ResponsiveContainer width="100%" height={380}>
-        <BarChart
-          data={isBreakdownView ? breakdownChartData : entries}
-          stackOffset={showPercent ? "expand" : undefined}
-        >
+        <BarChart<TokenChartRow> data={chartData} stackOffset={showPercent ? "expand" : undefined}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
           <XAxis
             dataKey="label"
