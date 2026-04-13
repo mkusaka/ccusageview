@@ -35,7 +35,7 @@ jobs:
           python-version: "3.14"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: corepack pnpm install --frozen-lockfile
 
       - name: Update offline pricing dataset
         run: pnpm pricing:update

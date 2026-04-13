@@ -14,7 +14,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: corepack pnpm install --frozen-lockfile
       - run: pnpm format:check
 
   lint:
@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: corepack pnpm install --frozen-lockfile
       - run: pnpm lint
 
   typecheck:
@@ -40,7 +40,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: corepack pnpm install --frozen-lockfile
       - run: pnpm exec tsc -b
 
   test:
@@ -53,7 +53,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: corepack pnpm install --frozen-lockfile
       - run: pnpm test
 
   build-cli:
@@ -66,5 +66,5 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - run: corepack pnpm install --frozen-lockfile
       - run: pnpm build:cli
