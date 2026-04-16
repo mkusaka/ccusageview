@@ -93,4 +93,8 @@ jobs:
               --base main \
               --head "$BRANCH" \
               --reviewer "mkusaka"
+
+            PR_NUMBER="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number')"
           fi
+
+          gh pr merge "$PR_NUMBER" --auto --merge
