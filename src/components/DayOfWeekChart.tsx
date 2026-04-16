@@ -10,26 +10,26 @@ import {
   Legend,
 } from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
-import { getBreakdownMetricValue, groupBreakdowns, type BreakdownMode } from "../utils/breakdown";
+import type { BreakdownMode } from "../utils/breakdown";
 import { formatCost, formatTokens } from "../utils/format";
 import { collectModels, buildModelSeries, shortenModelName, MODEL_COLORS } from "../utils/chart";
+import {
+  buildDayOfWeekByBreakdown,
+  buildDayOfWeekData,
+  DAY_OF_WEEK_AGGREGATIONS,
+  type DayBucket,
+  type DayOfWeekAggregation,
+  type DayOfWeekMetric,
+} from "../utils/dayOfWeek";
 import { CopyImageButton } from "./CopyImageButton";
 
 interface Props {
   entries: NormalizedEntry[];
 }
 
-type Metric =
-  | "cost"
-  | "totalTokens"
-  | "inputTokens"
-  | "outputTokens"
-  | "cacheCreationTokens"
-  | "cacheReadTokens";
-
 type ViewMode = "total" | "model" | "provider";
 
-const METRICS: Record<Metric, { label: string; format: (v: number) => string }> = {
+const METRICS: Record<DayOfWeekMetric, { label: string; format: (v: number) => string }> = {
   cost: { label: "Cost", format: formatCost },
   totalTokens: { label: "Total Tokens", format: formatTokens },
   inputTokens: { label: "Input", format: formatTokens },
@@ -38,93 +38,19 @@ const METRICS: Record<Metric, { label: string; format: (v: number) => string }> 
   cacheReadTokens: { label: "Cache Read", format: formatTokens },
 };
 
-const METRIC_KEYS = Object.keys(METRICS) as Metric[];
+const METRIC_KEYS = Object.keys(METRICS) as DayOfWeekMetric[];
 const TOOLTIP_WRAPPER_STYLE = { zIndex: 20 };
-const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-interface DayBucket {
-  day: string;
-  avg: number;
-  total: number;
-  count: number;
-}
-
-function parseDayIndex(label: string): number | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(label)) return null;
-  const date = new Date(label + "T00:00:00");
-  if (Number.isNaN(date.getTime())) return null;
-  const jsDay = date.getDay();
-  return jsDay === 0 ? 6 : jsDay - 1;
-}
-
-function buildDayOfWeekData(entries: NormalizedEntry[], metric: Metric): DayBucket[] {
-  const buckets: { total: number; count: number }[] = Array.from({ length: 7 }, () => ({
-    total: 0,
-    count: 0,
-  }));
-
-  for (const entry of entries) {
-    const dayIndex = parseDayIndex(entry.label);
-    if (dayIndex === null) continue;
-    buckets[dayIndex].total += entry[metric];
-    buckets[dayIndex].count += 1;
-  }
-
-  return buckets.map((bucket, index) => ({
-    day: DAY_LABELS[index],
-    avg: bucket.count > 0 ? bucket.total / bucket.count : 0,
-    total: bucket.total,
-    count: bucket.count,
-  }));
-}
-
-function buildDayOfWeekByBreakdown(
-  entries: NormalizedEntry[],
-  metric: Metric,
-  breakdownKeys: string[],
-  mode: BreakdownMode,
-): Record<string, string | number>[] {
-  const dayCounts = Array.from({ length: 7 }, () => 0);
-  const dayTotals = Array.from({ length: 7 }, () => new Map<string, number>());
-
-  for (const entry of entries) {
-    const dayIndex = parseDayIndex(entry.label);
-    if (dayIndex === null) continue;
-    dayCounts[dayIndex] += 1;
-
-    const grouped = groupBreakdowns(entry.modelBreakdowns, mode);
-    if (grouped.size === 0) {
-      const previous = dayTotals[dayIndex].get("Other") ?? 0;
-      dayTotals[dayIndex].set("Other", previous + getBreakdownMetricValue(entry, metric));
-      continue;
-    }
-
-    for (const [key, metrics] of grouped.entries()) {
-      const previous = dayTotals[dayIndex].get(key) ?? 0;
-      dayTotals[dayIndex].set(key, previous + getBreakdownMetricValue(metrics, metric));
-    }
-  }
-
-  return DAY_LABELS.map((day, index) => {
-    const row: Record<string, string | number> = { day };
-    const count = dayCounts[index];
-    if (count === 0) return row;
-
-    for (const key of breakdownKeys) {
-      row[key] = (dayTotals[index].get(key) ?? 0) / count;
-    }
-
-    if (dayTotals[index].has("Other")) {
-      row.Other = (dayTotals[index].get("Other") ?? 0) / count;
-    }
-
-    return row;
-  });
-}
+const AGGREGATION_LABELS: Record<DayOfWeekAggregation, string> = {
+  avg: "Avg",
+  max: "Max",
+  min: "Min",
+  sum: "Sum",
+};
 
 export function DayOfWeekChart({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [metric, setMetric] = useState<Metric>("cost");
+  const [metric, setMetric] = useState<DayOfWeekMetric>("cost");
+  const [aggregation, setAggregation] = useState<DayOfWeekAggregation>("avg");
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
@@ -149,9 +75,9 @@ export function DayOfWeekChart({ entries }: Props) {
   const breakdownData = useMemo(
     () =>
       hasBreakdownData
-        ? buildDayOfWeekByBreakdown(entries, metric, breakdownKeys, breakdownMode)
+        ? buildDayOfWeekByBreakdown(entries, metric, breakdownKeys, breakdownMode, aggregation)
         : [],
-    [entries, metric, breakdownKeys, breakdownMode, hasBreakdownData],
+    [entries, metric, breakdownKeys, breakdownMode, aggregation, hasBreakdownData],
   );
   const breakdownSeries = useMemo(
     () =>
@@ -169,7 +95,23 @@ export function DayOfWeekChart({ entries }: Props) {
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
       <div className="flex items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-1 shrink-0">
-          <h3 className="text-sm font-medium text-text-secondary">Day of Week (avg)</h3>
+          <h3 className="text-sm font-medium text-text-secondary">Day of Week</h3>
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+            {DAY_OF_WEEK_AGGREGATIONS.map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setAggregation(key)}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  aggregation === key
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {AGGREGATION_LABELS[key]}
+              </button>
+            ))}
+          </div>
           <CopyImageButton targetRef={chartRef} />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
@@ -389,17 +331,21 @@ export function DayOfWeekChart({ entries }: Props) {
                       }}
                     >
                       <p className="text-text-primary font-medium">{bucket.day}</p>
-                      <p className="text-text-secondary">Avg: {metricConfig.format(bucket.avg)}</p>
                       <p className="text-text-secondary">
-                        Total: {metricConfig.format(bucket.total)}
+                        {AGGREGATION_LABELS[aggregation]}:{" "}
+                        {metricConfig.format(bucket[aggregation])}
                       </p>
+                      <p className="text-text-secondary">Avg: {metricConfig.format(bucket.avg)}</p>
+                      <p className="text-text-secondary">Max: {metricConfig.format(bucket.max)}</p>
+                      <p className="text-text-secondary">Min: {metricConfig.format(bucket.min)}</p>
+                      <p className="text-text-secondary">Sum: {metricConfig.format(bucket.sum)}</p>
                       <p className="text-text-secondary">{bucket.count} days</p>
                     </div>
                   );
                 }}
               />
               <Bar
-                dataKey="avg"
+                dataKey={aggregation}
                 fill="var(--color-chart-blue)"
                 fillOpacity={0.7}
                 radius={[4, 4, 0, 0]}
