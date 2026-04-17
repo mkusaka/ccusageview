@@ -69,6 +69,8 @@ interface StatItem {
   sourceLabels?: string[];
 }
 
+type HighlightedStat = "mean" | 50 | 90 | 95 | 99 | null;
+
 const STAT_SOURCE_FIELD: Record<string, string> = {
   "Median (P50)": "median",
   Min: "min",
@@ -120,11 +122,20 @@ function buildStatItems(
   return items;
 }
 
+const STAT_HIGHLIGHT_TARGET: Partial<Record<string, HighlightedStat>> = {
+  Mean: "mean",
+  "Median (P50)": 50,
+  P90: 90,
+  P95: 95,
+  P99: 99,
+};
+
 export function StatisticsSummary({ entries }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<StatMetricKey>("cost");
   const [breakdownMode, setBreakdownMode] = useState<"total" | BreakdownMode>("total");
   const [hiddenBreakdowns, setHiddenBreakdowns] = useState<Set<string>>(new Set());
+  const [highlightedStat, setHighlightedStat] = useState<HighlightedStat>(null);
 
   const toggleBreakdown = (key: string) => {
     setHiddenBreakdowns((previous) => {
@@ -265,6 +276,7 @@ export function StatisticsSummary({ entries }: Props) {
         breakdownMode={breakdownMode}
         hiddenBreakdowns={hiddenBreakdowns}
         breakdownKeys={breakdownKeys}
+        highlightedStat={highlightedStat}
       />
 
       {breakdownMode !== "total" && breakdownSeries.length > 0 && (
@@ -298,7 +310,12 @@ export function StatisticsSummary({ entries }: Props) {
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
         {items.map((item) => (
-          <div key={item.label} className={item.sourceLabels ? "group/stat relative" : ""}>
+          <div
+            key={item.label}
+            className={item.sourceLabels ? "group/stat relative" : undefined}
+            onMouseEnter={() => setHighlightedStat(STAT_HIGHLIGHT_TARGET[item.label] ?? null)}
+            onMouseLeave={() => setHighlightedStat(null)}
+          >
             <p
               className="text-xs uppercase tracking-wide flex items-center gap-1.5"
               style={{ color: item.color ?? "var(--color-text-secondary)" }}
@@ -350,6 +367,7 @@ function DistributionChart({
   breakdownMode,
   hiddenBreakdowns,
   breakdownKeys,
+  highlightedStat,
 }: {
   entries: NormalizedEntry[];
   metric: StatMetricKey;
@@ -358,6 +376,7 @@ function DistributionChart({
   breakdownMode: "total" | BreakdownMode;
   hiddenBreakdowns: Set<string>;
   breakdownKeys: string[];
+  highlightedStat: HighlightedStat;
 }) {
   const chartData = useMemo(() => {
     if (breakdownMode === "total") {
@@ -387,6 +406,7 @@ function DistributionChart({
     95: stats.p95,
     99: stats.p99,
   };
+  const meanHighlighted = highlightedStat === "mean";
 
   return (
     <div className="mb-2">
@@ -439,11 +459,17 @@ function DistributionChart({
               x={meanRank}
               stroke={MEAN_COLOR}
               strokeDasharray="4 3"
-              strokeWidth={1.5}
+              strokeWidth={meanHighlighted ? 3 : 1.5}
+              strokeOpacity={highlightedStat == null || meanHighlighted ? 1 : 0.5}
               label={{
                 value: `Mean ${metricConfig.format(stats.mean)}`,
                 position: "top",
-                style: { fontSize: 10, fill: MEAN_COLOR },
+                style: {
+                  fontSize: meanHighlighted ? 11 : 10,
+                  fontWeight: meanHighlighted ? 600 : 400,
+                  fill: MEAN_COLOR,
+                  opacity: highlightedStat == null || meanHighlighted ? 1 : 0.7,
+                },
               }}
             />
           )}
@@ -453,11 +479,17 @@ function DistributionChart({
               x={rank}
               stroke={color}
               strokeDasharray="4 3"
-              strokeWidth={1.5}
+              strokeWidth={highlightedStat === rank ? 3 : 1.5}
+              strokeOpacity={highlightedStat == null || highlightedStat === rank ? 1 : 0.5}
               label={{
                 value: `${label} ${metricConfig.format(percentileValues[rank])}`,
                 position: "top",
-                style: { fontSize: 10, fill: color },
+                style: {
+                  fontSize: highlightedStat === rank ? 11 : 10,
+                  fontWeight: highlightedStat === rank ? 600 : 400,
+                  fill: color,
+                  opacity: highlightedStat == null || highlightedStat === rank ? 1 : 0.7,
+                },
               }}
             />
           ))}
