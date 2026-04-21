@@ -4,6 +4,12 @@ import type { NormalizedEntry } from "../utils/normalize";
 import { aggregateBreakdowns, type AggregatedBreakdown } from "../utils/aggregate";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatCost, formatTokens } from "../utils/format";
+import {
+  createInitialModelBreakdownSortState,
+  getNextModelBreakdownSortState,
+  type ModelBreakdownMetric,
+  type ModelBreakdownSortKey,
+} from "../utils/modelBreakdownTable";
 import { CopyImageButton } from "./CopyImageButton";
 
 interface Props {
@@ -19,19 +25,16 @@ const COLORS = [
   "var(--color-chart-red)",
 ];
 
-type Metric = keyof typeof METRICS;
-type SortDir = "asc" | "desc";
-
 const METRICS = {
   cost: { label: "Cost", format: (v: number) => formatCost(v) },
   inputTokens: { label: "Input", format: (v: number) => formatTokens(v) },
   outputTokens: { label: "Output", format: (v: number) => formatTokens(v) },
   cacheCreationTokens: { label: "Cache Create", format: (v: number) => formatTokens(v) },
   cacheReadTokens: { label: "Cache Read", format: (v: number) => formatTokens(v) },
-} as const;
+} as const satisfies Record<ModelBreakdownMetric, { label: string; format: (v: number) => string }>;
 
 interface TableColumn {
-  key: string;
+  key: ModelBreakdownSortKey;
   label: string;
   align: "left" | "right";
   render: (row: AggregatedBreakdown) => string;
@@ -120,37 +123,25 @@ function CustomPieTooltip({
 export function ModelBreakdown({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<BreakdownMode>("model");
-  const [metric, setMetric] = useState<Metric>("cost");
-  const [sortCol, setSortCol] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortState, setSortState] = useState(() => createInitialModelBreakdownSortState());
 
   const rows = useMemo(() => aggregateBreakdowns(entries, mode), [entries, mode]);
   const columns = useMemo(() => getTableColumns(mode), [mode]);
+  const { metric, sortCol, sortDir } = sortState;
 
   const sortedRows = useMemo(() => {
-    if (sortCol) {
-      const column = columns.find((candidate) => candidate.key === sortCol);
-      if (column) {
-        return rows.toSorted((a, b) => {
-          const left = column.sortValue(a);
-          const right = column.sortValue(b);
-          const comparison = left < right ? -1 : left > right ? 1 : 0;
-          return sortDir === "asc" ? comparison : -comparison;
-        });
-      }
-    }
+    const column =
+      columns.find((candidate) => candidate.key === sortCol) ?? columns[columns.length - 1];
+    return rows.toSorted((a, b) => {
+      const left = column.sortValue(a);
+      const right = column.sortValue(b);
+      const comparison = left < right ? -1 : left > right ? 1 : 0;
+      return sortDir === "asc" ? comparison : -comparison;
+    });
+  }, [rows, columns, sortCol, sortDir]);
 
-    return rows.toSorted((a, b) => b[metric] - a[metric]);
-  }, [rows, columns, metric, sortCol, sortDir]);
-
-  function handleSort(key: string) {
-    if (sortCol === key) {
-      setSortDir((direction) => (direction === "asc" ? "desc" : "asc"));
-      return;
-    }
-
-    setSortCol(key);
-    setSortDir("asc");
+  function handleSort(key: ModelBreakdownSortKey) {
+    setSortState((current) => getNextModelBreakdownSortState(current, key));
   }
 
   if (sortedRows.length === 0) return null;
@@ -167,15 +158,15 @@ export function ModelBreakdown({ entries }: Props) {
       <div className="flex items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-1 shrink-0">
           <h3 className="text-sm font-medium text-text-secondary">Breakdown</h3>
+          <span className="text-xs text-text-secondary whitespace-nowrap">
+            Pie: {metricConfig.label}
+          </span>
           <CopyImageButton targetRef={chartRef} />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
             <button
-              onClick={() => {
-                setMode("model");
-                setSortCol(null);
-              }}
+              onClick={() => setMode("model")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 mode === "model"
                   ? "bg-bg-card text-text-primary shadow-sm"
@@ -185,10 +176,7 @@ export function ModelBreakdown({ entries }: Props) {
               By Model
             </button>
             <button
-              onClick={() => {
-                setMode("provider");
-                setSortCol(null);
-              }}
+              onClick={() => setMode("provider")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 mode === "provider"
                   ? "bg-bg-card text-text-primary shadow-sm"
@@ -198,29 +186,14 @@ export function ModelBreakdown({ entries }: Props) {
               By Provider
             </button>
           </div>
-          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
-            {(Object.keys(METRICS) as Metric[]).map((key) => (
-              <button
-                key={key}
-                onClick={() => {
-                  setMetric(key);
-                  setSortCol(null);
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  metric === key
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                {METRICS[key].label}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="flex-shrink-0 w-full lg:w-80">
+          <p className="text-xs text-text-secondary px-2 mb-2">
+            Click a numeric table header to change the pie metric.
+          </p>
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
