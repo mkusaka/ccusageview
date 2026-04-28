@@ -13,6 +13,8 @@ import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatCost, formatTokens } from "../utils/format";
 import { collectModels, buildModelSeries, shortenModelName, MODEL_COLORS } from "../utils/chart";
+import type { ChartDataSeries, MarkdownColumn } from "../utils/chartData";
+import { buildMarkdownSection, pickDataKeys, seriesToColumns } from "../utils/chartData";
 import {
   buildDayOfWeekByBreakdown,
   buildDayOfWeekData,
@@ -21,7 +23,9 @@ import {
   type DayOfWeekAggregation,
   type DayOfWeekMetric,
 } from "../utils/dayOfWeek";
+import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
+import { CopyMarkdownButton } from "./CopyMarkdownButton";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -86,10 +90,82 @@ export function DayOfWeekChart({ entries }: Props) {
   );
 
   const hasData = data.some((bucket) => bucket.count > 0);
-  if (!hasData) return null;
-
   const isBreakdownView = (viewMode === "model" || viewMode === "provider") && hasBreakdownData;
   const metricConfig = METRICS[metric];
+  const chartMarkdown = useMemo(() => {
+    if (isBreakdownView) {
+      const series: ChartDataSeries[] = breakdownSeries
+        .filter((item) => !hiddenSeries.has(item.key))
+        .map((item) => ({ key: item.key, label: item.label, color: item.color }));
+      return buildMarkdownSection({
+        title: "Day of Week",
+        metadata: [
+          ["Metric", metricConfig.label],
+          ["Aggregation", AGGREGATION_LABELS[aggregation]],
+          ["View", viewMode === "provider" ? "By Provider" : "By Model"],
+          ["Show percent", showPercent],
+          ["Hidden series", Array.from(hiddenSeries)],
+        ],
+        tables: [
+          {
+            columns: seriesToColumns({ key: "day", label: "Day" }, series),
+            rows: pickDataKeys(breakdownData, ["day", ...series.map((item) => item.key)]),
+          },
+        ],
+      });
+    }
+
+    const columns: MarkdownColumn[] = [
+      { key: "day", label: "Day" },
+      { key: "avg", label: "Avg", align: "right" },
+      { key: "max", label: "Max", align: "right" },
+      { key: "min", label: "Min", align: "right" },
+      { key: "sum", label: "Sum", align: "right" },
+      { key: "count", label: "Days", align: "right" },
+    ];
+
+    return buildMarkdownSection({
+      title: "Day of Week",
+      metadata: [
+        ["Metric", metricConfig.label],
+        ["Aggregation", AGGREGATION_LABELS[aggregation]],
+        ["View", "Total"],
+      ],
+      tables: [
+        {
+          columns,
+          rows: pickDataKeys(
+            data,
+            columns.map((column) => column.key),
+          ),
+        },
+      ],
+    });
+  }, [
+    aggregation,
+    breakdownData,
+    breakdownSeries,
+    data,
+    hiddenSeries,
+    isBreakdownView,
+    metricConfig.label,
+    showPercent,
+    viewMode,
+  ]);
+  const markdownRegistration = useMemo(
+    () =>
+      hasData
+        ? {
+            id: "day-of-week",
+            order: 30,
+            markdown: chartMarkdown,
+          }
+        : null,
+    [chartMarkdown, hasData],
+  );
+  useRegisterChartMarkdown(markdownRegistration);
+
+  if (!hasData) return null;
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -113,6 +189,7 @@ export function DayOfWeekChart({ entries }: Props) {
             ))}
           </div>
           <CopyImageButton targetRef={chartRef} />
+          <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
           {hasBreakdownData && (

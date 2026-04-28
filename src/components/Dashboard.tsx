@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReportType } from "../types";
 import type { DashboardData } from "../utils/normalize";
 import { aggregateToMonthly, computeTotalsFromEntries } from "../utils/normalize";
+import { ChartMarkdownContext, type RegisteredMarkdownSection } from "./ChartMarkdownContext";
 import { SummaryCards } from "./SummaryCards";
 import { CostChart } from "./CostChart";
 import { TokenChart } from "./TokenChart";
@@ -11,6 +12,7 @@ import { DataTable } from "./DataTable";
 import { StatisticsSummary } from "./StatisticsSummary";
 import { DayOfWeekChart } from "./DayOfWeekChart";
 import { CopyImageButton } from "./CopyImageButton";
+import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { RangeSlider } from "./RangeSlider";
 
 interface Props {
@@ -29,6 +31,9 @@ type TimeGranularity = "daily" | "monthly";
 
 export function Dashboard({ data }: Props) {
   const dashboardRef = useRef<HTMLDivElement>(null);
+  const [markdownSectionsById, setMarkdownSectionsById] = useState<
+    Record<string, RegisteredMarkdownSection>
+  >({});
   const { entries: dailyEntries, totals, reportType, sourceLabels } = data;
 
   // Daily reports can be viewed as monthly too
@@ -75,6 +80,39 @@ export function Dashboard({ data }: Props) {
       : "Monthly Report"
     : TYPE_LABELS[reportType];
 
+  const registerMarkdownSection = useCallback((section: RegisteredMarkdownSection) => {
+    setMarkdownSectionsById((previous) => ({ ...previous, [section.id]: section }));
+    return () => {
+      setMarkdownSectionsById((previous) => {
+        if (previous[section.id] !== section) return previous;
+        const next = { ...previous };
+        delete next[section.id];
+        return next;
+      });
+    };
+  }, []);
+
+  const dashboardMarkdown = useMemo(() => {
+    const chartSections = Object.values(markdownSectionsById).toSorted((a, b) => a.order - b.order);
+    const rangeLabel =
+      filteredEntries.length > 0
+        ? `${filteredEntries[0]?.label ?? ""} - ${
+            filteredEntries[filteredEntries.length - 1]?.label ?? ""
+          }`
+        : "None";
+    const header = [
+      "# ccusageview Dashboard",
+      "",
+      `- Report: ${displayLabel}`,
+      `- Entries: ${filteredEntries.length}`,
+      `- Range: ${rangeLabel}`,
+      `- Sources: ${sourceLabels.length > 0 ? sourceLabels.join(", ") : "None"}`,
+    ].join("\n");
+
+    if (chartSections.length === 0) return header;
+    return `${header}\n\n${chartSections.map((section) => section.markdown).join("\n\n")}`;
+  }, [displayLabel, filteredEntries, markdownSectionsById, sourceLabels]);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -87,6 +125,7 @@ export function Dashboard({ data }: Props) {
         )}
 
         <CopyImageButton targetRef={dashboardRef} />
+        <CopyMarkdownButton markdown={dashboardMarkdown} title="Copy all chart data as Markdown" />
 
         {/* Granularity toggle for daily reports */}
         {canToggleGranularity && (
@@ -119,21 +158,23 @@ export function Dashboard({ data }: Props) {
         />
       )}
 
-      <div ref={dashboardRef} className="space-y-4">
-        <SummaryCards totals={filteredTotals} entryCount={filteredEntries.length} />
+      <ChartMarkdownContext.Provider value={registerMarkdownSection}>
+        <div ref={dashboardRef} className="space-y-4">
+          <SummaryCards totals={filteredTotals} entryCount={filteredEntries.length} />
 
-        {filteredEntries.length >= 2 && <StatisticsSummary entries={filteredEntries} />}
+          {filteredEntries.length >= 2 && <StatisticsSummary entries={filteredEntries} />}
 
-        {filteredEntries.length > 0 && (
-          <>
-            {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
-            <DayOfWeekChart entries={filteredEntries} />
-            <CostChart entries={filteredEntries} />
-            <TokenChart entries={filteredEntries} />
-            {hasModelBreakdowns && <ModelBreakdown entries={filteredEntries} />}
-          </>
-        )}
-      </div>
+          {filteredEntries.length > 0 && (
+            <>
+              {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
+              <DayOfWeekChart entries={filteredEntries} />
+              <CostChart entries={filteredEntries} />
+              <TokenChart entries={filteredEntries} />
+              {hasModelBreakdowns && <ModelBreakdown entries={filteredEntries} />}
+            </>
+          )}
+        </div>
+      </ChartMarkdownContext.Provider>
 
       {filteredEntries.length > 0 && <DataTable entries={filteredEntries} />}
     </div>

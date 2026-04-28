@@ -3,6 +3,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import type { NormalizedEntry } from "../utils/normalize";
 import { aggregateBreakdowns, type AggregatedBreakdown } from "../utils/aggregate";
 import type { BreakdownMode } from "../utils/breakdown";
+import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatTokens } from "../utils/format";
 import {
   createInitialModelBreakdownSortState,
@@ -10,7 +11,9 @@ import {
   type ModelBreakdownMetric,
   type ModelBreakdownSortKey,
 } from "../utils/modelBreakdownTable";
+import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
+import { CopyMarkdownButton } from "./CopyMarkdownButton";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -144,14 +147,67 @@ export function ModelBreakdown({ entries }: Props) {
     setSortState((current) => getNextModelBreakdownSortState(current, key));
   }
 
-  if (sortedRows.length === 0) return null;
-
   const metricConfig = METRICS[metric];
   const pieData: PieDataItem[] = sortedRows.map((row) => ({
     name: row.label,
     fullName: mode === "model" ? row.key : row.label,
     value: row[metric],
   }));
+  const chartMarkdown = useMemo(
+    () =>
+      buildMarkdownSection({
+        title: "Breakdown",
+        metadata: [
+          ["View", mode === "model" ? "By Model" : "By Provider"],
+          ["Pie metric", metricConfig.label],
+          ["Sort", `${sortCol} ${sortDir}`],
+        ],
+        tables: [
+          {
+            title: "Pie Data",
+            columns: [
+              { key: "fullName", label: mode === "model" ? "Model" : "Provider" },
+              { key: "value", label: metricConfig.label, align: "right" },
+            ],
+            rows: pickDataKeys(pieData, ["fullName", "value"]),
+          },
+          {
+            title: "Breakdown Table",
+            columns: [
+              { key: "label", label: mode === "model" ? "Model" : "Provider" },
+              { key: "inputTokens", label: "Input", align: "right" },
+              { key: "outputTokens", label: "Output", align: "right" },
+              { key: "cacheCreationTokens", label: "Cache Create", align: "right" },
+              { key: "cacheReadTokens", label: "Cache Read", align: "right" },
+              { key: "cost", label: "Cost", align: "right" },
+            ],
+            rows: pickDataKeys(sortedRows, [
+              "label",
+              "inputTokens",
+              "outputTokens",
+              "cacheCreationTokens",
+              "cacheReadTokens",
+              "cost",
+            ]),
+          },
+        ],
+      }),
+    [metricConfig.label, mode, pieData, sortCol, sortDir, sortedRows],
+  );
+  const markdownRegistration = useMemo(
+    () =>
+      sortedRows.length > 0
+        ? {
+            id: "breakdown",
+            order: 60,
+            markdown: chartMarkdown,
+          }
+        : null,
+    [chartMarkdown, sortedRows.length],
+  );
+  useRegisterChartMarkdown(markdownRegistration);
+
+  if (sortedRows.length === 0) return null;
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -162,6 +218,7 @@ export function ModelBreakdown({ entries }: Props) {
             Pie: {metricConfig.label}
           </span>
           <CopyImageButton targetRef={chartRef} />
+          <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">

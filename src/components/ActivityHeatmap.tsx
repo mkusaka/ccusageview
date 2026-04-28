@@ -1,7 +1,10 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import type { NormalizedEntry } from "../utils/normalize";
+import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatTokens } from "../utils/format";
+import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
+import { CopyMarkdownButton } from "./CopyMarkdownButton";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -195,7 +198,42 @@ export function ActivityHeatmap({ entries }: Props) {
     if (el) el.scrollLeft = el.scrollWidth;
   }, [weeks]);
 
-  if (weeks.length === 0) return null;
+  const metricConfig = METRICS[metric];
+  const chartMarkdown = useMemo(() => {
+    const rows = weeks.flat().map((day) => ({
+      date: day.date,
+      [metric]: day[metric],
+    }));
+
+    return buildMarkdownSection({
+      title: "Activity",
+      metadata: [
+        ["Metric", metricConfig.label],
+        ["Weeks", numWeeks],
+      ],
+      tables: [
+        {
+          columns: [
+            { key: "date", label: "Date" },
+            { key: metric, label: metricConfig.label, align: "right" },
+          ],
+          rows: pickDataKeys(rows, ["date", metric]),
+        },
+      ],
+    });
+  }, [metric, metricConfig.label, weeks]);
+  const markdownRegistration = useMemo(
+    () =>
+      weeks.length > 0
+        ? {
+            id: "activity",
+            order: 20,
+            markdown: chartMarkdown,
+          }
+        : null,
+    [chartMarkdown, weeks.length],
+  );
+  useRegisterChartMarkdown(markdownRegistration);
 
   function getColor(value: number): string {
     if (value === 0) return "var(--color-bg-secondary)";
@@ -207,7 +245,7 @@ export function ActivityHeatmap({ entries }: Props) {
     return "oklch(0.45 0.19 155)";
   }
 
-  const metricConfig = METRICS[metric];
+  if (weeks.length === 0) return null;
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -216,6 +254,7 @@ export function ActivityHeatmap({ entries }: Props) {
         <div className="flex items-center gap-1 shrink-0">
           <h3 className="text-sm font-medium text-text-secondary">Activity</h3>
           <CopyImageButton targetRef={chartRef} />
+          <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 overflow-x-auto">
           {(Object.keys(METRICS) as Metric[]).map((key) => (

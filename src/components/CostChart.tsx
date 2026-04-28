@@ -13,8 +13,12 @@ import type { NormalizedEntry } from "../utils/normalize";
 import { formatCost } from "../utils/format";
 import type { BreakdownMode } from "../utils/breakdown";
 import { collectModels, buildModelSeries, buildCostByModel, MODEL_COLORS } from "../utils/chart";
+import type { ChartDataSeries } from "../utils/chartData";
+import { buildMarkdownSection, pickDataKeys, seriesToColumns } from "../utils/chartData";
 import { buildCostByTokenType } from "../utils/pricing";
+import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
+import { CopyMarkdownButton } from "./CopyMarkdownButton";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -70,6 +74,65 @@ export function CostChart({ entries }: Props) {
 
   const isBreakdownView = (viewMode === "model" || viewMode === "provider") && hasBreakdownData;
   const isTokenTypeView = viewMode === "tokenType" && hasTokenTypeCostData;
+  const chartMarkdown = useMemo(() => {
+    let series: ChartDataSeries[];
+    let data: Record<string, unknown>[];
+    let viewLabel: string;
+
+    if (isTokenTypeView) {
+      viewLabel = "By Token Type";
+      series = TOKEN_TYPE_COST_SERIES.filter((s) => !hiddenSeries.has(s.key)).map((s) => ({
+        key: s.key,
+        label: s.name,
+        color: s.color,
+      }));
+      data = pickDataKeys(tokenTypeCostData, ["label", ...series.map((s) => s.key)]);
+    } else if (isBreakdownView) {
+      viewLabel = viewMode === "provider" ? "By Provider" : "By Model";
+      series = breakdownSeries
+        .filter((s) => !hiddenSeries.has(s.key))
+        .map((s) => ({ key: s.key, label: s.label, color: s.color }));
+      data = pickDataKeys(breakdownChartData, ["label", ...series.map((s) => s.key)]);
+    } else {
+      viewLabel = "Total";
+      series = [{ key: "cost", label: "Cost", color: "var(--color-chart-blue)" }];
+      data = pickDataKeys(entries, ["label", "cost"]);
+    }
+
+    return buildMarkdownSection({
+      title: "Cost Over Time",
+      metadata: [
+        ["View", viewLabel],
+        ["Show percent", (isBreakdownView || isTokenTypeView) && showPercent],
+        ["Hidden series", Array.from(hiddenSeries)],
+      ],
+      tables: [
+        {
+          columns: seriesToColumns({ key: "label", label: "Label" }, series),
+          rows: data,
+        },
+      ],
+    });
+  }, [
+    breakdownChartData,
+    breakdownSeries,
+    entries,
+    hiddenSeries,
+    isBreakdownView,
+    isTokenTypeView,
+    showPercent,
+    tokenTypeCostData,
+    viewMode,
+  ]);
+  const markdownRegistration = useMemo(
+    () => ({
+      id: "cost",
+      order: 40,
+      markdown: chartMarkdown,
+    }),
+    [chartMarkdown],
+  );
+  useRegisterChartMarkdown(markdownRegistration);
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -77,6 +140,7 @@ export function CostChart({ entries }: Props) {
         <div className="flex items-center gap-1">
           <h3 className="text-sm font-medium text-text-secondary">Cost Over Time</h3>
           <CopyImageButton targetRef={chartRef} />
+          <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
         {(hasBreakdownData || hasTokenTypeCostData) && (
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">

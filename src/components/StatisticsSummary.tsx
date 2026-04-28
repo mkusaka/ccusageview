@@ -25,8 +25,11 @@ import {
   type DescriptiveStats,
 } from "../utils/statistics";
 import { collectModels, buildModelSeries, MODEL_COLORS } from "../utils/chart";
+import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatTokens, formatSkewness } from "../utils/format";
+import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
+import { CopyMarkdownButton } from "./CopyMarkdownButton";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -170,19 +173,11 @@ export function StatisticsSummary({ entries }: Props) {
     return computeAllStatsForVisibleModels(entries, visibleBreakdowns, includeOther, breakdownMode);
   }, [entries, breakdownMode, visibleBreakdowns, includeOther]);
 
-  if (entries.length < 2) {
-    return (
-      <div className="bg-bg-card border border-border rounded-lg p-4">
-        <h3 className="text-sm font-medium text-text-secondary">Statistics</h3>
-        <p className="text-sm text-text-secondary mt-2">Need at least 2 entries for statistics</p>
-      </div>
-    );
-  }
-
-  const stats = allStats[metric];
+  const stats = entries.length >= 2 ? allStats[metric] : null;
   const metricConfig = METRICS[metric];
 
   const sourceMap = useMemo(() => {
+    if (!stats) return {};
     const labeledValues =
       breakdownMode === "total"
         ? extractMetricWithLabels(entries, metric)
@@ -196,7 +191,159 @@ export function StatisticsSummary({ entries }: Props) {
     return findStatSources(labeledValues, stats);
   }, [entries, metric, breakdownMode, visibleBreakdowns, includeOther, stats]);
 
-  const items = buildStatItems(stats, metricConfig.format, sourceMap);
+  const items = stats ? buildStatItems(stats, metricConfig.format, sourceMap) : [];
+  const distributionData = useMemo(() => {
+    if (!stats) return [];
+    if (breakdownMode === "total") {
+      return buildDistribution(entries, metric);
+    }
+
+    return buildDistributionFromValues(
+      extractMetricForVisibleModels(
+        entries,
+        metric,
+        visibleBreakdowns,
+        includeOther,
+        breakdownMode,
+      ),
+    );
+  }, [entries, metric, breakdownMode, visibleBreakdowns, includeOther, stats]);
+  const chartMarkdown = useMemo(() => {
+    if (!stats) return "";
+
+    const statRows = [
+      { stat: "Count", value: stats.count, formatted: String(stats.count) },
+      { stat: "Sum", value: stats.sum, formatted: metricConfig.format(stats.sum) },
+      { stat: "Mean", value: stats.mean, formatted: metricConfig.format(stats.mean) },
+      {
+        stat: "Median (P50)",
+        value: stats.median,
+        formatted: metricConfig.format(stats.median),
+        sourceLabels: sourceMap.median?.join(", ") ?? "",
+      },
+      {
+        stat: "Min",
+        value: stats.min,
+        formatted: metricConfig.format(stats.min),
+        sourceLabels: sourceMap.min?.join(", ") ?? "",
+      },
+      {
+        stat: "Max",
+        value: stats.max,
+        formatted: metricConfig.format(stats.max),
+        sourceLabels: sourceMap.max?.join(", ") ?? "",
+      },
+      {
+        stat: "P25",
+        value: stats.p25,
+        formatted: metricConfig.format(stats.p25),
+      },
+      {
+        stat: "P75",
+        value: stats.p75,
+        formatted: metricConfig.format(stats.p75),
+        sourceLabels: sourceMap.p75?.join(", ") ?? "",
+      },
+      {
+        stat: "P90",
+        value: stats.p90,
+        formatted: metricConfig.format(stats.p90),
+        sourceLabels: sourceMap.p90?.join(", ") ?? "",
+      },
+      {
+        stat: "P95",
+        value: stats.p95,
+        formatted: metricConfig.format(stats.p95),
+        sourceLabels: sourceMap.p95?.join(", ") ?? "",
+      },
+      {
+        stat: "P99",
+        value: stats.p99,
+        formatted: metricConfig.format(stats.p99),
+        sourceLabels: sourceMap.p99?.join(", ") ?? "",
+      },
+      {
+        stat: "Std Dev",
+        value: stats.standardDeviation,
+        formatted: metricConfig.format(stats.standardDeviation),
+      },
+      {
+        stat: "IQR",
+        value: stats.iqr,
+        formatted: metricConfig.format(stats.iqr),
+      },
+      {
+        stat: "CV",
+        value: stats.coefficientOfVariation,
+        formatted: Number.isFinite(stats.coefficientOfVariation)
+          ? `${(stats.coefficientOfVariation * 100).toFixed(1)}%`
+          : "N/A",
+      },
+      {
+        stat: "Skewness",
+        value: stats.skewness,
+        formatted: formatSkewness(stats.skewness),
+      },
+    ];
+
+    return buildMarkdownSection({
+      title: "Statistics",
+      metadata: [
+        ["Metric", metricConfig.label],
+        [
+          "View",
+          breakdownMode === "total"
+            ? "Total"
+            : breakdownMode === "model"
+              ? "By Model"
+              : "By Provider",
+        ],
+        ["Hidden breakdowns", Array.from(hiddenBreakdowns)],
+        ["Entries", stats.count],
+      ],
+      tables: [
+        {
+          title: "Stats",
+          columns: [
+            { key: "stat", label: "Stat" },
+            { key: "value", label: "Value", align: "right" },
+            { key: "formatted", label: "Formatted" },
+            { key: "sourceLabels", label: "Source labels" },
+          ],
+          rows: statRows,
+        },
+        {
+          title: "Distribution",
+          columns: [
+            { key: "rank", label: "Percentile", align: "right" },
+            { key: "value", label: metricConfig.label, align: "right" },
+          ],
+          rows: pickDataKeys(distributionData, ["rank", "value"]),
+        },
+      ],
+    });
+  }, [breakdownMode, distributionData, hiddenBreakdowns, metricConfig, sourceMap, stats]);
+  const markdownRegistration = useMemo(
+    () =>
+      stats
+        ? {
+            id: "statistics",
+            order: 10,
+            markdown: chartMarkdown,
+          }
+        : null,
+    [chartMarkdown, stats],
+  );
+  useRegisterChartMarkdown(markdownRegistration);
+
+  if (!stats) {
+    return (
+      <div className="bg-bg-card border border-border rounded-lg p-4">
+        <h3 className="text-sm font-medium text-text-secondary">Statistics</h3>
+        <p className="text-sm text-text-secondary mt-2">Need at least 2 entries for statistics</p>
+      </div>
+    );
+  }
 
   return (
     <div ref={panelRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -205,6 +352,7 @@ export function StatisticsSummary({ entries }: Props) {
           <h3 className="text-sm font-medium text-text-secondary">Statistics</h3>
           <span className="text-xs text-text-secondary">({stats.count} entries)</span>
           <CopyImageButton targetRef={panelRef} />
+          <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
           {hasBreakdownData && (
