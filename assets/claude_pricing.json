@@ -152,6 +152,7 @@
   },
   "anthropic.claude-haiku-4-5-20251001-v1:0": {
     "cache_creation_input_token_cost": 1.25e-6,
+    "cache_creation_input_token_cost_above_1hr": 2e-6,
     "cache_read_input_token_cost": 1e-7,
     "input_cost_per_token": 1e-6,
     "litellm_provider": "bedrock_converse",
@@ -175,6 +176,7 @@
   },
   "anthropic.claude-haiku-4-5@20251001": {
     "cache_creation_input_token_cost": 1.25e-6,
+    "cache_creation_input_token_cost_above_1hr": 2e-6,
     "cache_read_input_token_cost": 1e-7,
     "input_cost_per_token": 1e-6,
     "litellm_provider": "bedrock_converse",
@@ -219,6 +221,7 @@
     "supports_vision": true,
     "supports_prompt_caching": false,
     "supports_reasoning": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_tool_choice": true
   },
   "anthropic.claude-opus-4-1-20250805-v1:0": {
@@ -275,6 +278,7 @@
   },
   "anthropic.claude-opus-4-5-20251101-v1:0": {
     "cache_creation_input_token_cost": 6.25e-6,
+    "cache_creation_input_token_cost_above_1hr": 1e-5,
     "cache_read_input_token_cost": 5e-7,
     "input_cost_per_token": 5e-6,
     "litellm_provider": "bedrock_converse",
@@ -294,6 +298,7 @@
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_response_schema": true,
     "supports_tool_choice": true,
     "supports_vision": true,
@@ -302,6 +307,7 @@
   },
   "anthropic.claude-opus-4-6-v1": {
     "cache_creation_input_token_cost": 6.25e-6,
+    "cache_creation_input_token_cost_above_1hr": 1e-5,
     "cache_read_input_token_cost": 5e-7,
     "input_cost_per_token": 5e-6,
     "litellm_provider": "bedrock_converse",
@@ -331,6 +337,7 @@
   },
   "anthropic.claude-opus-4-7": {
     "cache_creation_input_token_cost": 6.25e-6,
+    "cache_creation_input_token_cost_above_1hr": 1e-5,
     "cache_read_input_token_cost": 5e-7,
     "input_cost_per_token": 5e-6,
     "litellm_provider": "bedrock_converse",
@@ -391,11 +398,13 @@
   },
   "anthropic.claude-sonnet-4-5-20250929-v1:0": {
     "cache_creation_input_token_cost": 3.75e-6,
+    "cache_creation_input_token_cost_above_1hr": 6e-6,
     "cache_read_input_token_cost": 3e-7,
     "input_cost_per_token": 3e-6,
     "input_cost_per_token_above_200k_tokens": 6e-6,
     "output_cost_per_token_above_200k_tokens": 2.25e-5,
     "cache_creation_input_token_cost_above_200k_tokens": 7.5e-6,
+    "cache_creation_input_token_cost_above_1hr_above_200k_tokens": 1.2e-5,
     "cache_read_input_token_cost_above_200k_tokens": 6e-7,
     "litellm_provider": "bedrock_converse",
     "max_input_tokens": 200000,
@@ -422,6 +431,7 @@
   },
   "anthropic.claude-sonnet-4-6": {
     "cache_creation_input_token_cost": 3.75e-6,
+    "cache_creation_input_token_cost_above_1hr": 6e-6,
     "cache_read_input_token_cost": 3e-7,
     "input_cost_per_token": 3e-6,
     "litellm_provider": "bedrock_converse",
@@ -442,6 +452,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_max_reasoning_effort": true,
     "supports_tool_choice": true,
     "supports_vision": true,
     "tool_use_system_prompt_tokens": 346,
@@ -739,6 +750,7 @@
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_response_schema": true,
     "supports_tool_choice": true,
     "supports_vision": true,
@@ -766,6 +778,7 @@
     "supports_pdf_input": true,
     "supports_prompt_caching": true,
     "supports_reasoning": true,
+    "supports_minimal_reasoning_effort": true,
     "supports_response_schema": true,
     "supports_tool_choice": true,
     "supports_vision": true,
@@ -787,6 +800,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": false,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -820,6 +834,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": false,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -853,6 +868,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": false,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -863,12 +879,12 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_xhigh_reasoning_effort": true,
+    "supports_max_reasoning_effort": true,
     "tool_use_system_prompt_tokens": 346,
     "provider_specific_entry": {
       "us": 1.1,
       "fast": 6.0
     },
-    "supports_max_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
   "claude-opus-4-7-20260416": {
@@ -887,6 +903,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": false,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -897,12 +914,12 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_xhigh_reasoning_effort": true,
+    "supports_max_reasoning_effort": true,
     "tool_use_system_prompt_tokens": 346,
     "provider_specific_entry": {
       "us": 1.1,
       "fast": 6.0
     },
-    "supports_max_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
   "claude-sonnet-4-20250514": {
@@ -1038,6 +1055,7 @@
       "search_context_size_low": 0.01,
       "search_context_size_medium": 0.01
     },
+    "supports_adaptive_thinking": true,
     "supports_assistant_prefill": true,
     "supports_computer_use": true,
     "supports_function_calling": true,
@@ -1045,6 +1063,7 @@
     "supports_prompt_caching": true,
     "supports_reasoning": true,
     "supports_response_schema": true,
+    "supports_max_reasoning_effort": true,
     "supports_tool_choice": true,
     "supports_vision": true,
     "tool_use_system_prompt_tokens": 346,
