@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { adaptReport } from "../adapt";
 import { detectReportType } from "../detect";
-import { normalizeEntries, normalizeTotals, aggregateToMonthly } from "../normalize";
+import {
+  normalizeEntries,
+  normalizeTotals,
+  aggregateToWeekly,
+  aggregateToMonthly,
+} from "../normalize";
 
 // Realistic codex daily report with multiple entries and models
 const CODEX_REPORT = {
@@ -154,6 +159,16 @@ describe("E2E pipeline: codex format", () => {
     expect(monthly[0].cost).toBeCloseTo(0.18388725 + 1.89801275);
     // Nov: single entry
     expect(monthly[1].inputTokens).toBe(489072578);
+  });
+
+  it("aggregates to weekly correctly", () => {
+    const entries = normalizeEntries(report);
+    const weekly = aggregateToWeekly(entries);
+    expect(weekly).toHaveLength(2);
+    expect(weekly[0].label).toBe("2025-09-15");
+    expect(weekly[1].label).toBe("2025-11-17");
+    expect(weekly[0].inputTokens).toBe(361481 + 7443023);
+    expect(weekly[1].inputTokens).toBe(489072578);
   });
 
   it("monthly aggregation merges model breakdowns", () => {

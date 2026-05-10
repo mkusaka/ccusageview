@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { detectReportType } from "../detect.ts";
-import { normalizeEntries, normalizeTotals, aggregateToMonthly } from "../normalize.ts";
+import {
+  normalizeEntries,
+  normalizeTotals,
+  aggregateToWeekly,
+  aggregateToMonthly,
+} from "../normalize.ts";
 import dailyJson from "../../../examples/daily.json";
 import weeklyJson from "../../../examples/weekly.json";
 import monthlyJson from "../../../examples/monthly.json";
@@ -37,6 +42,15 @@ describe("E2E pipeline: example files", () => {
       expect(monthly[0].label).toBe("2025-07");
       expect(monthly[1].label).toBe("2025-08");
       expect(monthly[0].inputTokens).toBe(1_000_000);
+    });
+
+    it("aggregates to weekly", () => {
+      const entries = normalizeEntries(report);
+      const weekly = aggregateToWeekly(entries);
+      expect(weekly).toHaveLength(2);
+      expect(weekly[0].label).toBe("2025-06-30");
+      expect(weekly[1].label).toBe("2025-07-28");
+      expect(weekly[0].inputTokens).toBe(1_000_000);
     });
 
     it("preserves modelBreakdowns through pipeline", () => {

@@ -105,6 +105,44 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
   }
 }
 
+function parseIsoDateLabel(label: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(label)) return null;
+
+  const [year, month, day] = label.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+function formatIsoDateLabel(date: Date): string {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getWeekStartLabel(label: string): string | null {
+  const date = parseIsoDateLabel(label);
+  if (!date) return null;
+
+  const day = date.getUTCDay();
+  const daysSinceMonday = day === 0 ? 6 : day - 1;
+  date.setUTCDate(date.getUTCDate() - daysSinceMonday);
+  return formatIsoDateLabel(date);
+}
+
+// Aggregate daily entries into weekly entries (week starts on Monday)
+export function aggregateToWeekly(dailyEntries: NormalizedEntry[]): NormalizedEntry[] {
+  return groupEntries(dailyEntries, (e) => getWeekStartLabel(e.label));
+}
+
 // Aggregate daily entries into monthly entries (frontend computation)
 export function aggregateToMonthly(dailyEntries: NormalizedEntry[]): NormalizedEntry[] {
   return groupEntries(dailyEntries, (e) => {

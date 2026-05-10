@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeEntries,
   normalizeTotals,
+  aggregateToWeekly,
   aggregateToMonthly,
   computeTotalsFromEntries,
 } from "../normalize";
@@ -87,6 +88,80 @@ describe("normalizeTotals", () => {
 
   it("snapshot: blocks totals", () => {
     expect(normalizeTotals(BLOCKS_REPORT)).toMatchSnapshot();
+  });
+});
+
+describe("aggregateToWeekly", () => {
+  it("aggregates daily entries by Monday-start week", () => {
+    const daily = normalizeEntries(DAILY_REPORT);
+    const weekly = aggregateToWeekly(daily);
+    expect(weekly).toHaveLength(2);
+    expect(weekly[0].label).toBe("2025-06-30");
+    expect(weekly[1].label).toBe("2025-07-28");
+  });
+
+  it("sums token values for the same week", () => {
+    const daily = normalizeEntries(DAILY_REPORT);
+    const weekly = aggregateToWeekly(daily);
+    expect(weekly[0].inputTokens).toBe(1_000_000);
+    expect(weekly[0].cost).toBeCloseTo(4.3);
+  });
+
+  it("aggregates modelBreakdowns by model name", () => {
+    const daily = normalizeEntries(DAILY_REPORT);
+    const weekly = aggregateToWeekly(daily);
+    const firstWeekBreakdowns = weekly[0].modelBreakdowns;
+    expect(firstWeekBreakdowns).toBeDefined();
+    expect(firstWeekBreakdowns!.length).toBe(2);
+  });
+
+  it("keeps Mondays in their own week and groups Sundays with the previous Monday", () => {
+    const entries = [
+      {
+        label: "2025-07-06",
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheCreationTokens: 10,
+        cacheReadTokens: 200,
+        totalTokens: 360,
+        cost: 0.5,
+        models: ["model-a"],
+      },
+      {
+        label: "2025-07-07",
+        inputTokens: 200,
+        outputTokens: 100,
+        cacheCreationTokens: 20,
+        cacheReadTokens: 400,
+        totalTokens: 720,
+        cost: 1,
+        models: ["model-a"],
+      },
+    ];
+    const weekly = aggregateToWeekly(entries);
+    expect(weekly.map((entry) => entry.label)).toEqual(["2025-06-30", "2025-07-07"]);
+  });
+
+  it("skips entries with non-date labels", () => {
+    const entries = [
+      {
+        label: "session-abc",
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheCreationTokens: 10,
+        cacheReadTokens: 200,
+        totalTokens: 360,
+        cost: 0.5,
+        models: ["model-a"],
+      },
+    ];
+    const weekly = aggregateToWeekly(entries);
+    expect(weekly).toHaveLength(0);
+  });
+
+  it("snapshot: weekly aggregation from daily", () => {
+    const daily = normalizeEntries(DAILY_REPORT);
+    expect(aggregateToWeekly(daily)).toMatchSnapshot();
   });
 });
 
