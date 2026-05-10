@@ -1,7 +1,11 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReportType } from "../types";
 import type { DashboardData } from "../utils/normalize";
-import { aggregateToMonthly, computeTotalsFromEntries } from "../utils/normalize";
+import {
+  aggregateToMonthly,
+  aggregateToWeekly,
+  computeTotalsFromEntries,
+} from "../utils/normalize";
 import { ChartMarkdownContext, type RegisteredMarkdownSection } from "./ChartMarkdownContext";
 import { SummaryCards } from "./SummaryCards";
 import { CostChart } from "./CostChart";
@@ -27,7 +31,19 @@ const TYPE_LABELS: Record<ReportType, string> = {
   blocks: "Blocks Report",
 };
 
-type TimeGranularity = "daily" | "monthly";
+type TimeGranularity = "daily" | "weekly" | "monthly";
+
+const GRANULARITY_LABELS: Record<TimeGranularity, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
+};
+
+const GRANULARITY_REPORT_LABELS: Record<TimeGranularity, string> = {
+  daily: "Daily Report",
+  weekly: "Weekly Report",
+  monthly: "Monthly Report",
+};
 
 export function Dashboard({ data }: Props) {
   const dashboardRef = useRef<HTMLDivElement>(null);
@@ -36,9 +52,14 @@ export function Dashboard({ data }: Props) {
   >({});
   const { entries: dailyEntries, totals, reportType, sourceLabels } = data;
 
-  // Daily reports can be viewed as monthly too
+  // Daily reports can be viewed as weekly or monthly too
   const canToggleGranularity = reportType === "daily";
   const [granularity, setGranularity] = useState<TimeGranularity>("daily");
+
+  const weeklyEntries = useMemo(
+    () => (canToggleGranularity ? aggregateToWeekly(dailyEntries) : []),
+    [canToggleGranularity, dailyEntries],
+  );
 
   const monthlyEntries = useMemo(
     () => (canToggleGranularity ? aggregateToMonthly(dailyEntries) : []),
@@ -46,7 +67,13 @@ export function Dashboard({ data }: Props) {
   );
 
   // Pick entries based on the active granularity
-  const entries = canToggleGranularity && granularity === "monthly" ? monthlyEntries : dailyEntries;
+  const entries = canToggleGranularity
+    ? granularity === "weekly"
+      ? weeklyEntries
+      : granularity === "monthly"
+        ? monthlyEntries
+        : dailyEntries
+    : dailyEntries;
 
   // Range slider state — reset when entries change (render-time reset pattern)
   const [range, setRange] = useState<[number, number]>([0, Math.max(0, entries.length - 1)]);
@@ -75,9 +102,7 @@ export function Dashboard({ data }: Props) {
   const showHeatmap = reportType === "daily" || reportType === "weekly";
 
   const displayLabel = canToggleGranularity
-    ? granularity === "daily"
-      ? "Daily Report"
-      : "Monthly Report"
+    ? GRANULARITY_REPORT_LABELS[granularity]
     : TYPE_LABELS[reportType];
 
   const registerMarkdownSection = useCallback((section: RegisteredMarkdownSection) => {
@@ -130,7 +155,7 @@ export function Dashboard({ data }: Props) {
         {/* Granularity toggle for daily reports */}
         {canToggleGranularity && (
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 ml-auto">
-            {(["daily", "monthly"] as const).map((g) => (
+            {(["daily", "weekly", "monthly"] as const).map((g) => (
               <button
                 key={g}
                 onClick={() => setGranularity(g)}
@@ -140,7 +165,7 @@ export function Dashboard({ data }: Props) {
                     : "text-text-secondary hover:text-text-primary"
                 }`}
               >
-                {g === "daily" ? "Daily" : "Monthly"}
+                {GRANULARITY_LABELS[g]}
               </button>
             ))}
           </div>
