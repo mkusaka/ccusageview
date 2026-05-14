@@ -34,14 +34,12 @@ const chartComponentExports = [
 ] as const;
 
 describe("recharts-components", () => {
-  it("keeps Recharts primitives on direct exports", () => {
+  it.each(chartComponentExports)("keeps %s on direct exports", (name, component) => {
     const reactLazyType = Symbol.for("react.lazy");
 
-    for (const [name, component] of chartComponentExports) {
-      expect(
-        component,
-        `${name} must not be React.lazy; lazy wrappers can retrigger React error #185 on ccost JSON dashboards`,
-      ).not.toHaveProperty("$$typeof", reactLazyType);
-    }
+    expect(
+      component,
+      `${name} must not be React.lazy; lazy wrappers can retrigger React error #185 on ccost JSON dashboards`,
+    ).not.toHaveProperty("$$typeof", reactLazyType);
   });
 });
