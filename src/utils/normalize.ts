@@ -85,9 +85,9 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
         });
 
     case "blocks":
-      return report.blocks
-        .filter((e) => !e.isGap)
-        .map((e) => ({
+      return report.blocks.reduce<NormalizedEntry[]>((entries, e) => {
+        if (e.isGap) return entries;
+        entries.push({
           label: new Date(e.startTime).toLocaleString("en-US", {
             month: "short",
             day: "numeric",
@@ -101,7 +101,9 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
           totalTokens: e.totalTokens,
           cost: e.costUSD,
           models: e.models,
-        }));
+        });
+        return entries;
+      }, []);
   }
 }
 

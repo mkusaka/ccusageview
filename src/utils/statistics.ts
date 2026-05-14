@@ -11,38 +11,6 @@ export type StatMetricKey =
   | "cacheReadTokens";
 
 /**
- * Extract a single metric's values for a specific model from entries.
- * Only entries where the model appears in modelBreakdowns are included.
- */
-export function extractMetricByModel(
-  entries: NormalizedEntry[],
-  key: StatMetricKey,
-  modelName: string,
-): number[] {
-  const values: number[] = [];
-  for (const e of entries) {
-    if (!e.modelBreakdowns) continue;
-    const mb = e.modelBreakdowns.find((m) => m.modelName === modelName);
-    if (mb) values.push(getBreakdownMetricValue(mb, key));
-  }
-  return values;
-}
-
-/**
- * Compute descriptive statistics for each metric, filtered to a specific model.
- */
-export function computeAllStatsByModel(
-  entries: NormalizedEntry[],
-  modelName: string,
-): Record<StatMetricKey, DescriptiveStats> {
-  const result = {} as Record<StatMetricKey, DescriptiveStats>;
-  for (const key of STAT_METRIC_KEYS) {
-    result[key] = computeStats(extractMetricByModel(entries, key, modelName));
-  }
-  return result;
-}
-
-/**
  * Extract a single metric's values from entries, filtered to a set of visible models.
  * Sums the visible models' breakdown values per entry.
  * Entries without breakdowns are included when includeOther is true.
@@ -169,21 +137,6 @@ export function extractMetricWithLabels(
   return entries.map((e) => ({ label: e.label, value: e[key] }));
 }
 
-/** Extract a single metric's values with labels, filtered by model */
-export function extractMetricByModelWithLabels(
-  entries: NormalizedEntry[],
-  key: StatMetricKey,
-  modelName: string,
-): LabeledValue[] {
-  const result: LabeledValue[] = [];
-  for (const e of entries) {
-    if (!e.modelBreakdowns) continue;
-    const mb = e.modelBreakdowns.find((m) => m.modelName === modelName);
-    if (mb) result.push({ label: e.label, value: getBreakdownMetricValue(mb, key) });
-  }
-  return result;
-}
-
 /**
  * Find source labels (dates) for stat values that exactly match actual entries.
  * Returns a map from stat field name to matching labels.
@@ -207,7 +160,10 @@ export function findStatSources(
 
   const result: Partial<Record<string, string[]>> = {};
   for (const { field, value } of fieldsToCheck) {
-    const matches = labeledValues.filter((v) => v.value === value).map((v) => v.label);
+    const matches: string[] = [];
+    for (const labeledValue of labeledValues) {
+      if (labeledValue.value === value) matches.push(labeledValue.label);
+    }
     if (matches.length > 0) {
       result[field] = matches;
     }

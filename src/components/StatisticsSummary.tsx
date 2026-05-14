@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useRef, useState, type RefObject } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -8,7 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceLine,
-} from "recharts";
+} from "./recharts-lazy";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import {
@@ -25,6 +25,7 @@ import {
   type DescriptiveStats,
 } from "../utils/statistics";
 import { collectModels, buildModelSeries, MODEL_COLORS } from "../utils/chart";
+import type { ChartDataSeries } from "../utils/chartData";
 import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatTokens, formatSkewness } from "../utils/format";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
@@ -73,6 +74,7 @@ interface StatItem {
 }
 
 type HighlightedStat = "mean" | 50 | 90 | 95 | 99 | null;
+type StatisticsBreakdownMode = "total" | BreakdownMode;
 
 const STAT_SOURCE_FIELD: Record<string, string> = {
   "Median (P50)": "median",
@@ -136,9 +138,14 @@ const STAT_HIGHLIGHT_TARGET: Partial<Record<string, HighlightedStat>> = {
 export function StatisticsSummary({ entries }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<StatMetricKey>("cost");
-  const [breakdownMode, setBreakdownMode] = useState<"total" | BreakdownMode>("total");
+  const [breakdownMode, setBreakdownMode] = useState<StatisticsBreakdownMode>("total");
   const [hiddenBreakdowns, setHiddenBreakdowns] = useState<Set<string>>(new Set());
   const [highlightedStat, setHighlightedStat] = useState<HighlightedStat>(null);
+
+  const handleBreakdownModeChange = (nextMode: StatisticsBreakdownMode) => {
+    setBreakdownMode(nextMode);
+    setHiddenBreakdowns(new Set());
+  };
 
   const toggleBreakdown = (key: string) => {
     setHiddenBreakdowns((previous) => {
@@ -347,74 +354,16 @@ export function StatisticsSummary({ entries }: Props) {
 
   return (
     <div ref={panelRef} className="bg-bg-card border border-border rounded-lg p-4">
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <div className="flex items-center gap-1 shrink-0">
-          <h3 className="text-sm font-medium text-text-secondary">Statistics</h3>
-          <span className="text-xs text-text-secondary">({stats.count} entries)</span>
-          <CopyImageButton targetRef={panelRef} />
-          <CopyMarkdownButton markdown={chartMarkdown} />
-        </div>
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {hasBreakdownData && (
-            <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
-              <button
-                onClick={() => {
-                  setBreakdownMode("total");
-                  setHiddenBreakdowns(new Set());
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  breakdownMode === "total"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                Total
-              </button>
-              <button
-                onClick={() => {
-                  setBreakdownMode("model");
-                  setHiddenBreakdowns(new Set());
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  breakdownMode === "model"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Model
-              </button>
-              <button
-                onClick={() => {
-                  setBreakdownMode("provider");
-                  setHiddenBreakdowns(new Set());
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  breakdownMode === "provider"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Provider
-              </button>
-            </div>
-          )}
-          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
-            {METRIC_KEYS.map((key) => (
-              <button
-                key={key}
-                onClick={() => setMetric(key)}
-                className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
-                  metric === key
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                {METRICS[key].label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+      <StatisticsHeader
+        breakdownMode={breakdownMode}
+        chartMarkdown={chartMarkdown}
+        entryCount={stats.count}
+        hasBreakdownData={hasBreakdownData}
+        metric={metric}
+        panelRef={panelRef}
+        onBreakdownModeChange={handleBreakdownModeChange}
+        onMetricChange={setMetric}
+      />
 
       <DistributionChart
         entries={entries}
@@ -427,73 +376,171 @@ export function StatisticsSummary({ entries }: Props) {
         highlightedStat={highlightedStat}
       />
 
-      {breakdownMode !== "total" && breakdownSeries.length > 0 && (
-        <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 text-xs mt-1 mb-3">
-          {breakdownSeries.map((series) => (
+      <StatisticsBreakdownLegend
+        breakdownMode={breakdownMode}
+        breakdownSeries={breakdownSeries}
+        hiddenBreakdowns={hiddenBreakdowns}
+        toggleBreakdown={toggleBreakdown}
+      />
+
+      <StatisticsCards items={items} onHighlightChange={setHighlightedStat} />
+    </div>
+  );
+}
+
+function StatisticsHeader({
+  breakdownMode,
+  chartMarkdown,
+  entryCount,
+  hasBreakdownData,
+  metric,
+  panelRef,
+  onBreakdownModeChange,
+  onMetricChange,
+}: {
+  breakdownMode: StatisticsBreakdownMode;
+  chartMarkdown: string;
+  entryCount: number;
+  hasBreakdownData: boolean;
+  metric: StatMetricKey;
+  panelRef: RefObject<HTMLDivElement | null>;
+  onBreakdownModeChange: (mode: StatisticsBreakdownMode) => void;
+  onMetricChange: (metric: StatMetricKey) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 mb-4">
+      <div className="flex items-center gap-1 shrink-0">
+        <h3 className="text-sm font-medium text-text-secondary">Statistics</h3>
+        <span className="text-xs text-text-secondary">({entryCount} entries)</span>
+        <CopyImageButton targetRef={panelRef} />
+        <CopyMarkdownButton markdown={chartMarkdown} />
+      </div>
+      <div className="flex items-center gap-2 overflow-x-auto">
+        {hasBreakdownData && (
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+            {(["total", "model", "provider"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => onBreakdownModeChange(mode)}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  breakdownMode === mode
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+          {METRIC_KEYS.map((key) => (
             <button
-              key={series.key}
-              type="button"
-              onClick={() => toggleBreakdown(series.key)}
-              className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-              style={{
-                opacity: hiddenBreakdowns.has(series.key) ? 0.3 : 1,
-                fontSize: "inherit",
-                color: "inherit",
-                textDecoration: hiddenBreakdowns.has(series.key) ? "line-through" : "none",
-              }}
+              key={key}
+              onClick={() => onMetricChange(key)}
+              className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
+                metric === key
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
             >
-              <span
-                style={{
-                  width: 10,
-                  height: 10,
-                  backgroundColor: series.color,
-                  display: "inline-block",
-                }}
-              />
-              <span style={{ color: "var(--color-text-secondary)" }}>{series.label}</span>
+              {METRICS[key].label}
             </button>
           ))}
         </div>
-      )}
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
-        {items.map((item) => (
-          <div
-            key={item.label}
-            className={item.sourceLabels ? "group/stat relative" : undefined}
-            onMouseEnter={() => setHighlightedStat(STAT_HIGHLIGHT_TARGET[item.label] ?? null)}
-            onMouseLeave={() => setHighlightedStat(null)}
-          >
-            <p
-              className="text-xs uppercase tracking-wide flex items-center gap-1.5"
-              style={{ color: item.color ?? "var(--color-text-secondary)" }}
-            >
-              {item.color && (
-                <span
-                  className="inline-block w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: item.color }}
-                />
-              )}
-              {item.label}
-            </p>
-            <p
-              className={`text-lg font-semibold mt-0.5 text-text-primary${
-                item.sourceLabels
-                  ? " cursor-help underline decoration-dashed decoration-1 decoration-text-secondary/40 underline-offset-4"
-                  : ""
-              }`}
-            >
-              {item.value}
-            </p>
-            {item.sourceLabels && (
-              <div className="pointer-events-none absolute bottom-full left-0 mb-1 hidden group-hover/stat:block z-10 bg-bg-secondary border border-border rounded-md px-2.5 py-1.5 text-xs text-text-secondary whitespace-nowrap shadow-lg">
-                {formatSourceLabels(item.sourceLabels)}
-              </div>
-            )}
-            {item.subLabel && <p className="text-xs text-text-secondary mt-0.5">{item.subLabel}</p>}
-          </div>
-        ))}
       </div>
+    </div>
+  );
+}
+
+function StatisticsBreakdownLegend({
+  breakdownMode,
+  breakdownSeries,
+  hiddenBreakdowns,
+  toggleBreakdown,
+}: {
+  breakdownMode: StatisticsBreakdownMode;
+  breakdownSeries: ChartDataSeries[];
+  hiddenBreakdowns: Set<string>;
+  toggleBreakdown: (key: string) => void;
+}) {
+  if (breakdownMode === "total" || breakdownSeries.length === 0) return null;
+
+  return (
+    <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 text-xs mt-1 mb-3">
+      {breakdownSeries.map((series) => (
+        <button
+          key={series.key}
+          type="button"
+          onClick={() => toggleBreakdown(series.key)}
+          className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+          style={{
+            opacity: hiddenBreakdowns.has(series.key) ? 0.3 : 1,
+            fontSize: "inherit",
+            color: "inherit",
+            textDecoration: hiddenBreakdowns.has(series.key) ? "line-through" : "none",
+          }}
+        >
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              backgroundColor: series.color,
+              display: "inline-block",
+            }}
+          />
+          <span style={{ color: "var(--color-text-secondary)" }}>{series.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function StatisticsCards({
+  items,
+  onHighlightChange,
+}: {
+  items: StatItem[];
+  onHighlightChange: (highlightedStat: HighlightedStat) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
+      {items.map((item) => (
+        <div
+          key={item.label}
+          className={item.sourceLabels ? "group/stat relative" : undefined}
+          onMouseEnter={() => onHighlightChange(STAT_HIGHLIGHT_TARGET[item.label] ?? null)}
+          onMouseLeave={() => onHighlightChange(null)}
+        >
+          <p
+            className="text-xs uppercase tracking-wide flex items-center gap-1.5"
+            style={{ color: item.color ?? "var(--color-text-secondary)" }}
+          >
+            {item.color && (
+              <span
+                className="inline-block size-2 rounded-full flex-shrink-0"
+                style={{ backgroundColor: item.color }}
+              />
+            )}
+            {item.label}
+          </p>
+          <p
+            className={`text-lg font-semibold mt-0.5 text-text-primary${
+              item.sourceLabels
+                ? " cursor-help underline decoration-dashed decoration-1 decoration-text-secondary/40 underline-offset-4"
+                : ""
+            }`}
+          >
+            {item.value}
+          </p>
+          {item.sourceLabels && (
+            <div className="pointer-events-none absolute bottom-full left-0 mb-1 hidden group-hover/stat:block z-10 bg-bg-secondary border border-border rounded-md px-2.5 py-1.5 text-xs text-text-secondary whitespace-nowrap shadow-lg">
+              {formatSourceLabels(item.sourceLabels)}
+            </div>
+          )}
+          {item.subLabel && <p className="text-xs text-text-secondary mt-0.5">{item.subLabel}</p>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -559,90 +606,95 @@ function DistributionChart({
   return (
     <div className="mb-2">
       <p className="text-xs text-text-secondary mb-2">Distribution (sorted ascending)</p>
-      <ResponsiveContainer width="100%" height={240}>
-        <AreaChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-          <XAxis
-            dataKey="rank"
-            type="number"
-            domain={[0, 100]}
-            tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(value: number) => `${value}%`}
-            label={{
-              value: "Percentile",
-              position: "insideBottomRight",
-              offset: -5,
-              style: { fontSize: 11, fill: "var(--color-text-secondary)" },
-            }}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(value: number) => metricConfig.format(value)}
-            width={80}
-          />
-          <Tooltip
-            formatter={(value) => [metricConfig.format(Number(value ?? 0)), metricConfig.label]}
-            labelFormatter={(rank) => `Percentile: ${rank}%`}
-            contentStyle={{
-              backgroundColor: "var(--color-bg-card)",
-              border: "1px solid var(--color-border)",
-              borderRadius: "8px",
-              fontSize: 12,
-            }}
-          />
-          <Area
-            type="monotone"
-            dataKey="value"
-            fill="var(--color-chart-blue)"
-            stroke="var(--color-chart-blue)"
-            fillOpacity={0.15}
-            strokeWidth={2}
-          />
-          {meanRank != null && (
-            <ReferenceLine
-              x={meanRank}
-              stroke={MEAN_COLOR}
-              strokeDasharray="4 3"
-              strokeWidth={meanHighlighted ? 3 : 1.5}
-              strokeOpacity={highlightedStat == null || meanHighlighted ? 1 : 0.5}
+      <Suspense fallback={<div className="h-60" />}>
+        <ResponsiveContainer width="100%" height={240}>
+          <AreaChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+            <XAxis
+              dataKey="rank"
+              type="number"
+              domain={[0, 100]}
+              tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value: number) => `${value}%`}
               label={{
-                value: `Mean ${metricConfig.format(stats.mean)}`,
-                position: "top",
-                style: {
-                  fontSize: meanHighlighted ? 11 : 10,
-                  fontWeight: meanHighlighted ? 600 : 400,
-                  fill: MEAN_COLOR,
-                  opacity: highlightedStat == null || meanHighlighted ? 1 : 0.7,
-                },
+                value: "Percentile",
+                position: "insideBottomRight",
+                offset: -5,
+                style: { fontSize: 11, fill: "var(--color-text-secondary)" },
               }}
             />
-          )}
-          {PERCENTILE_LINES.map(({ rank, label, color }) => (
-            <ReferenceLine
-              key={rank}
-              x={rank}
-              stroke={color}
-              strokeDasharray="4 3"
-              strokeWidth={highlightedStat === rank ? 3 : 1.5}
-              strokeOpacity={highlightedStat == null || highlightedStat === rank ? 1 : 0.5}
-              label={{
-                value: `${label} ${metricConfig.format(percentileValues[rank])}`,
-                position: "top",
-                style: {
-                  fontSize: highlightedStat === rank ? 11 : 10,
-                  fontWeight: highlightedStat === rank ? 600 : 400,
-                  fill: color,
-                  opacity: highlightedStat == null || highlightedStat === rank ? 1 : 0.7,
-                },
+            <YAxis
+              tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(value: number) => metricConfig.format(value)}
+              width={80}
+            />
+            <Tooltip
+              formatter={(value: unknown) => [
+                metricConfig.format(Number(value ?? 0)),
+                metricConfig.label,
+              ]}
+              labelFormatter={(rank: unknown) => `Percentile: ${rank}%`}
+              contentStyle={{
+                backgroundColor: "var(--color-bg-card)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "8px",
+                fontSize: 12,
               }}
             />
-          ))}
-        </AreaChart>
-      </ResponsiveContainer>
+            <Area
+              type="monotone"
+              dataKey="value"
+              fill="var(--color-chart-blue)"
+              stroke="var(--color-chart-blue)"
+              fillOpacity={0.15}
+              strokeWidth={2}
+            />
+            {meanRank != null && (
+              <ReferenceLine
+                x={meanRank}
+                stroke={MEAN_COLOR}
+                strokeDasharray="4 3"
+                strokeWidth={meanHighlighted ? 3 : 1.5}
+                strokeOpacity={highlightedStat == null || meanHighlighted ? 1 : 0.5}
+                label={{
+                  value: `Mean ${metricConfig.format(stats.mean)}`,
+                  position: "top",
+                  style: {
+                    fontSize: meanHighlighted ? 11 : 10,
+                    fontWeight: meanHighlighted ? 600 : 400,
+                    fill: MEAN_COLOR,
+                    opacity: highlightedStat == null || meanHighlighted ? 1 : 0.7,
+                  },
+                }}
+              />
+            )}
+            {PERCENTILE_LINES.map(({ rank, label, color }) => (
+              <ReferenceLine
+                key={rank}
+                x={rank}
+                stroke={color}
+                strokeDasharray="4 3"
+                strokeWidth={highlightedStat === rank ? 3 : 1.5}
+                strokeOpacity={highlightedStat == null || highlightedStat === rank ? 1 : 0.5}
+                label={{
+                  value: `${label} ${metricConfig.format(percentileValues[rank])}`,
+                  position: "top",
+                  style: {
+                    fontSize: highlightedStat === rank ? 11 : 10,
+                    fontWeight: highlightedStat === rank ? 600 : 400,
+                    fill: color,
+                    opacity: highlightedStat == null || highlightedStat === rank ? 1 : 0.7,
+                  },
+                }}
+              />
+            ))}
+          </AreaChart>
+        </ResponsiveContainer>
+      </Suspense>
     </div>
   );
 }

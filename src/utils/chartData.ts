@@ -10,7 +10,7 @@ export interface MarkdownColumn {
   align?: "left" | "right";
 }
 
-export interface MarkdownTable {
+interface MarkdownTable {
   title?: string;
   columns: readonly MarkdownColumn[];
   rows: readonly Record<string, unknown>[];
@@ -85,7 +85,7 @@ function separatorForColumn(column: MarkdownColumn): string {
   return column.align === "right" ? "---:" : "---";
 }
 
-export function buildMarkdownTable(table: MarkdownTable): string {
+function buildMarkdownTable(table: MarkdownTable): string {
   if (table.rows.length === 0) return "";
 
   const lines = [

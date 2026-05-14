@@ -51,7 +51,7 @@ export interface MonthlyReport {
   totals: Totals;
 }
 
-export interface SessionEntry {
+interface SessionEntry {
   sessionId: string;
   inputTokens: number;
   outputTokens: number;
@@ -72,14 +72,14 @@ export interface SessionReport {
 }
 
 // Blocks report uses different field names
-export interface BlockTokenCounts {
+interface BlockTokenCounts {
   inputTokens: number;
   outputTokens: number;
   cacheCreationInputTokens: number;
   cacheReadInputTokens: number;
 }
 
-export interface BlockEntry {
+interface BlockEntry {
   id: string;
   startTime: string;
   endTime: string;

@@ -27,6 +27,7 @@ const RAW_PRICING_DATA: ReadonlyMap<string, RawTokenPricing> = new Map(
 const RAW_PRICING_ENTRIES = Array.from(RAW_PRICING_DATA.entries());
 
 const PROVIDER_PREFIXES = ["anthropic/", "anthropic.", "openai/", "azure/", "openrouter/openai/"];
+const PROVIDER_SEPARATOR_PATTERN = /\//u;
 
 const MODEL_ALIASES: ReadonlyMap<string, string> = new Map([
   ["claude-opus-4.5", "claude-opus-4-5"],
@@ -64,6 +65,14 @@ const MODEL_ALIASES: ReadonlyMap<string, string> = new Map([
 
 function normalizeModelName(modelName: string): string {
   return modelName.trim().toLowerCase();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function containsText(value: string, search: string): boolean {
+  return new RegExp(escapeRegExp(search), "u").test(value);
 }
 
 function swapClaudeV3Order(modelName: string): string {
@@ -111,7 +120,8 @@ function buildCandidateNames(modelName: string): string[] {
       }
     }
 
-    const hasProviderPrefix = current.includes("/") || current.startsWith("anthropic.");
+    const hasProviderPrefix =
+      PROVIDER_SEPARATOR_PATTERN.test(current) || current.startsWith("anthropic.");
     if (!hasProviderPrefix) {
       for (const prefix of PROVIDER_PREFIXES) {
         if (!current.startsWith(prefix)) queue.push(`${prefix}${current}`);
@@ -162,9 +172,14 @@ export function getTokenPricing(modelName: string): TokenPricing | null {
   }
 
   for (const candidate of candidates) {
-    const fuzzyMatch = RAW_PRICING_ENTRIES.find(
-      ([key]) => key.includes(candidate) || candidate.includes(key),
-    );
+    let fuzzyMatch: (typeof RAW_PRICING_ENTRIES)[number] | null = null;
+    for (const entry of RAW_PRICING_ENTRIES) {
+      const [key] = entry;
+      if (containsText(key, candidate) || containsText(candidate, key)) {
+        fuzzyMatch = entry;
+        break;
+      }
+    }
     if (!fuzzyMatch) continue;
     const converted = toTokenPricing(fuzzyMatch[1]);
     if (!converted) continue;

@@ -32,7 +32,7 @@ export function RangeSlider({
     <div className="bg-bg-card border border-border rounded-lg px-4 py-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs text-text-secondary truncate mr-2">
-          {startLabel} — {endLabel}
+          {startLabel} to {endLabel}
         </span>
         <span className="text-xs text-text-secondary whitespace-nowrap">
           {end - start + 1} / {count}

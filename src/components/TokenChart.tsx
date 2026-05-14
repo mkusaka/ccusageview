@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { Suspense, useState, useMemo, useRef } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -8,7 +8,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-} from "recharts";
+  type RechartsTooltipProps,
+} from "./recharts-lazy";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatTokens } from "../utils/format";
@@ -53,6 +54,26 @@ const TOKEN_TYPE_TABS: { key: ModelTokenType; label: string }[] = [
 ];
 
 type ViewMode = "type" | "model" | "provider";
+type TokenBreakdownChartData = ReturnType<typeof buildTokenTypeByModel>;
+
+function getVisibleTypeSeries(hiddenSeries: Set<string>) {
+  const visible: (typeof TYPE_SERIES)[number][] = [];
+  for (const series of TYPE_SERIES) {
+    if (!hiddenSeries.has(series.key)) visible.push(series);
+  }
+  return visible;
+}
+
+function getVisibleChartSeries(
+  series: ChartDataSeries[],
+  hiddenSeries: Set<string>,
+): ChartDataSeries[] {
+  const visible: ChartDataSeries[] = [];
+  for (const item of series) {
+    if (!hiddenSeries.has(item.key)) visible.push(item);
+  }
+  return visible;
+}
 
 export function TokenChart({ entries, syncId }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -97,13 +118,11 @@ export function TokenChart({ entries, syncId }: Props) {
 
     if (isBreakdownView) {
       viewLabel = viewMode === "provider" ? "By Provider" : "By Model";
-      series = breakdownSeries
-        .filter((s) => !hiddenSeries.has(s.key))
-        .map((s) => ({ key: s.key, label: s.label, color: s.color }));
+      series = getVisibleChartSeries(breakdownSeries, hiddenSeries);
       data = pickDataKeys(breakdownChartData, ["label", ...series.map((s) => s.key)]);
     } else {
       viewLabel = "By Type";
-      series = TYPE_SERIES.filter((s) => !hiddenSeries.has(s.key)).map((s) => ({
+      series = getVisibleTypeSeries(hiddenSeries).map((s) => ({
         key: s.key,
         label: s.name,
         color: s.color,
@@ -233,6 +252,41 @@ export function TokenChart({ entries, syncId }: Props) {
           ))}
         </div>
       )}
+      <TokenBarChart
+        entries={entries}
+        syncId={syncId}
+        isBreakdownView={isBreakdownView}
+        showPercent={showPercent}
+        hiddenSeries={hiddenSeries}
+        breakdownChartData={breakdownChartData}
+        breakdownSeries={breakdownSeries}
+        toggleSeries={toggleSeries}
+      />
+    </div>
+  );
+}
+
+function TokenBarChart({
+  entries,
+  syncId,
+  isBreakdownView,
+  showPercent,
+  hiddenSeries,
+  breakdownChartData,
+  breakdownSeries,
+  toggleSeries,
+}: {
+  entries: NormalizedEntry[];
+  syncId?: string;
+  isBreakdownView: boolean;
+  showPercent: boolean;
+  hiddenSeries: Set<string>;
+  breakdownChartData: TokenBreakdownChartData;
+  breakdownSeries: ChartDataSeries[];
+  toggleSeries: (key: string) => void;
+}) {
+  return (
+    <Suspense fallback={<div className="h-96" />}>
       <ResponsiveContainer width="100%" height={380}>
         <BarChart
           data={isBreakdownView ? breakdownChartData : entries}
@@ -261,10 +315,10 @@ export function TokenChart({ entries, syncId }: Props) {
           <Tooltip
             content={
               showPercent
-                ? ({ active, payload, label }) => {
+                ? ({ active, payload, label }: RechartsTooltipProps) => {
                     if (!active || !payload?.length) return null;
                     const total = payload.reduce(
-                      (s, p) => s + Number(p.payload?.[String(p.dataKey)] ?? 0),
+                      (s: number, p) => s + Number(p.payload?.[String(p.dataKey)] ?? 0),
                       0,
                     );
                     return (
@@ -294,7 +348,10 @@ export function TokenChart({ entries, syncId }: Props) {
             formatter={
               showPercent
                 ? undefined
-                : (value, name) => [formatTokens(Number(value ?? 0)), String(name)]
+                : (value: unknown, name: unknown) => [
+                    formatTokens(Number(value ?? 0)),
+                    String(name),
+                  ]
             }
             contentStyle={
               showPercent
@@ -343,19 +400,17 @@ export function TokenChart({ entries, syncId }: Props) {
             }}
           />
           {isBreakdownView
-            ? breakdownSeries
-                .filter((s) => !hiddenSeries.has(s.key))
-                .map((s) => (
-                  <Bar
-                    key={s.key}
-                    dataKey={s.key}
-                    name={s.label}
-                    stackId="tokens"
-                    fill={s.color}
-                    fillOpacity={0.85}
-                  />
-                ))
-            : TYPE_SERIES.filter((s) => !hiddenSeries.has(s.key)).map((s) => (
+            ? getVisibleChartSeries(breakdownSeries, hiddenSeries).map((s) => (
+                <Bar
+                  key={s.key}
+                  dataKey={s.key}
+                  name={s.label}
+                  stackId="tokens"
+                  fill={s.color}
+                  fillOpacity={0.85}
+                />
+              ))
+            : getVisibleTypeSeries(hiddenSeries).map((s) => (
                 <Bar
                   key={s.key}
                   dataKey={s.key}
@@ -367,6 +422,6 @@ export function TokenChart({ entries, syncId }: Props) {
               ))}
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </Suspense>
   );
 }

@@ -77,7 +77,7 @@ export function InputView({ inputs, onChange, activeTab, onTabChange, error }: P
               </button>
               <button
                 onClick={() => removeTab(i)}
-                className="px-1 py-1 text-xs text-text-secondary hover:text-text-primary transition-colors"
+                className="p-1 text-xs text-text-secondary hover:text-text-primary transition-colors"
                 title="Remove tab"
               >
                 &times;

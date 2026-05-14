@@ -73,7 +73,7 @@ export function parseInputs(inputs: SourceInput[]): {
   }
 
   const reportType: ReportType = sources[0].report.type;
-  const sourceLabels = sources.map((s) => s.label).filter(Boolean);
+  const sourceLabels = sources.flatMap((s) => (s.label ? [s.label] : []));
 
   if (sources.length === 1) {
     const report = sources[0].report;
@@ -168,7 +168,6 @@ export function restoreFromHash(json: string): SourceInput[] | null {
 function App() {
   const [inputs, setInputs] = useState<SourceInput[]>([createSourceInput()]);
   const [activeTab, setActiveTab] = useState(0);
-  const [error, setError] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(() => {
     const saved = localStorage.getItem("ccusageview-dark");
     if (saved !== null) return saved === "true";
@@ -202,11 +201,6 @@ function App() {
   // Parse inputs
   const parseResult = useMemo(() => parseInputs(inputs), [inputs]);
 
-  // Sync error
-  useEffect(() => {
-    setError(parseResult.error);
-  }, [parseResult]);
-
   // Debounced hash update
   useEffect(() => {
     if (!parseResult.data) return;
@@ -238,7 +232,7 @@ function App() {
     );
   }, []);
 
-  const nonEmptyInputs = inputs.filter((inp) => inp.content.trim());
+  const nonEmptyInputs = inputs.flatMap((inp) => (inp.content.trim() ? [inp] : []));
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
@@ -252,7 +246,7 @@ function App() {
             {parseResult.data && <ShareButton />}
             <button
               onClick={() => setDarkMode((d) => !d)}
-              className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors"
+              className="size-8 flex items-center justify-center rounded-md hover:bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors"
               title="Toggle dark mode"
             >
               {darkMode ? (
@@ -288,7 +282,7 @@ function App() {
           onChange={handleInputsChange}
           activeTab={activeTab}
           onTabChange={setActiveTab}
-          error={error}
+          error={parseResult.error}
         />
         {nonEmptyInputs.length >= 2 && (
           <div className="flex items-center gap-2 text-xs">

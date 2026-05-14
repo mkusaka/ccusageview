@@ -119,7 +119,7 @@ function buildGrid(
   let currentMonth = -1;
   const cursor = new Date(gridStart);
 
-  while (cursor <= gridEnd) {
+  for (let weekIndex = 0; weekIndex < numWeeks; weekIndex++) {
     const week: DayData[] = [];
     for (let d = 0; d < 7; d++) {
       const dateStr = cursor.toISOString().slice(0, 10);
@@ -130,7 +130,7 @@ function buildGrid(
         currentMonth = m;
         months.push({
           label: cursor.toLocaleDateString("en-US", { month: "short" }),
-          colStart: weeks.length,
+          colStart: weekIndex,
         });
       }
 
@@ -158,8 +158,8 @@ export function ActivityHeatmap({ entries }: Props) {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
+    const ro = new ResizeObserver((observerEntries) => {
+      for (const entry of observerEntries) {
         setContainerWidth(entry.contentRect.width);
       }
     });
@@ -277,9 +277,9 @@ export function ActivityHeatmap({ entries }: Props) {
         <div ref={scrollRef} className="overflow-x-auto">
           <svg width={svgWidth} height={svgHeight} className="block">
             {/* Month labels */}
-            {months.map((m, i) => (
+            {months.map((m) => (
               <text
-                key={i}
+                key={`${m.label}-${m.colStart}`}
                 x={labelWidth + m.colStart * cellStep}
                 y={monthLabelHeight - 2}
                 fontSize={11}
@@ -294,7 +294,7 @@ export function ActivityHeatmap({ entries }: Props) {
               (label, i) =>
                 label && (
                   <text
-                    key={i}
+                    key={label}
                     x={0}
                     y={gridTop + i * cellStep + cellSize * 0.8}
                     fontSize={10}
@@ -309,7 +309,7 @@ export function ActivityHeatmap({ entries }: Props) {
             {weeks.map((week, wi) =>
               week.map((day, di) => (
                 <rect
-                  key={`${wi}-${di}`}
+                  key={day.date}
                   x={labelWidth + wi * cellStep}
                   y={gridTop + di * cellStep}
                   width={cellSize}
@@ -358,7 +358,7 @@ export function ActivityHeatmap({ entries }: Props) {
           {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
             <span
               key={ratio}
-              className="inline-block w-3 h-3 rounded-sm"
+              className="inline-block size-3 rounded-sm"
               style={{
                 backgroundColor:
                   ratio === 0 ? "var(--color-bg-secondary)" : getColor(ratio * maxValue),

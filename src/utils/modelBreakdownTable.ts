@@ -1,4 +1,4 @@
-export const MODEL_BREAKDOWN_METRICS = [
+const MODEL_BREAKDOWN_METRICS = [
   "cost",
   "inputTokens",
   "outputTokens",
@@ -8,7 +8,7 @@ export const MODEL_BREAKDOWN_METRICS = [
 
 export type ModelBreakdownMetric = (typeof MODEL_BREAKDOWN_METRICS)[number];
 export type ModelBreakdownSortKey = "label" | ModelBreakdownMetric;
-export type ModelBreakdownSortDir = "asc" | "desc";
+type ModelBreakdownSortDir = "asc" | "desc";
 
 export interface ModelBreakdownSortState {
   sortCol: ModelBreakdownSortKey;
