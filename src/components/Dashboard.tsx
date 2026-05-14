@@ -102,6 +102,7 @@ export function Dashboard({ data }: Props) {
   );
 
   const showHeatmap = reportType === "daily" || reportType === "weekly";
+  const showDayOfWeek = reportType === "daily" && granularity === "daily";
 
   const displayLabel = canToggleGranularity
     ? GRANULARITY_REPORT_LABELS[granularity]
@@ -194,7 +195,7 @@ export function Dashboard({ data }: Props) {
           {filteredEntries.length > 0 && (
             <>
               {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
-              <DayOfWeekChart entries={filteredEntries} />
+              {showDayOfWeek && <DayOfWeekChart entries={filteredEntries} />}
               <CostChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
               <TokenChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
               {hasModelBreakdowns && <ModelBreakdown entries={filteredEntries} />}
