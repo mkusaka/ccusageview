@@ -1,5 +1,5 @@
 import { Suspense, useMemo, useRef, useState } from "react";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "./recharts-lazy";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "./recharts-components";
 import type { NormalizedEntry } from "../utils/normalize";
 import { aggregateBreakdowns, type AggregatedBreakdown } from "../utils/aggregate";
 import type { BreakdownMode } from "../utils/breakdown";

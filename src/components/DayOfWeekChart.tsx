@@ -9,7 +9,7 @@ import {
   Tooltip,
   Legend,
   type RechartsTooltipProps,
-} from "./recharts-lazy";
+} from "./recharts-components";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatCost, formatTokens } from "../utils/format";
@@ -20,7 +20,6 @@ import {
   buildDayOfWeekByBreakdown,
   buildDayOfWeekData,
   DAY_OF_WEEK_AGGREGATIONS,
-  type DayBucket,
   type DayOfWeekAggregation,
   type DayOfWeekMetric,
 } from "../utils/dayOfWeek";
@@ -483,9 +482,9 @@ function DayOfWeekBarChart({
               <Tooltip
                 allowEscapeViewBox={{ x: true, y: true }}
                 wrapperStyle={TOOLTIP_WRAPPER_STYLE}
-                content={({ payload }: { payload?: Array<{ payload: DayBucket }> }) => {
-                  if (!payload || payload.length === 0) return null;
-                  const bucket = payload[0].payload as DayBucket;
+                content={({ label }: RechartsTooltipProps) => {
+                  const bucket = data.find((item) => item.day === label);
+                  if (!bucket) return null;
                   if (bucket.count === 0) return null;
                   return (
                     <div
