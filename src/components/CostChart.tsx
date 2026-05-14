@@ -22,6 +22,7 @@ import { CopyMarkdownButton } from "./CopyMarkdownButton";
 
 interface Props {
   entries: NormalizedEntry[];
+  syncId?: string;
 }
 
 type ViewMode = "total" | "model" | "provider" | "tokenType";
@@ -33,7 +34,7 @@ const TOKEN_TYPE_COST_SERIES = [
   { key: "cacheReadCost", name: "Cache Read", color: "var(--color-chart-purple)" },
 ] as const;
 
-export function CostChart({ entries }: Props) {
+export function CostChart({ entries, syncId }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [showPercent, setShowPercent] = useState(false);
@@ -224,6 +225,8 @@ export function CostChart({ entries }: Props) {
           data={
             isTokenTypeView ? tokenTypeCostData : isBreakdownView ? breakdownChartData : entries
           }
+          syncId={syncId}
+          syncMethod="index"
           stackOffset={(isBreakdownView || isTokenTypeView) && showPercent ? "expand" : undefined}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
