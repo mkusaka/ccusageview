@@ -45,6 +45,8 @@ const GRANULARITY_REPORT_LABELS: Record<TimeGranularity, string> = {
   monthly: "Monthly Report",
 };
 
+const COST_TOKEN_CHART_SYNC_ID = "cost-token-time-series";
+
 export function Dashboard({ data }: Props) {
   const dashboardRef = useRef<HTMLDivElement>(null);
   const [markdownSectionsById, setMarkdownSectionsById] = useState<
@@ -194,8 +196,8 @@ export function Dashboard({ data }: Props) {
             <>
               {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
               {showDayOfWeek && <DayOfWeekChart entries={filteredEntries} />}
-              <CostChart entries={filteredEntries} />
-              <TokenChart entries={filteredEntries} />
+              <CostChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
+              <TokenChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
               {hasModelBreakdowns && <ModelBreakdown entries={filteredEntries} />}
             </>
           )}
