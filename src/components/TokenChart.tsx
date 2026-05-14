@@ -27,6 +27,7 @@ import { CopyMarkdownButton } from "./CopyMarkdownButton";
 
 interface Props {
   entries: NormalizedEntry[];
+  syncId?: string;
 }
 
 const TYPE_SERIES = [
@@ -53,7 +54,7 @@ const TOKEN_TYPE_TABS: { key: ModelTokenType; label: string }[] = [
 
 type ViewMode = "type" | "model" | "provider";
 
-export function TokenChart({ entries }: Props) {
+export function TokenChart({ entries, syncId }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("type");
   const [tokenType, setTokenType] = useState<ModelTokenType>("inputTokens");
@@ -235,6 +236,8 @@ export function TokenChart({ entries }: Props) {
       <ResponsiveContainer width="100%" height={380}>
         <BarChart
           data={isBreakdownView ? breakdownChartData : entries}
+          syncId={syncId}
+          syncMethod="index"
           stackOffset={showPercent ? "expand" : undefined}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
