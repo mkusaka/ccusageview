@@ -9,7 +9,7 @@ import {
   Tooltip,
   Legend,
   type RechartsTooltipProps,
-} from "./recharts-lazy";
+} from "./recharts-components";
 import type { NormalizedEntry } from "../utils/normalize";
 import { formatCost } from "../utils/format";
 import type { BreakdownMode } from "../utils/breakdown";

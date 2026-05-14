@@ -8,7 +8,7 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceLine,
-} from "./recharts-lazy";
+} from "./recharts-components";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import {
