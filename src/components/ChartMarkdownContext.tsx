@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect } from "react";
+import { createContext, use, useEffect } from "react";
 
 export interface RegisteredMarkdownSection {
   id: string;
@@ -11,7 +11,7 @@ export type RegisterMarkdownSection = (section: RegisteredMarkdownSection) => ()
 export const ChartMarkdownContext = createContext<RegisterMarkdownSection | null>(null);
 
 export function useRegisterChartMarkdown(section: RegisteredMarkdownSection | null) {
-  const register = useContext(ChartMarkdownContext);
+  const register = use(ChartMarkdownContext);
 
   useEffect(() => {
     if (!register || !section) return;

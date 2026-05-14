@@ -31,7 +31,7 @@ export const DAY_OF_WEEK_AGGREGATIONS = [
   "min",
   "sum",
 ] as const satisfies ReadonlyArray<DayOfWeekAggregation>;
-export const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 function parseDayIndex(label: string): number | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(label)) return null;

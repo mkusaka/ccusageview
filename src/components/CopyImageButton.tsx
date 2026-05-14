@@ -33,7 +33,7 @@ export function CopyImageButton({ targetRef }: Props) {
   return (
     <button
       onClick={handleCopy}
-      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors"
+      className="size-7 flex items-center justify-center rounded-md hover:bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors"
       title="Copy as image"
     >
       {copied ? (

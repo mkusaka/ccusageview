@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+// react-doctor-disable-next-line react-doctor/no-barrel-import
 import app from "../index";
 
 function createMockEnv() {

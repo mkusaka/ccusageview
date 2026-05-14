@@ -75,6 +75,19 @@ const COLUMNS: Column[] = [
   },
 ];
 
+function getEntryKey(entry: NormalizedEntry): string {
+  return [
+    entry.label,
+    entry.inputTokens,
+    entry.outputTokens,
+    entry.cacheCreationTokens,
+    entry.cacheReadTokens,
+    entry.totalTokens,
+    entry.cost,
+    entry.models.join("|"),
+  ].join(":");
+}
+
 export function DataTable({ entries }: Props) {
   const [open, setOpen] = useState(false);
   const [sortCol, setSortCol] = useState<string | null>(null);
@@ -133,8 +146,8 @@ export function DataTable({ entries }: Props) {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((entry, i) => (
-                <tr key={i} className="border-b border-border/50">
+              {sorted.map((entry) => (
+                <tr key={getEntryKey(entry)} className="border-b border-border/50">
                   {COLUMNS.map((col) => (
                     <td
                       key={col.key}

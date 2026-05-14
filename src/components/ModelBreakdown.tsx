@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
+import { Suspense, useMemo, useRef, useState } from "react";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "./recharts-lazy";
 import type { NormalizedEntry } from "../utils/normalize";
 import { aggregateBreakdowns, type AggregatedBreakdown } from "../utils/aggregate";
 import type { BreakdownMode } from "../utils/breakdown";
@@ -251,32 +251,38 @@ export function ModelBreakdown({ entries }: Props) {
           <p className="text-xs text-text-secondary px-2 mb-2">
             Click a numeric table header to change the pie metric.
           </p>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={pieData}
-                dataKey="value"
-                nameKey="name"
-                cx="50%"
-                cy="45%"
-                innerRadius={55}
-                outerRadius={95}
-                paddingAngle={2}
-                stroke="var(--color-bg-card)"
-                strokeWidth={2}
-              >
-                {pieData.map((_, index) => (
-                  <Cell key={index} fill={COLORS[index % COLORS.length]} fillOpacity={0.85} />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomPieTooltip formatValue={metricConfig.format} />} />
-            </PieChart>
-          </ResponsiveContainer>
+          <Suspense fallback={<div className="h-[300px]" />}>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={pieData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="45%"
+                  innerRadius={55}
+                  outerRadius={95}
+                  paddingAngle={2}
+                  stroke="var(--color-bg-card)"
+                  strokeWidth={2}
+                >
+                  {pieData.map((item, index) => (
+                    <Cell
+                      key={item.fullName}
+                      fill={COLORS[index % COLORS.length]}
+                      fillOpacity={0.85}
+                    />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomPieTooltip formatValue={metricConfig.format} />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </Suspense>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 px-2">
             {pieData.map((item, index) => (
               <div key={item.fullName} className="flex items-center gap-1.5">
                 <span
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                  className="size-2.5 rounded-full flex-shrink-0"
                   style={{
                     backgroundColor: COLORS[index % COLORS.length],
                     opacity: 0.85,

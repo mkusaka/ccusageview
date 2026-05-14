@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { Suspense, useMemo, useReducer, useRef } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -8,7 +8,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-} from "recharts";
+  type RechartsTooltipProps,
+} from "./recharts-lazy";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatCost, formatTokens } from "../utils/format";
@@ -32,6 +33,54 @@ interface Props {
 }
 
 type ViewMode = "total" | "model" | "provider";
+type DayOfWeekData = ReturnType<typeof buildDayOfWeekData>;
+type DayOfWeekBreakdownData = ReturnType<typeof buildDayOfWeekByBreakdown>;
+interface DayOfWeekState {
+  metric: DayOfWeekMetric;
+  aggregation: DayOfWeekAggregation;
+  viewMode: ViewMode;
+  showPercent: boolean;
+  hiddenSeries: Set<string>;
+}
+
+type DayOfWeekAction =
+  | { type: "setMetric"; metric: DayOfWeekMetric }
+  | { type: "setAggregation"; aggregation: DayOfWeekAggregation }
+  | { type: "setViewMode"; viewMode: ViewMode }
+  | { type: "togglePercent" }
+  | { type: "toggleSeries"; key: string };
+
+const INITIAL_DAY_OF_WEEK_STATE: DayOfWeekState = {
+  metric: "cost",
+  aggregation: "avg",
+  viewMode: "total",
+  showPercent: false,
+  hiddenSeries: new Set(),
+};
+
+function dayOfWeekReducer(state: DayOfWeekState, action: DayOfWeekAction): DayOfWeekState {
+  switch (action.type) {
+    case "setMetric":
+      return { ...state, metric: action.metric };
+    case "setAggregation":
+      return { ...state, aggregation: action.aggregation };
+    case "setViewMode":
+      return {
+        ...state,
+        viewMode: action.viewMode,
+        showPercent: action.viewMode === "total" ? false : state.showPercent,
+        hiddenSeries: new Set(),
+      };
+    case "togglePercent":
+      return { ...state, showPercent: !state.showPercent };
+    case "toggleSeries": {
+      const hiddenSeries = new Set(state.hiddenSeries);
+      if (hiddenSeries.has(action.key)) hiddenSeries.delete(action.key);
+      else hiddenSeries.add(action.key);
+      return { ...state, hiddenSeries };
+    }
+  }
+}
 
 const METRICS: Record<DayOfWeekMetric, { label: string; format: (v: number) => string }> = {
   cost: { label: "Cost", format: formatCost },
@@ -51,22 +100,27 @@ const AGGREGATION_LABELS: Record<DayOfWeekAggregation, string> = {
   sum: "Sum",
 };
 
+function getVisibleChartSeries(
+  series: ChartDataSeries[],
+  hiddenSeries: Set<string>,
+): ChartDataSeries[] {
+  const visible: ChartDataSeries[] = [];
+  for (const item of series) {
+    if (!hiddenSeries.has(item.key)) visible.push(item);
+  }
+  return visible;
+}
+
 export function DayOfWeekChart({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [metric, setMetric] = useState<DayOfWeekMetric>("cost");
-  const [aggregation, setAggregation] = useState<DayOfWeekAggregation>("avg");
-  const [viewMode, setViewMode] = useState<ViewMode>("total");
-  const [showPercent, setShowPercent] = useState(false);
-  const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
+  const [{ metric, aggregation, viewMode, showPercent, hiddenSeries }, dispatch] = useReducer(
+    dayOfWeekReducer,
+    INITIAL_DAY_OF_WEEK_STATE,
+  );
   const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
 
   const toggleSeries = (key: string) => {
-    setHiddenSeries((previous) => {
-      const next = new Set(previous);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    dispatch({ type: "toggleSeries", key });
   };
 
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
@@ -94,9 +148,7 @@ export function DayOfWeekChart({ entries }: Props) {
   const metricConfig = METRICS[metric];
   const chartMarkdown = useMemo(() => {
     if (isBreakdownView) {
-      const series: ChartDataSeries[] = breakdownSeries
-        .filter((item) => !hiddenSeries.has(item.key))
-        .map((item) => ({ key: item.key, label: item.label, color: item.color }));
+      const series = getVisibleChartSeries(breakdownSeries, hiddenSeries);
       return buildMarkdownSection({
         title: "Day of Week",
         metadata: [
@@ -177,7 +229,7 @@ export function DayOfWeekChart({ entries }: Props) {
               <button
                 key={key}
                 type="button"
-                onClick={() => setAggregation(key)}
+                onClick={() => dispatch({ type: "setAggregation", aggregation: key })}
                 className={`px-2 py-0.5 text-xs rounded transition-colors ${
                   aggregation === key
                     ? "bg-bg-card text-text-primary shadow-sm"
@@ -196,9 +248,7 @@ export function DayOfWeekChart({ entries }: Props) {
             <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
               <button
                 onClick={() => {
-                  setViewMode("total");
-                  setShowPercent(false);
-                  setHiddenSeries(new Set());
+                  dispatch({ type: "setViewMode", viewMode: "total" });
                 }}
                 className={`px-2 py-0.5 text-xs rounded transition-colors ${
                   viewMode === "total"
@@ -210,8 +260,7 @@ export function DayOfWeekChart({ entries }: Props) {
               </button>
               <button
                 onClick={() => {
-                  setViewMode("model");
-                  setHiddenSeries(new Set());
+                  dispatch({ type: "setViewMode", viewMode: "model" });
                 }}
                 className={`px-2 py-0.5 text-xs rounded transition-colors ${
                   viewMode === "model"
@@ -223,8 +272,7 @@ export function DayOfWeekChart({ entries }: Props) {
               </button>
               <button
                 onClick={() => {
-                  setViewMode("provider");
-                  setHiddenSeries(new Set());
+                  dispatch({ type: "setViewMode", viewMode: "provider" });
                 }}
                 className={`px-2 py-0.5 text-xs rounded transition-colors ${
                   viewMode === "provider"
@@ -236,7 +284,7 @@ export function DayOfWeekChart({ entries }: Props) {
               </button>
               {isBreakdownView && (
                 <button
-                  onClick={() => setShowPercent((previous) => !previous)}
+                  onClick={() => dispatch({ type: "togglePercent" })}
                   className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
                     showPercent
                       ? "bg-bg-card text-text-primary shadow-sm"
@@ -253,7 +301,7 @@ export function DayOfWeekChart({ entries }: Props) {
             {METRIC_KEYS.map((key) => (
               <button
                 key={key}
-                onClick={() => setMetric(key)}
+                onClick={() => dispatch({ type: "setMetric", metric: key })}
                 className={`shrink-0 px-2 py-0.5 text-xs rounded transition-colors ${
                   metric === key
                     ? "bg-bg-card text-text-primary shadow-sm"
@@ -267,6 +315,47 @@ export function DayOfWeekChart({ entries }: Props) {
         </div>
       </div>
 
+      <DayOfWeekBarChart
+        aggregation={aggregation}
+        breakdownData={breakdownData}
+        breakdownMode={breakdownMode}
+        breakdownSeries={breakdownSeries}
+        data={data}
+        hiddenSeries={hiddenSeries}
+        isBreakdownView={isBreakdownView}
+        metricConfig={metricConfig}
+        showPercent={showPercent}
+        toggleSeries={toggleSeries}
+      />
+    </div>
+  );
+}
+
+function DayOfWeekBarChart({
+  aggregation,
+  breakdownData,
+  breakdownMode,
+  breakdownSeries,
+  data,
+  hiddenSeries,
+  isBreakdownView,
+  metricConfig,
+  showPercent,
+  toggleSeries,
+}: {
+  aggregation: DayOfWeekAggregation;
+  breakdownData: DayOfWeekBreakdownData;
+  breakdownMode: BreakdownMode;
+  breakdownSeries: ChartDataSeries[];
+  data: DayOfWeekData;
+  hiddenSeries: Set<string>;
+  isBreakdownView: boolean;
+  metricConfig: (typeof METRICS)[DayOfWeekMetric];
+  showPercent: boolean;
+  toggleSeries: (key: string) => void;
+}) {
+  return (
+    <Suspense fallback={<div className="h-60" />}>
       <ResponsiveContainer width="100%" height={240}>
         <BarChart
           data={isBreakdownView ? breakdownData : data}
@@ -299,10 +388,11 @@ export function DayOfWeekChart({ entries }: Props) {
                 wrapperStyle={TOOLTIP_WRAPPER_STYLE}
                 content={
                   showPercent
-                    ? ({ active, payload, label }) => {
+                    ? ({ active, payload, label }: RechartsTooltipProps) => {
                         if (!active || !payload?.length) return null;
                         const total = payload.reduce(
-                          (sum, item) => sum + Number(item.payload?.[String(item.dataKey)] ?? 0),
+                          (sum: number, item) =>
+                            sum + Number(item.payload?.[String(item.dataKey)] ?? 0),
                           0,
                         );
                         return (
@@ -332,7 +422,7 @@ export function DayOfWeekChart({ entries }: Props) {
                 formatter={
                   showPercent
                     ? undefined
-                    : (value, name) => [
+                    : (value: unknown, name: unknown) => [
                         metricConfig.format(Number(value ?? 0)),
                         breakdownMode === "model" ? shortenModelName(String(name)) : String(name),
                       ]
@@ -378,24 +468,22 @@ export function DayOfWeekChart({ entries }: Props) {
                   </div>
                 )}
               />
-              {breakdownSeries
-                .filter((series) => !hiddenSeries.has(series.key))
-                .map((series) => (
-                  <Bar
-                    key={series.key}
-                    dataKey={series.key}
-                    name={series.label}
-                    stackId="breakdown"
-                    fill={series.color}
-                  />
-                ))}
+              {getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series) => (
+                <Bar
+                  key={series.key}
+                  dataKey={series.key}
+                  name={series.label}
+                  stackId="breakdown"
+                  fill={series.color}
+                />
+              ))}
             </>
           ) : (
             <>
               <Tooltip
                 allowEscapeViewBox={{ x: true, y: true }}
                 wrapperStyle={TOOLTIP_WRAPPER_STYLE}
-                content={({ payload }) => {
+                content={({ payload }: { payload?: Array<{ payload: DayBucket }> }) => {
                   if (!payload || payload.length === 0) return null;
                   const bucket = payload[0].payload as DayBucket;
                   if (bucket.count === 0) return null;
@@ -431,6 +519,6 @@ export function DayOfWeekChart({ entries }: Props) {
           )}
         </BarChart>
       </ResponsiveContainer>
-    </div>
+    </Suspense>
   );
 }

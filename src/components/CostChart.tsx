@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { Suspense, useState, useMemo, useRef } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -8,7 +8,8 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-} from "recharts";
+  type RechartsTooltipProps,
+} from "./recharts-lazy";
 import type { NormalizedEntry } from "../utils/normalize";
 import { formatCost } from "../utils/format";
 import type { BreakdownMode } from "../utils/breakdown";
@@ -26,6 +27,8 @@ interface Props {
 }
 
 type ViewMode = "total" | "model" | "provider" | "tokenType";
+type CostBreakdownChartData = ReturnType<typeof buildCostByModel>;
+type TokenTypeCostData = ReturnType<typeof buildCostByTokenType>;
 
 const TOKEN_TYPE_COST_SERIES = [
   { key: "inputCost", name: "Input", color: "var(--color-chart-blue)" },
@@ -33,6 +36,25 @@ const TOKEN_TYPE_COST_SERIES = [
   { key: "cacheWriteCost", name: "Cache Write", color: "var(--color-chart-orange)" },
   { key: "cacheReadCost", name: "Cache Read", color: "var(--color-chart-purple)" },
 ] as const;
+
+function getVisibleTokenTypeCostSeries(hiddenSeries: Set<string>) {
+  const visible: (typeof TOKEN_TYPE_COST_SERIES)[number][] = [];
+  for (const series of TOKEN_TYPE_COST_SERIES) {
+    if (!hiddenSeries.has(series.key)) visible.push(series);
+  }
+  return visible;
+}
+
+function getVisibleChartSeries(
+  series: ChartDataSeries[],
+  hiddenSeries: Set<string>,
+): ChartDataSeries[] {
+  const visible: ChartDataSeries[] = [];
+  for (const item of series) {
+    if (!hiddenSeries.has(item.key)) visible.push(item);
+  }
+  return visible;
+}
 
 export function CostChart({ entries, syncId }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
@@ -82,7 +104,7 @@ export function CostChart({ entries, syncId }: Props) {
 
     if (isTokenTypeView) {
       viewLabel = "By Token Type";
-      series = TOKEN_TYPE_COST_SERIES.filter((s) => !hiddenSeries.has(s.key)).map((s) => ({
+      series = getVisibleTokenTypeCostSeries(hiddenSeries).map((s) => ({
         key: s.key,
         label: s.name,
         color: s.color,
@@ -90,9 +112,7 @@ export function CostChart({ entries, syncId }: Props) {
       data = pickDataKeys(tokenTypeCostData, ["label", ...series.map((s) => s.key)]);
     } else if (isBreakdownView) {
       viewLabel = viewMode === "provider" ? "By Provider" : "By Model";
-      series = breakdownSeries
-        .filter((s) => !hiddenSeries.has(s.key))
-        .map((s) => ({ key: s.key, label: s.label, color: s.color }));
+      series = getVisibleChartSeries(breakdownSeries, hiddenSeries);
       data = pickDataKeys(breakdownChartData, ["label", ...series.map((s) => s.key)]);
     } else {
       viewLabel = "Total";
@@ -220,6 +240,47 @@ export function CostChart({ entries, syncId }: Props) {
           </div>
         )}
       </div>
+      <CostAreaChart
+        entries={entries}
+        syncId={syncId}
+        isBreakdownView={isBreakdownView}
+        isTokenTypeView={isTokenTypeView}
+        showPercent={showPercent}
+        hiddenSeries={hiddenSeries}
+        breakdownChartData={breakdownChartData}
+        breakdownSeries={breakdownSeries}
+        tokenTypeCostData={tokenTypeCostData}
+        toggleSeries={toggleSeries}
+      />
+    </div>
+  );
+}
+
+function CostAreaChart({
+  entries,
+  syncId,
+  isBreakdownView,
+  isTokenTypeView,
+  showPercent,
+  hiddenSeries,
+  breakdownChartData,
+  breakdownSeries,
+  tokenTypeCostData,
+  toggleSeries,
+}: {
+  entries: NormalizedEntry[];
+  syncId?: string;
+  isBreakdownView: boolean;
+  isTokenTypeView: boolean;
+  showPercent: boolean;
+  hiddenSeries: Set<string>;
+  breakdownChartData: CostBreakdownChartData;
+  breakdownSeries: ChartDataSeries[];
+  tokenTypeCostData: TokenTypeCostData;
+  toggleSeries: (key: string) => void;
+}) {
+  return (
+    <Suspense fallback={<div className="h-80" />}>
       <ResponsiveContainer width="100%" height={320}>
         <AreaChart
           data={
@@ -250,10 +311,10 @@ export function CostChart({ entries, syncId }: Props) {
           <Tooltip
             content={
               (isBreakdownView || isTokenTypeView) && showPercent
-                ? ({ active, payload, label }) => {
+                ? ({ active, payload, label }: RechartsTooltipProps) => {
                     if (!active || !payload?.length) return null;
                     const total = payload.reduce(
-                      (s, p) => s + Number(p.payload?.[String(p.dataKey)] ?? 0),
+                      (s: number, p) => s + Number(p.payload?.[String(p.dataKey)] ?? 0),
                       0,
                     );
                     return (
@@ -283,7 +344,7 @@ export function CostChart({ entries, syncId }: Props) {
             formatter={
               (isBreakdownView || isTokenTypeView) && showPercent
                 ? undefined
-                : (value, name) => [formatCost(Number(value ?? 0)), String(name)]
+                : (value: unknown, name: unknown) => [formatCost(Number(value ?? 0)), String(name)]
             }
             contentStyle={
               (isBreakdownView || isTokenTypeView) && showPercent
@@ -328,7 +389,7 @@ export function CostChart({ entries, syncId }: Props) {
                   </div>
                 )}
               />
-              {TOKEN_TYPE_COST_SERIES.filter((s) => !hiddenSeries.has(s.key)).map((s) => (
+              {getVisibleTokenTypeCostSeries(hiddenSeries).map((s) => (
                 <Area
                   key={s.key}
                   type="monotone"
@@ -374,21 +435,19 @@ export function CostChart({ entries, syncId }: Props) {
                   </div>
                 )}
               />
-              {breakdownSeries
-                .filter((s) => !hiddenSeries.has(s.key))
-                .map((s) => (
-                  <Area
-                    key={s.key}
-                    type="monotone"
-                    dataKey={s.key}
-                    name={s.label}
-                    stackId="1"
-                    fill={s.color}
-                    stroke={s.color}
-                    fillOpacity={0.6}
-                    strokeWidth={1}
-                  />
-                ))}
+              {getVisibleChartSeries(breakdownSeries, hiddenSeries).map((s) => (
+                <Area
+                  key={s.key}
+                  type="monotone"
+                  dataKey={s.key}
+                  name={s.label}
+                  stackId="1"
+                  fill={s.color}
+                  stroke={s.color}
+                  fillOpacity={0.6}
+                  strokeWidth={1}
+                />
+              ))}
             </>
           ) : (
             <Area
@@ -402,6 +461,6 @@ export function CostChart({ entries, syncId }: Props) {
           )}
         </AreaChart>
       </ResponsiveContainer>
-    </div>
+    </Suspense>
   );
 }

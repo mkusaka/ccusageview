@@ -79,9 +79,9 @@ export function Dashboard({ data }: Props) {
 
   // Range slider state — reset when entries change (render-time reset pattern)
   const [range, setRange] = useState<[number, number]>([0, Math.max(0, entries.length - 1)]);
-  const [prevEntries, setPrevEntries] = useState(entries);
-  if (entries !== prevEntries) {
-    setPrevEntries(entries);
+  const prevEntries = useRef(entries);
+  if (entries !== prevEntries.current) {
+    prevEntries.current = entries;
     setRange([0, Math.max(0, entries.length - 1)]);
   }
 
