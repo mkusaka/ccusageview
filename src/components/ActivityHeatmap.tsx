@@ -92,8 +92,17 @@ function emptyDay(dateStr: string): DayData {
   };
 }
 
+function parseDateKey(dateStr: string): Date {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function formatDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 // Generate grid of weeks (columns) x days (rows)
-// Right-aligned to today, showing numWeeks columns (like GitHub's contribution graph)
+// Right-aligned to the latest data point, showing numWeeks columns.
 function buildGrid(
   dayMap: Map<string, DayData>,
   numWeeks: number,
@@ -103,16 +112,16 @@ function buildGrid(
 } {
   if (dayMap.size === 0) return { weeks: [], months: [] };
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const latestDateStr = Array.from(dayMap.keys()).toSorted().at(-1);
+  if (!latestDateStr) return { weeks: [], months: [] };
 
-  // Grid ends at the end of today's week (Saturday)
-  const gridEnd = new Date(today);
-  gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()));
+  // Grid ends at the end of the latest data point's week (Saturday).
+  const gridEnd = parseDateKey(latestDateStr);
+  gridEnd.setUTCDate(gridEnd.getUTCDate() + (6 - gridEnd.getUTCDay()));
 
   // Grid starts numWeeks back from gridEnd's Sunday
   const gridStart = new Date(gridEnd);
-  gridStart.setDate(gridStart.getDate() - (numWeeks * 7 - 1));
+  gridStart.setUTCDate(gridStart.getUTCDate() - (numWeeks * 7 - 1));
 
   const weeks: DayData[][] = [];
   const months: { label: string; colStart: number }[] = [];
@@ -122,19 +131,19 @@ function buildGrid(
   for (let weekIndex = 0; weekIndex < numWeeks; weekIndex++) {
     const week: DayData[] = [];
     for (let d = 0; d < 7; d++) {
-      const dateStr = cursor.toISOString().slice(0, 10);
+      const dateStr = formatDateKey(cursor);
       week.push(dayMap.get(dateStr) ?? emptyDay(dateStr));
 
-      const m = cursor.getMonth();
+      const m = cursor.getUTCMonth();
       if (m !== currentMonth && d === 0) {
         currentMonth = m;
         months.push({
-          label: cursor.toLocaleDateString("en-US", { month: "short" }),
+          label: cursor.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }),
           colStart: weekIndex,
         });
       }
 
-      cursor.setDate(cursor.getDate() + 1);
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
     weeks.push(week);
   }
