@@ -287,6 +287,7 @@ export function computeAllStats(
 export interface DistributionPoint {
   rank: number; // percentile rank 0–100
   value: number;
+  sourceLabel?: string;
 }
 
 /** Find the percentile rank for a given value by interpolating through distribution data */
@@ -315,6 +316,19 @@ export function buildDistributionFromValues(values: number[]): DistributionPoint
   return sorted.map((value, i) => ({
     rank: n === 1 ? 100 : Math.round((i / (n - 1)) * 100),
     value,
+  }));
+}
+
+/** Build sorted distribution data while preserving the source label for each point */
+export function buildDistributionFromLabeledValues(values: LabeledValue[]): DistributionPoint[] {
+  const sorted = values.toSorted((a, b) => a.value - b.value);
+  const n = sorted.length;
+  if (n === 0) return [];
+
+  return sorted.map((item, i) => ({
+    rank: n === 1 ? 100 : Math.round((i / (n - 1)) * 100),
+    value: item.value,
+    sourceLabel: item.label,
   }));
 }
 

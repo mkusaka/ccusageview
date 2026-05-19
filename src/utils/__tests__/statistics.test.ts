@@ -5,6 +5,7 @@ import {
   extractMetric,
   computeAllStats,
   buildDistribution,
+  buildDistributionFromLabeledValues,
   findStatSources,
   findRankForValue,
   extractMetricForVisibleModels,
@@ -313,6 +314,26 @@ describe("buildDistribution", () => {
     for (let i = 1; i < result.length; i++) {
       expect(result[i].value).toBeGreaterThanOrEqual(result[i - 1].value);
     }
+  });
+});
+
+describe("buildDistributionFromLabeledValues", () => {
+  it("returns empty array for empty labeled values", () => {
+    expect(buildDistributionFromLabeledValues([])).toEqual([]);
+  });
+
+  it("preserves source labels after sorting by value", () => {
+    const result = buildDistributionFromLabeledValues([
+      { label: "2025-01-03", value: 30 },
+      { label: "2025-01-01", value: 10 },
+      { label: "2025-01-02", value: 20 },
+    ]);
+
+    expect(result).toEqual([
+      { rank: 0, value: 10, sourceLabel: "2025-01-01" },
+      { rank: 50, value: 20, sourceLabel: "2025-01-02" },
+      { rank: 100, value: 30, sourceLabel: "2025-01-03" },
+    ]);
   });
 });
 

@@ -8,15 +8,14 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceLine,
+  type RechartsTooltipProps,
 } from "./recharts-components";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import {
   computeAllStats,
   computeAllStatsForVisibleModels,
-  buildDistribution,
-  buildDistributionFromValues,
-  extractMetricForVisibleModels,
+  buildDistributionFromLabeledValues,
   extractMetricWithLabels,
   extractMetricForVisibleModelsWithLabels,
   findStatSources,
@@ -201,19 +200,18 @@ export function StatisticsSummary({ entries }: Props) {
   const items = stats ? buildStatItems(stats, metricConfig.format, sourceMap) : [];
   const distributionData = useMemo(() => {
     if (!stats) return [];
-    if (breakdownMode === "total") {
-      return buildDistribution(entries, metric);
-    }
+    const labeledValues =
+      breakdownMode === "total"
+        ? extractMetricWithLabels(entries, metric)
+        : extractMetricForVisibleModelsWithLabels(
+            entries,
+            metric,
+            visibleBreakdowns,
+            includeOther,
+            breakdownMode,
+          );
 
-    return buildDistributionFromValues(
-      extractMetricForVisibleModels(
-        entries,
-        metric,
-        visibleBreakdowns,
-        includeOther,
-        breakdownMode,
-      ),
-    );
+    return buildDistributionFromLabeledValues(labeledValues);
   }, [entries, metric, breakdownMode, visibleBreakdowns, includeOther, stats]);
   const chartMarkdown = useMemo(() => {
     if (!stats) return "";
@@ -574,21 +572,18 @@ function DistributionChart({
   highlightedStat: HighlightedStat;
 }) {
   const chartData = useMemo(() => {
-    if (breakdownMode === "total") {
-      return buildDistribution(entries, metric);
-    }
+    const labeledValues =
+      breakdownMode === "total"
+        ? extractMetricWithLabels(entries, metric)
+        : extractMetricForVisibleModelsWithLabels(
+            entries,
+            metric,
+            new Set(breakdownKeys.filter((key) => !hiddenBreakdowns.has(key))),
+            !hiddenBreakdowns.has("Other"),
+            breakdownMode,
+          );
 
-    const visibleBreakdowns = new Set(breakdownKeys.filter((key) => !hiddenBreakdowns.has(key)));
-    const includeOther = !hiddenBreakdowns.has("Other");
-    return buildDistributionFromValues(
-      extractMetricForVisibleModels(
-        entries,
-        metric,
-        visibleBreakdowns,
-        includeOther,
-        breakdownMode,
-      ),
-    );
+    return buildDistributionFromLabeledValues(labeledValues);
   }, [entries, metric, breakdownMode, hiddenBreakdowns, breakdownKeys]);
 
   const meanRank = useMemo(() => findRankForValue(chartData, stats.mean), [chartData, stats.mean]);
@@ -632,19 +627,7 @@ function DistributionChart({
               tickFormatter={(value: number) => metricConfig.format(value)}
               width={80}
             />
-            <Tooltip
-              formatter={(value: unknown) => [
-                metricConfig.format(Number(value ?? 0)),
-                metricConfig.label,
-              ]}
-              labelFormatter={(rank: unknown) => `Percentile: ${rank}%`}
-              contentStyle={{
-                backgroundColor: "var(--color-bg-card)",
-                border: "1px solid var(--color-border)",
-                borderRadius: "8px",
-                fontSize: 12,
-              }}
-            />
+            <Tooltip content={<DistributionTooltip metricConfig={metricConfig} />} />
             <Area
               type="monotone"
               dataKey="value"
@@ -695,6 +678,36 @@ function DistributionChart({
           </AreaChart>
         </ResponsiveContainer>
       </Suspense>
+    </div>
+  );
+}
+
+function DistributionTooltip({
+  active,
+  payload,
+  label,
+  metricConfig,
+}: RechartsTooltipProps & { metricConfig: MetricConfig }) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const point = payload[0]?.payload;
+  const value = Number(point?.value ?? 0);
+  const sourceLabel = typeof point?.sourceLabel === "string" ? point.sourceLabel : "";
+  const sourceLabelName = /^\d{4}-\d{2}(-\d{2})?$/.test(sourceLabel) ? "Period" : "Source";
+  const rank = label ?? point?.rank ?? "";
+
+  return (
+    <div className="bg-bg-card border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
+      <p className="font-medium text-text-primary">Percentile: {rank}%</p>
+      <p className="text-text-secondary">
+        {metricConfig.label}:{" "}
+        <span className="text-text-primary">{metricConfig.format(value)}</span>
+      </p>
+      {sourceLabel && (
+        <p className="text-text-secondary">
+          {sourceLabelName}: {sourceLabel}
+        </p>
+      )}
     </div>
   );
 }
