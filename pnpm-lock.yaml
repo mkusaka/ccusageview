@@ -10,7 +10,7 @@ importers:
     dependencies:
       hono:
         specifier: ^4.11.9
-        version: 4.12.18
+        version: 4.12.19
       nanoid:
         specifier: ^5.1.6
         version: 5.1.11
@@ -1298,8 +1298,8 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
-  hono@4.12.18:
-    resolution: {integrity: sha512-RWzP96k/yv0PQfyXnWjs6zot20TqfpfsNXhOnev8d1InAxubW93L11/oNUc3tQqn2G0bSdAOBpX+2uDFHV7kdQ==}
+  hono@4.12.19:
+    resolution: {integrity: sha512-xa3eYXYXx68XTT4hZ7dRzsXBhaq85ToSrlUJNoR0gwz/1Ap/CNwX47wfvV7pc/xWhjKVVkLT7zBJy8chhNguqQ==}
     engines: {node: '>=16.9.0'}
 
   html-to-image@1.11.13:
@@ -2680,7 +2680,7 @@ snapshots:
 
   graceful-fs@4.2.11: {}
 
-  hono@4.12.18: {}
+  hono@4.12.19: {}
 
   html-to-image@1.11.13: {}
 
