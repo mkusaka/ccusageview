@@ -1,7 +1,7 @@
 {
   "weekly": [
     {
-      "week": "2025-06-30",
+      "period": "2025-06-30",
       "inputTokens": 1000000,
       "outputTokens": 40000,
       "cacheCreationTokens": 160000,

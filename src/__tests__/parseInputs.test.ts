@@ -6,7 +6,7 @@ import type { SourceInput } from "../App";
 const DAILY_CLAUDE = JSON.stringify({
   daily: [
     {
-      date: "2025-07-01",
+      period: "2025-07-01",
       inputTokens: 100,
       outputTokens: 50,
       cacheCreationTokens: 10,
@@ -39,7 +39,7 @@ const DAILY_CLAUDE = JSON.stringify({
 const DAILY_CLAUDE_2 = JSON.stringify({
   daily: [
     {
-      date: "2025-07-02",
+      period: "2025-07-02",
       inputTokens: 200,
       outputTokens: 100,
       cacheCreationTokens: 20,
@@ -57,6 +57,30 @@ const DAILY_CLAUDE_2 = JSON.stringify({
     cacheReadTokens: 400,
     totalTokens: 720,
     totalCost: 1.0,
+  },
+});
+
+const DAILY_CLAUDE_3 = JSON.stringify({
+  daily: [
+    {
+      period: "2025-07-03",
+      inputTokens: 50,
+      outputTokens: 25,
+      cacheCreationTokens: 5,
+      cacheReadTokens: 100,
+      totalTokens: 180,
+      totalCost: 0.25,
+      modelsUsed: ["claude-haiku-3"],
+      modelBreakdowns: [],
+    },
+  ],
+  totals: {
+    inputTokens: 50,
+    outputTokens: 25,
+    cacheCreationTokens: 5,
+    cacheReadTokens: 100,
+    totalTokens: 180,
+    totalCost: 0.25,
   },
 });
 
@@ -83,38 +107,6 @@ const SESSION_REPORT = JSON.stringify({
     cacheReadTokens: 200,
     totalTokens: 360,
     totalCost: 0.5,
-  },
-});
-
-// Codex format daily report
-const DAILY_CODEX = JSON.stringify({
-  daily: [
-    {
-      date: "Sep 16, 2025",
-      inputTokens: 361481,
-      cachedInputTokens: 300928,
-      outputTokens: 7058,
-      reasoningOutputTokens: 4032,
-      totalTokens: 368539,
-      costUSD: 0.18388725,
-      models: {
-        "gpt-5-codex": {
-          inputTokens: 361481,
-          cachedInputTokens: 300928,
-          outputTokens: 7058,
-          reasoningOutputTokens: 4032,
-          totalTokens: 368539,
-          isFallback: false,
-        },
-      },
-    },
-  ],
-  totals: {
-    inputTokens: 361481,
-    cachedInputTokens: 300928,
-    outputTokens: 7058,
-    totalTokens: 368539,
-    costUSD: 0.18388725,
   },
 });
 
@@ -155,17 +147,6 @@ describe("parseInputs", () => {
       expect(result.data!.totals.totalCost).toBe(0.5);
     });
 
-    it("parses a single codex daily report via adapter", () => {
-      const result = parseInputs([inp(DAILY_CODEX)]);
-      expect(result.error).toBeNull();
-      expect(result.data).not.toBeNull();
-      expect(result.data!.reportType).toBe("daily");
-      expect(result.data!.entries).toHaveLength(1);
-      expect(result.data!.entries[0].label).toBe("2025-09-16");
-      expect(result.data!.entries[0].cost).toBe(0.18388725);
-      expect(result.data!.entries[0].models).toEqual(["gpt-5-codex"]);
-    });
-
     it("collects source labels", () => {
       const result = parseInputs([inp(DAILY_CLAUDE, "Claude Code")]);
       expect(result.data!.sourceLabels).toEqual(["Claude Code"]);
@@ -204,14 +185,6 @@ describe("parseInputs", () => {
       expect(result.data!.totals.inputTokens).toBe(300);
       expect(result.data!.totals.totalCost).toBe(1.5);
     });
-
-    it("merges codex and claude reports of same type", () => {
-      const result = parseInputs([inp(DAILY_CLAUDE, "Claude"), inp(DAILY_CODEX, "Codex")]);
-      expect(result.error).toBeNull();
-      expect(result.data!.reportType).toBe("daily");
-      expect(result.data!.entries).toHaveLength(2);
-      expect(result.data!.sourceLabels).toEqual(["Claude", "Codex"]);
-    });
   });
 
   describe("type mismatch error", () => {
@@ -240,7 +213,7 @@ describe("parseInputs", () => {
       const result = parseInputs([
         inp(DAILY_CLAUDE, "A"),
         inp(DAILY_CLAUDE_2, "B", false),
-        inp(DAILY_CODEX, "C"),
+        inp(DAILY_CLAUDE_3, "C"),
       ]);
       expect(result.error).toBeNull();
       expect(result.data!.entries).toHaveLength(2);

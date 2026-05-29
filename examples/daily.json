@@ -1,7 +1,7 @@
 {
   "daily": [
     {
-      "date": "2025-07-01",
+      "period": "2025-07-01",
       "inputTokens": 600000,
       "outputTokens": 25000,
       "cacheCreationTokens": 110000,
@@ -29,7 +29,7 @@
       ]
     },
     {
-      "date": "2025-07-02",
+      "period": "2025-07-02",
       "inputTokens": 400000,
       "outputTokens": 15000,
       "cacheCreationTokens": 50000,
@@ -49,7 +49,7 @@
       ]
     },
     {
-      "date": "2025-08-01",
+      "period": "2025-08-01",
       "inputTokens": 200000,
       "outputTokens": 10000,
       "cacheCreationTokens": 30000,

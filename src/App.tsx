@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { ReportData, ReportType } from "./types";
 import { buildHash, loadFromHash } from "./utils/compression";
 import { detectReportType } from "./utils/detect";
-import { adaptReport } from "./utils/adapt";
 import { normalizeEntries, normalizeTotals, computeTotalsFromEntries } from "./utils/normalize";
 import type { DashboardData } from "./utils/normalize";
 import { mergeNormalizedEntries } from "./utils/merge";
@@ -49,14 +48,14 @@ export function parseInputs(inputs: SourceInput[]): {
     if (Array.isArray(parsed)) {
       for (const item of parsed) {
         try {
-          sources.push({ report: detectReportType(adaptReport(item)), label: input.label });
+          sources.push({ report: detectReportType(item), label: input.label });
         } catch (e) {
           return { data: null, error: e instanceof Error ? e.message : "Invalid report" };
         }
       }
     } else {
       try {
-        sources.push({ report: detectReportType(adaptReport(parsed)), label: input.label });
+        sources.push({ report: detectReportType(parsed), label: input.label });
       } catch (e) {
         return { data: null, error: e instanceof Error ? e.message : "Invalid report" };
       }

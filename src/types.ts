@@ -20,9 +20,7 @@ export interface Totals {
 
 // Shared fields for daily/weekly/monthly entries
 export interface TimeEntry {
-  date?: string;
-  week?: string;
-  month?: string;
+  period: string;
   inputTokens: number;
   outputTokens: number;
   cacheCreationTokens: number;
@@ -98,7 +96,6 @@ interface BlockEntry {
 export interface BlocksReport {
   type: "blocks";
   blocks: BlockEntry[];
-  totals: Record<string, unknown>;
 }
 
 export type ReportData = DailyReport | WeeklyReport | MonthlyReport | SessionReport | BlocksReport;

@@ -28,7 +28,7 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
   switch (report.type) {
     case "daily":
       return report.daily.map((e) => ({
-        label: e.date ?? "",
+        label: e.period,
         inputTokens: e.inputTokens,
         outputTokens: e.outputTokens,
         cacheCreationTokens: e.cacheCreationTokens,
@@ -41,7 +41,7 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
 
     case "weekly":
       return report.weekly.map((e) => ({
-        label: e.week ?? "",
+        label: e.period,
         inputTokens: e.inputTokens,
         outputTokens: e.outputTokens,
         cacheCreationTokens: e.cacheCreationTokens,
@@ -54,7 +54,7 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
 
     case "monthly":
       return report.monthly.map((e) => ({
-        label: e.month ?? "",
+        label: e.period,
         inputTokens: e.inputTokens,
         outputTokens: e.outputTokens,
         cacheCreationTokens: e.cacheCreationTokens,
