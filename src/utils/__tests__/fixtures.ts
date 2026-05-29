@@ -41,7 +41,7 @@ function makeTotals(entries: TimeEntry[]): Totals {
 
 const DAILY_ENTRIES: TimeEntry[] = [
   {
-    date: "2025-07-01",
+    period: "2025-07-01",
     inputTokens: 600_000,
     outputTokens: 25_000,
     cacheCreationTokens: 110_000,
@@ -52,7 +52,7 @@ const DAILY_ENTRIES: TimeEntry[] = [
     modelBreakdowns: [MB_SONNET, MB_HAIKU],
   },
   {
-    date: "2025-07-02",
+    period: "2025-07-02",
     inputTokens: 400_000,
     outputTokens: 15_000,
     cacheCreationTokens: 50_000,
@@ -63,7 +63,7 @@ const DAILY_ENTRIES: TimeEntry[] = [
     modelBreakdowns: [MB_SONNET],
   },
   {
-    date: "2025-08-01",
+    period: "2025-08-01",
     inputTokens: 200_000,
     outputTokens: 10_000,
     cacheCreationTokens: 30_000,
@@ -83,7 +83,7 @@ export const DAILY_REPORT: DailyReport = {
 
 const WEEKLY_ENTRIES: TimeEntry[] = [
   {
-    week: "2025-06-30",
+    period: "2025-06-30",
     inputTokens: 1_000_000,
     outputTokens: 40_000,
     cacheCreationTokens: 160_000,
@@ -103,7 +103,7 @@ export const WEEKLY_REPORT: WeeklyReport = {
 
 const MONTHLY_ENTRIES: TimeEntry[] = [
   {
-    month: "2025-07",
+    period: "2025-07",
     inputTokens: 1_000_000,
     outputTokens: 40_000,
     cacheCreationTokens: 160_000,
@@ -225,7 +225,6 @@ export const BLOCKS_REPORT: BlocksReport = {
       projection: null,
     },
   ],
-  totals: {},
 };
 
 // Strip the synthetic `type` field to simulate raw JSON input

@@ -1,7 +1,7 @@
 {
   "monthly": [
     {
-      "month": "2025-07",
+      "period": "2025-07",
       "inputTokens": 1000000,
       "outputTokens": 40000,
       "cacheCreationTokens": 160000,

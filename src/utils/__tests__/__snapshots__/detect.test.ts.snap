@@ -6,7 +6,6 @@ exports[`detectReportType > snapshot: detected daily report shape 1`] = `
     {
       "cacheCreationTokens": 110000,
       "cacheReadTokens": 1000000,
-      "date": "2025-07-01",
       "inputTokens": 600000,
       "modelBreakdowns": [
         {
@@ -31,13 +30,13 @@ exports[`detectReportType > snapshot: detected daily report shape 1`] = `
         "claude-haiku-3-20240307",
       ],
       "outputTokens": 25000,
+      "period": "2025-07-01",
       "totalCost": 2.8,
       "totalTokens": 1735000,
     },
     {
       "cacheCreationTokens": 50000,
       "cacheReadTokens": 500000,
-      "date": "2025-07-02",
       "inputTokens": 400000,
       "modelBreakdowns": [
         {
@@ -53,13 +52,13 @@ exports[`detectReportType > snapshot: detected daily report shape 1`] = `
         "claude-sonnet-4-20250514",
       ],
       "outputTokens": 15000,
+      "period": "2025-07-02",
       "totalCost": 1.5,
       "totalTokens": 965000,
     },
     {
       "cacheCreationTokens": 30000,
       "cacheReadTokens": 300000,
-      "date": "2025-08-01",
       "inputTokens": 200000,
       "modelBreakdowns": [
         {
@@ -75,6 +74,7 @@ exports[`detectReportType > snapshot: detected daily report shape 1`] = `
         "claude-haiku-3-20240307",
       ],
       "outputTokens": 10000,
+      "period": "2025-08-01",
       "totalCost": 0.9,
       "totalTokens": 540000,
     },
