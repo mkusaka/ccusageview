@@ -104,6 +104,7 @@ export interface DescriptiveStats {
   count: number;
   min: number;
   max: number;
+  range: number;
   sum: number;
   mean: number;
   median: number;
@@ -197,6 +198,7 @@ export function computeStats(values: number[]): DescriptiveStats {
       count: 0,
       min: 0,
       max: 0,
+      range: 0,
       sum: 0,
       mean: 0,
       median: 0,
@@ -218,6 +220,7 @@ export function computeStats(values: number[]): DescriptiveStats {
   const mean = sum / n;
   const min = sorted[0];
   const max = sorted[n - 1];
+  const range = max - min;
 
   // Variance (sample variance, n-1 denominator)
   let sumSqDiff = 0;
@@ -255,6 +258,7 @@ export function computeStats(values: number[]): DescriptiveStats {
     count: n,
     min,
     max,
+    range,
     sum,
     mean,
     median,

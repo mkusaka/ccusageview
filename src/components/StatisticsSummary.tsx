@@ -91,10 +91,16 @@ function buildStatItems(
   sourceMap: Partial<Record<string, string[]>>,
 ): StatItem[] {
   const items: StatItem[] = [
+    { label: "Sum", value: format(stats.sum) },
     { label: "Mean", value: format(stats.mean) },
     { label: "Median (P50)", value: format(stats.median) },
     { label: "Min", value: format(stats.min) },
     { label: "Max", value: format(stats.max) },
+    {
+      label: "Range",
+      value: format(stats.range),
+      subLabel: `${format(stats.min)} - ${format(stats.max)}`,
+    },
     { label: "P75", value: format(stats.p75) },
     { label: "P90", value: format(stats.p90) },
     { label: "P95", value: format(stats.p95) },
@@ -237,6 +243,11 @@ export function StatisticsSummary({ entries }: Props) {
         value: stats.max,
         formatted: metricConfig.format(stats.max),
         sourceLabels: sourceMap.max?.join(", ") ?? "",
+      },
+      {
+        stat: "Range",
+        value: stats.range,
+        formatted: metricConfig.format(stats.range),
       },
       {
         stat: "P25",
