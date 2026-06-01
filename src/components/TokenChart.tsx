@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
   type RechartsTooltipProps,
+  syncTooltipByIndexToLocalCoordinate,
 } from "./recharts-components";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
@@ -291,7 +292,7 @@ function TokenBarChart({
         <BarChart
           data={isBreakdownView ? breakdownChartData : entries}
           syncId={syncId}
-          syncMethod="index"
+          syncMethod={syncTooltipByIndexToLocalCoordinate}
           stackOffset={showPercent ? "expand" : undefined}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
