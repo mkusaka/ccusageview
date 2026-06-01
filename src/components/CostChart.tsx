@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
   type RechartsTooltipProps,
+  syncTooltipByIndexToLocalCoordinate,
 } from "./recharts-components";
 import type { NormalizedEntry } from "../utils/normalize";
 import { formatCost } from "../utils/format";
@@ -287,7 +288,7 @@ function CostAreaChart({
             isTokenTypeView ? tokenTypeCostData : isBreakdownView ? breakdownChartData : entries
           }
           syncId={syncId}
-          syncMethod="index"
+          syncMethod={syncTooltipByIndexToLocalCoordinate}
           stackOffset={(isBreakdownView || isTokenTypeView) && showPercent ? "expand" : undefined}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />

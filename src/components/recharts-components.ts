@@ -1,3 +1,5 @@
+import type { MouseHandlerDataParam } from "recharts";
+
 // Recharts child components must stay on the original module exports. Wrapping
 // them individually in React.lazy remounts Recharts internals and can trigger
 // React error #185 through the chart wrapper ref path.
@@ -18,6 +20,18 @@ export {
   XAxis,
   YAxis,
 } from "recharts";
+
+// Recharts' built-in "index" sync scales the source chart's active coordinate
+// into receivers. A custom method keeps index matching but lets receivers use
+// their own categorical coordinate, which avoids AreaChart/BarChart cursor drift.
+export function syncTooltipByIndexToLocalCoordinate(
+  ticks: ReadonlyArray<unknown>,
+  data: MouseHandlerDataParam,
+): number {
+  const index = Number(data.activeTooltipIndex);
+  if (!Number.isInteger(index) || index < 0 || index >= ticks.length) return -1;
+  return index;
+}
 
 interface RechartsPayloadItem<TPayload extends Record<string, string | number>> {
   dataKey?: string | number;
