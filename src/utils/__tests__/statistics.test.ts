@@ -100,6 +100,7 @@ describe("computeStats", () => {
     expect(stats.count).toBe(0);
     expect(stats.min).toBe(0);
     expect(stats.max).toBe(0);
+    expect(stats.range).toBe(0);
     expect(stats.sum).toBe(0);
     expect(stats.mean).toBe(0);
     expect(stats.median).toBe(0);
@@ -114,6 +115,7 @@ describe("computeStats", () => {
     expect(stats.count).toBe(1);
     expect(stats.min).toBe(5);
     expect(stats.max).toBe(5);
+    expect(stats.range).toBe(0);
     expect(stats.sum).toBe(5);
     expect(stats.mean).toBe(5);
     expect(stats.median).toBe(5);
@@ -129,6 +131,7 @@ describe("computeStats", () => {
     expect(stats.median).toBe(15);
     expect(stats.min).toBe(10);
     expect(stats.max).toBe(20);
+    expect(stats.range).toBe(10);
     expect(stats.standardDeviation).toBeCloseTo(Math.sqrt(50), 10);
     expect(stats.skewness).toBeNaN(); // n < 3
   });
@@ -140,6 +143,7 @@ describe("computeStats", () => {
     expect(stats.count).toBe(10);
     expect(stats.min).toBe(1);
     expect(stats.max).toBe(10);
+    expect(stats.range).toBe(9);
     expect(stats.sum).toBe(55);
     expect(stats.mean).toBe(5.5);
     expect(stats.median).toBe(5.5);
