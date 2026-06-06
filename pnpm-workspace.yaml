@@ -1,0 +1,14 @@
+packages:
+  - .
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
+strictDepBuilds: true
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+trustPolicyExclude:
+  - "reselect@5.1.1"
+allowBuilds:
+  esbuild: true
+  lefthook: false
+  sharp: true
+  workerd: true
