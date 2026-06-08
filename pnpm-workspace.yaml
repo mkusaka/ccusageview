@@ -5,6 +5,8 @@ minimumReleaseAgeStrict: true
 strictDepBuilds: true
 trustPolicy: no-downgrade
 blockExoticSubdeps: true
+overrides:
+  es-toolkit: 1.46.1
 trustPolicyExclude:
   - "reselect@5.1.1"
 allowBuilds:
