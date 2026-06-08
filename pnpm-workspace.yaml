@@ -6,7 +6,7 @@ strictDepBuilds: true
 trustPolicy: no-downgrade
 blockExoticSubdeps: true
 overrides:
-  es-toolkit: 1.46.1
+  es-toolkit: 1.47.0
 trustPolicyExclude:
   - "reselect@5.1.1"
 allowBuilds:
