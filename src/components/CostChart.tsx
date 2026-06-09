@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
   type RechartsTooltipProps,
+  type ChartRowData,
   syncTooltipByIndexToLocalCoordinate,
 } from "./recharts-components";
 import type { NormalizedEntry } from "../utils/normalize";
@@ -285,7 +286,11 @@ function CostAreaChart({
       <ResponsiveContainer width="100%" height={320}>
         <AreaChart
           data={
-            isTokenTypeView ? tokenTypeCostData : isBreakdownView ? breakdownChartData : entries
+            (isTokenTypeView
+              ? tokenTypeCostData
+              : isBreakdownView
+                ? breakdownChartData
+                : entries) as ChartRowData
           }
           syncId={syncId}
           syncMethod={syncTooltipByIndexToLocalCoordinate}

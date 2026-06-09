@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
   type RechartsTooltipProps,
+  type ChartRowData,
 } from "./recharts-components";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
@@ -357,7 +358,7 @@ function DayOfWeekBarChart({
     <Suspense fallback={<div className="h-60" />}>
       <ResponsiveContainer width="100%" height={240}>
         <BarChart
-          data={isBreakdownView ? breakdownData : data}
+          data={(isBreakdownView ? breakdownData : data) as ChartRowData}
           margin={{ top: 10, right: 20, bottom: 0, left: 10 }}
           stackOffset={isBreakdownView && showPercent ? "expand" : undefined}
         >
