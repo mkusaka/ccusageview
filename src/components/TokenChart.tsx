@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend,
   type RechartsTooltipProps,
+  type ChartRowData,
   syncTooltipByIndexToLocalCoordinate,
 } from "./recharts-components";
 import type { NormalizedEntry } from "../utils/normalize";
@@ -290,7 +291,7 @@ function TokenBarChart({
     <Suspense fallback={<div className="h-96" />}>
       <ResponsiveContainer width="100%" height={380}>
         <BarChart
-          data={isBreakdownView ? breakdownChartData : entries}
+          data={(isBreakdownView ? breakdownChartData : entries) as ChartRowData}
           syncId={syncId}
           syncMethod={syncTooltipByIndexToLocalCoordinate}
           stackOffset={showPercent ? "expand" : undefined}
