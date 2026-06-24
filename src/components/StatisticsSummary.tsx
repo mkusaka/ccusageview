@@ -27,6 +27,7 @@ import { collectModels, buildModelSeries, MODEL_COLORS } from "../utils/chart";
 import type { ChartDataSeries } from "../utils/chartData";
 import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatTokens, formatSkewness } from "../utils/format";
+import { formatCacheReadRate } from "../utils/cacheEfficiency";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
@@ -47,6 +48,7 @@ const METRICS: Record<StatMetricKey, MetricConfig> = {
   outputTokens: { label: "Output", format: formatTokens },
   cacheCreationTokens: { label: "Cache Create", format: formatTokens },
   cacheReadTokens: { label: "Cache Read", format: formatTokens },
+  cacheReadRate: { label: "Cache Read Rate", format: formatCacheReadRate },
 };
 
 const METRIC_KEYS = Object.keys(METRICS) as StatMetricKey[];

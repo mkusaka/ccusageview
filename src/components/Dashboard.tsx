@@ -10,6 +10,7 @@ import { ChartMarkdownContext, type RegisteredMarkdownSection } from "./ChartMar
 import { SummaryCards } from "./SummaryCards";
 import { CostChart } from "./CostChart";
 import { TokenChart } from "./TokenChart";
+import { CacheEfficiencyChart } from "./CacheEfficiencyChart";
 import { ModelBreakdown } from "./ModelBreakdown";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { DataTable } from "./DataTable";
@@ -198,6 +199,7 @@ export function Dashboard({ data }: Props) {
               {showDayOfWeek && <DayOfWeekChart entries={filteredEntries} />}
               <CostChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
               <TokenChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
+              <CacheEfficiencyChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
               {hasModelBreakdowns && <ModelBreakdown entries={filteredEntries} />}
             </>
           )}

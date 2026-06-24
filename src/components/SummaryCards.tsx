@@ -1,5 +1,6 @@
 import type { NormalizedTotals } from "../utils/normalize";
 import { formatCost, formatTokens } from "../utils/format";
+import { calculateCacheEfficiency, formatCacheReadRate } from "../utils/cacheEfficiency";
 
 interface Props {
   totals: NormalizedTotals;
@@ -13,14 +14,18 @@ interface CardData {
 }
 
 export function SummaryCards({ totals, entryCount }: Props) {
+  const cacheEfficiency = calculateCacheEfficiency(totals);
   const cards: CardData[] = [
     { label: "Total Cost", value: formatCost(totals.totalCost) },
     { label: "Total Tokens", value: formatTokens(totals.totalTokens) },
     { label: "Input Tokens", value: formatTokens(totals.inputTokens) },
     { label: "Output Tokens", value: formatTokens(totals.outputTokens) },
     {
-      label: "Cache Read",
-      value: formatTokens(totals.cacheReadTokens),
+      label: "Cache Read Rate",
+      value: formatCacheReadRate(cacheEfficiency.cacheReadRate),
+      subLabel: `Read ${formatTokens(cacheEfficiency.cacheReadTokens)} / Input+Read ${formatTokens(
+        cacheEfficiency.inputPlusCacheReadTokens,
+      )}`,
     },
     { label: "Entries", value: entryCount.toLocaleString("en-US") },
   ];

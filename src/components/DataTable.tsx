@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import type { NormalizedEntry } from "../utils/normalize";
 import { formatCost, formatTokens } from "../utils/format";
+import { formatCacheReadRate, getCacheReadRate } from "../utils/cacheEfficiency";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -13,7 +14,7 @@ interface Column {
   label: string;
   align: "left" | "right";
   render: (entry: NormalizedEntry) => string;
-  sortValue: (entry: NormalizedEntry) => number | string;
+  sortValue: (entry: NormalizedEntry) => number | string | null;
 }
 
 const COLUMNS: Column[] = [
@@ -51,6 +52,13 @@ const COLUMNS: Column[] = [
     align: "right",
     render: (e) => formatTokens(e.cacheReadTokens),
     sortValue: (e) => e.cacheReadTokens,
+  },
+  {
+    key: "cacheReadRate",
+    label: "Cache Read Rate",
+    align: "right",
+    render: (e) => formatCacheReadRate(getCacheReadRate(e)),
+    sortValue: (e) => getCacheReadRate(e),
   },
   {
     key: "totalTokens",
@@ -101,6 +109,9 @@ export function DataTable({ entries }: Props) {
     return entries.toSorted((a, b) => {
       const va = col.sortValue(a);
       const vb = col.sortValue(b);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
       const cmp = va < vb ? -1 : va > vb ? 1 : 0;
       return sortDir === "asc" ? cmp : -cmp;
     });

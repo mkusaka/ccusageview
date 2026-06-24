@@ -1,14 +1,52 @@
 import type { NormalizedEntry } from "./normalize";
 import { getBreakdownMetricValue, groupBreakdowns, type BreakdownMode } from "./breakdown";
+import { getCacheReadRate } from "./cacheEfficiency";
 
 /** Numeric fields of NormalizedEntry that statistics can be computed over */
-export type StatMetricKey =
+export type EntryStatMetricKey =
   | "cost"
   | "totalTokens"
   | "inputTokens"
   | "outputTokens"
   | "cacheCreationTokens"
   | "cacheReadTokens";
+
+export type StatMetricKey = EntryStatMetricKey | "cacheReadRate";
+
+function getEntryMetricValue(entry: NormalizedEntry, key: StatMetricKey): number | null {
+  if (key === "cacheReadRate") return getCacheReadRate(entry);
+  return entry[key];
+}
+
+function getVisibleBreakdownMetricValue(
+  grouped: ReturnType<typeof groupBreakdowns>,
+  key: StatMetricKey,
+  visibleModels: Set<string>,
+): number | null | undefined {
+  let found = false;
+
+  if (key === "cacheReadRate") {
+    let inputTokens = 0;
+    let cacheReadTokens = 0;
+    for (const [name, metrics] of grouped.entries()) {
+      if (!visibleModels.has(name)) continue;
+      inputTokens += metrics.inputTokens;
+      cacheReadTokens += metrics.cacheReadTokens;
+      found = true;
+    }
+    if (!found) return undefined;
+    return getCacheReadRate({ inputTokens, cacheReadTokens });
+  }
+
+  let sum = 0;
+  for (const [name, metrics] of grouped.entries()) {
+    if (visibleModels.has(name)) {
+      sum += getBreakdownMetricValue(metrics, key);
+      found = true;
+    }
+  }
+  return found ? sum : undefined;
+}
 
 /**
  * Extract a single metric's values from entries, filtered to a set of visible models.
@@ -26,19 +64,15 @@ export function extractMetricForVisibleModels(
   for (const e of entries) {
     const grouped = groupBreakdowns(e.modelBreakdowns, mode);
     if (grouped.size === 0) {
-      if (includeOther) values.push(e[key]);
+      if (includeOther) {
+        const value = getEntryMetricValue(e, key);
+        if (value != null) values.push(value);
+      }
       continue;
     }
 
-    let sum = 0;
-    let found = false;
-    for (const [name, metrics] of grouped.entries()) {
-      if (visibleModels.has(name)) {
-        sum += getBreakdownMetricValue(metrics, key);
-        found = true;
-      }
-    }
-    if (found) values.push(sum);
+    const value = getVisibleBreakdownMetricValue(grouped, key, visibleModels);
+    if (value != null) values.push(value);
   }
   return values;
 }
@@ -55,19 +89,15 @@ export function extractMetricForVisibleModelsWithLabels(
   for (const e of entries) {
     const grouped = groupBreakdowns(e.modelBreakdowns, mode);
     if (grouped.size === 0) {
-      if (includeOther) result.push({ label: e.label, value: e[key] });
+      if (includeOther) {
+        const value = getEntryMetricValue(e, key);
+        if (value != null) result.push({ label: e.label, value });
+      }
       continue;
     }
 
-    let sum = 0;
-    let found = false;
-    for (const [name, metrics] of grouped.entries()) {
-      if (visibleModels.has(name)) {
-        sum += getBreakdownMetricValue(metrics, key);
-        found = true;
-      }
-    }
-    if (found) result.push({ label: e.label, value: sum });
+    const value = getVisibleBreakdownMetricValue(grouped, key, visibleModels);
+    if (value != null) result.push({ label: e.label, value });
   }
   return result;
 }
@@ -97,6 +127,7 @@ export const STAT_METRIC_KEYS: readonly StatMetricKey[] = [
   "outputTokens",
   "cacheCreationTokens",
   "cacheReadTokens",
+  "cacheReadRate",
 ] as const;
 
 /** Result of computing descriptive statistics over a single metric */
@@ -121,7 +152,12 @@ export interface DescriptiveStats {
 
 /** Extract a single metric's values from entries */
 export function extractMetric(entries: NormalizedEntry[], key: StatMetricKey): number[] {
-  return entries.map((e) => e[key]);
+  const values: number[] = [];
+  for (const entry of entries) {
+    const value = getEntryMetricValue(entry, key);
+    if (value != null) values.push(value);
+  }
+  return values;
 }
 
 /** A metric value paired with the entry label (date) it came from */
@@ -135,7 +171,12 @@ export function extractMetricWithLabels(
   entries: NormalizedEntry[],
   key: StatMetricKey,
 ): LabeledValue[] {
-  return entries.map((e) => ({ label: e.label, value: e[key] }));
+  const values: LabeledValue[] = [];
+  for (const entry of entries) {
+    const value = getEntryMetricValue(entry, key);
+    if (value != null) values.push({ label: entry.label, value });
+  }
+  return values;
 }
 
 /**

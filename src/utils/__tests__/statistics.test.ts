@@ -222,11 +222,21 @@ describe("extractMetric", () => {
     expect(extractMetric([entry], "outputTokens")).toEqual([4]);
     expect(extractMetric([entry], "cacheCreationTokens")).toEqual([5]);
     expect(extractMetric([entry], "cacheReadTokens")).toEqual([6]);
+    expect(extractMetric([entry], "cacheReadRate")).toEqual([6 / 9]);
+  });
+
+  it("skips cache read rate values with a zero denominator", () => {
+    const entries = [
+      makeEntry("a", { inputTokens: 0, cacheReadTokens: 0 }),
+      makeEntry("b", { inputTokens: 100, cacheReadTokens: 300 }),
+    ];
+
+    expect(extractMetric(entries, "cacheReadRate")).toEqual([0.75]);
   });
 });
 
 describe("computeAllStats", () => {
-  it("returns stats for all 6 metrics", () => {
+  it("returns stats for all 7 metrics", () => {
     const entries = [
       makeEntry("a", {
         cost: 1,
@@ -267,11 +277,11 @@ describe("computeAllStats", () => {
 
   it("returns correct count matching entries.length", () => {
     const entries = [
-      makeEntry("a"),
-      makeEntry("b"),
-      makeEntry("c"),
-      makeEntry("d"),
-      makeEntry("e"),
+      makeEntry("a", { inputTokens: 1 }),
+      makeEntry("b", { inputTokens: 1 }),
+      makeEntry("c", { inputTokens: 1 }),
+      makeEntry("d", { inputTokens: 1 }),
+      makeEntry("e", { inputTokens: 1 }),
     ];
     const result = computeAllStats(entries);
 
@@ -596,6 +606,48 @@ describe("extractMetricForVisibleModels", () => {
     // Only entry "a" has modelA
     expect(result).toEqual([10]);
   });
+
+  it("computes cache read rate from visible model input and cache read totals", () => {
+    const ents = [
+      makeEntry("a", {
+        modelBreakdowns: [
+          makeBreakdown("modelA", { inputTokens: 100, cacheReadTokens: 300 }),
+          makeBreakdown("modelB", { inputTokens: 900, cacheReadTokens: 100 }),
+        ],
+      }),
+    ];
+
+    expect(
+      extractMetricForVisibleModels(ents, "cacheReadRate", new Set(["modelA"]), false),
+    ).toEqual([0.75]);
+    expect(
+      extractMetricForVisibleModels(ents, "cacheReadRate", new Set(["modelA", "modelB"]), false),
+    ).toEqual([400 / 1_400]);
+  });
+
+  it("computes cache read rate for visible providers", () => {
+    const ents = [
+      makeEntry("a", {
+        modelBreakdowns: [
+          makeBreakdown("claude-sonnet-4-20250514", {
+            inputTokens: 100,
+            cacheReadTokens: 300,
+          }),
+          makeBreakdown("gpt-5-codex", { inputTokens: 100, cacheReadTokens: 0 }),
+        ],
+      }),
+    ];
+
+    const result = extractMetricForVisibleModels(
+      ents,
+      "cacheReadRate",
+      new Set(["Anthropic"]),
+      false,
+      "provider",
+    );
+
+    expect(result).toEqual([0.75]);
+  });
 });
 
 describe("extractMetricForVisibleModelsWithLabels", () => {
@@ -638,6 +690,29 @@ describe("extractMetricForVisibleModelsWithLabels", () => {
       { label: "day2", value: 12 }, // only modelA
     ]);
   });
+
+  it("returns labeled cache read rates for visible models", () => {
+    const ents = [
+      makeEntry("day1", {
+        modelBreakdowns: [
+          makeBreakdown("modelA", { inputTokens: 100, cacheReadTokens: 300 }),
+          makeBreakdown("modelB", { inputTokens: 100, cacheReadTokens: 0 }),
+        ],
+      }),
+      makeEntry("day2", {
+        modelBreakdowns: [makeBreakdown("modelA", { inputTokens: 0, cacheReadTokens: 0 })],
+      }),
+    ];
+
+    const result = extractMetricForVisibleModelsWithLabels(
+      ents,
+      "cacheReadRate",
+      new Set(["modelA"]),
+      false,
+    );
+
+    expect(result).toEqual([{ label: "day1", value: 0.75 }]);
+  });
 });
 
 describe("computeAllStatsForVisibleModels", () => {
@@ -668,7 +743,7 @@ describe("computeAllStatsForVisibleModels", () => {
     }),
   ];
 
-  it("returns stats for all 6 metrics filtered to visible models", () => {
+  it("returns stats for all 7 metrics filtered to visible models", () => {
     const visible = new Set(["modelA"]);
     const result = computeAllStatsForVisibleModels(entries, visible, false);
 
@@ -684,6 +759,7 @@ describe("computeAllStatsForVisibleModels", () => {
 
     // modelA inputTokens: [60, 120, 180] → mean = 120
     expect(result.inputTokens.mean).toBe(120);
+    expect(result.cacheReadRate.mean).toBe(0);
   });
 
   it("computes correct stats when filtering to single model", () => {
