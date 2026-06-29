@@ -25,6 +25,13 @@ import { buildMarkdownSection } from "../utils/chartData";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import {
+  asNumber,
+  getChartJsColor,
+  getOrCreateExternalTooltipElement,
+  positionExternalTooltip,
+  withOpacity,
+} from "./chartjs-utils";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -74,24 +81,6 @@ function hasAnyBreakdownData(entries: readonly NormalizedEntry[]): boolean {
   return entries.some((entry) => entry.modelBreakdowns && entry.modelBreakdowns.length > 0);
 }
 
-const CHART_JS_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#14b8a6", "#ef4444"];
-
-function getChartJsColor(index: number): string {
-  return CHART_JS_COLORS[index % CHART_JS_COLORS.length];
-}
-
-function withOpacity(hex: string, opacity: number): string {
-  const normalized = hex.replace("#", "");
-  const r = Number.parseInt(normalized.slice(0, 2), 16);
-  const g = Number.parseInt(normalized.slice(2, 4), 16);
-  const b = Number.parseInt(normalized.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-}
-
-function asNumber(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
 function shouldShowTooltipItem(context: TooltipItem<"bar" | "line">): boolean {
   const value = context.parsed.y;
   return typeof value === "number" && Number.isFinite(value) && value !== 0;
@@ -106,35 +95,6 @@ function formatTooltipItem(context: TooltipItem<"bar" | "line">): string {
   return `${label}: ${formatTokens(value ?? 0)}`;
 }
 
-function getOrCreateTooltipElement(chart: ChartJsInstance): HTMLDivElement {
-  const parent = chart.canvas.parentNode as HTMLElement;
-  let tooltipEl = parent.querySelector<HTMLDivElement>("[data-cache-efficiency-tooltip]");
-
-  if (!tooltipEl) {
-    tooltipEl = document.createElement("div");
-    tooltipEl.dataset.cacheEfficiencyTooltip = "true";
-    tooltipEl.style.position = "absolute";
-    tooltipEl.style.pointerEvents = "none";
-    tooltipEl.style.zIndex = "20";
-    tooltipEl.style.minWidth = "220px";
-    tooltipEl.style.maxWidth = "min(760px, calc(100vw - 32px))";
-    tooltipEl.style.maxHeight = "min(420px, calc(100vh - 32px))";
-    tooltipEl.style.overflowY = "auto";
-    tooltipEl.style.border = "1px solid var(--color-border)";
-    tooltipEl.style.borderRadius = "8px";
-    tooltipEl.style.background = "var(--color-bg-card)";
-    tooltipEl.style.boxShadow = "0 10px 30px rgba(15, 23, 42, 0.18)";
-    tooltipEl.style.color = "var(--color-text-primary)";
-    tooltipEl.style.fontSize = "12px";
-    tooltipEl.style.lineHeight = "1.35";
-    tooltipEl.style.padding = "8px 10px";
-    tooltipEl.style.transition = "opacity 80ms ease";
-    parent.appendChild(tooltipEl);
-  }
-
-  return tooltipEl;
-}
-
 function renderExternalTooltip({
   chart,
   tooltip,
@@ -142,7 +102,7 @@ function renderExternalTooltip({
   chart: ChartJsInstance;
   tooltip: TooltipModel<"bar" | "line">;
 }) {
-  const tooltipEl = getOrCreateTooltipElement(chart);
+  const tooltipEl = getOrCreateExternalTooltipElement(chart, "cache-efficiency");
 
   if (tooltip.opacity === 0) {
     tooltipEl.style.opacity = "0";
@@ -193,25 +153,7 @@ function renderExternalTooltip({
 
   tooltipEl.appendChild(body);
 
-  const parent = chart.canvas.parentNode as HTMLElement;
-  const parentRect = parent.getBoundingClientRect();
-  tooltipEl.style.maxHeight = `${Math.max(160, parentRect.height - 16)}px`;
-  const tooltipWidth = tooltipEl.offsetWidth;
-  const tooltipHeight = tooltipEl.offsetHeight;
-  const left = Math.min(
-    Math.max(tooltip.caretX, tooltipWidth / 2 + 8),
-    parentRect.width - tooltipWidth / 2 - 8,
-  );
-  let top = tooltip.caretY - tooltipHeight - 12;
-  if (top < 8) top = tooltip.caretY + 12;
-  if (top + tooltipHeight > parentRect.height - 8) {
-    top = Math.max(8, parentRect.height - tooltipHeight - 8);
-  }
-
-  tooltipEl.style.opacity = "1";
-  tooltipEl.style.left = `${left}px`;
-  tooltipEl.style.top = `${top}px`;
-  tooltipEl.style.transform = "translateX(-50%)";
+  positionExternalTooltip(chart, tooltip, tooltipEl);
 }
 
 function buildChartJsData(

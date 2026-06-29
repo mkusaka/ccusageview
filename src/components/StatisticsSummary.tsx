@@ -1,15 +1,7 @@
-import { Suspense, useMemo, useRef, useState, type RefObject } from "react";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ReferenceLine,
-  type RechartsTooltipProps,
-} from "./recharts-components";
+import { useMemo, useRef, useState, type RefObject } from "react";
+import "chart.js/auto";
+import type { ChartData, ChartOptions, Plugin } from "chart.js";
+import { Line } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import {
@@ -31,6 +23,7 @@ import { formatCacheReadRate } from "../utils/cacheEfficiency";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import { getChartJsColor, withOpacity } from "./chartjs-utils";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -556,14 +549,28 @@ function StatisticsCards({
   );
 }
 
-const MEAN_COLOR = "var(--color-chart-teal)";
+const MEAN_COLOR = "#14b8a6";
 
 const PERCENTILE_LINES = [
-  { rank: 50, label: "P50", color: "var(--color-chart-green)" },
-  { rank: 90, label: "P90", color: "var(--color-chart-orange)" },
-  { rank: 95, label: "P95", color: "var(--color-chart-purple)" },
-  { rank: 99, label: "P99", color: "var(--color-chart-red)" },
+  { rank: 50, label: "P50", color: "#22c55e" },
+  { rank: 90, label: "P90", color: "#f59e0b" },
+  { rank: 95, label: "P95", color: "#a855f7" },
+  { rank: 99, label: "P99", color: "#ef4444" },
 ] as const;
+
+interface DistributionPoint {
+  x: number;
+  y: number;
+  sourceLabel: string;
+}
+
+interface DistributionLine {
+  rank: number;
+  label: string;
+  color: string;
+  highlighted: boolean;
+  dimmed: boolean;
+}
 
 function DistributionChart({
   entries,
@@ -601,126 +608,177 @@ function DistributionChart({
 
   const meanRank = useMemo(() => findRankForValue(chartData, stats.mean), [chartData, stats.mean]);
 
-  if (chartData.length < 2) return null;
-
-  const percentileValues: Record<number, number> = {
-    50: stats.median,
-    90: stats.p90,
-    95: stats.p95,
-    99: stats.p99,
-  };
+  const percentileValues = useMemo<Record<number, number>>(
+    () => ({
+      50: stats.median,
+      90: stats.p90,
+      95: stats.p95,
+      99: stats.p99,
+    }),
+    [stats.median, stats.p90, stats.p95, stats.p99],
+  );
   const meanHighlighted = highlightedStat === "mean";
+  const referenceLines = useMemo<DistributionLine[]>(
+    () => [
+      ...(meanRank == null
+        ? []
+        : [
+            {
+              rank: meanRank,
+              label: `Mean ${metricConfig.format(stats.mean)}`,
+              color: MEAN_COLOR,
+              highlighted: meanHighlighted,
+              dimmed: highlightedStat != null && !meanHighlighted,
+            },
+          ]),
+      ...PERCENTILE_LINES.map(({ rank, label, color }) => ({
+        rank,
+        label: `${label} ${metricConfig.format(percentileValues[rank])}`,
+        color,
+        highlighted: highlightedStat === rank,
+        dimmed: highlightedStat != null && highlightedStat !== rank,
+      })),
+    ],
+    [highlightedStat, meanHighlighted, meanRank, metricConfig, percentileValues, stats.mean],
+  );
+  const distributionChartData = useMemo<ChartData<"line", DistributionPoint[], number>>(
+    () => ({
+      datasets: [
+        {
+          label: metricConfig.label,
+          data: chartData.map((point) => ({
+            x: point.rank,
+            y: point.value,
+            sourceLabel: point.sourceLabel ?? "",
+          })),
+          borderColor: getChartJsColor(0),
+          backgroundColor: withOpacity(getChartJsColor(0), 0.15),
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          fill: "origin",
+          tension: 0.25,
+        },
+      ],
+    }),
+    [chartData, metricConfig.label],
+  );
+  const referenceLinePlugin = useMemo<Plugin<"line">>(
+    () => ({
+      id: "distribution-reference-lines",
+      afterDatasetsDraw(chart) {
+        const xScale = chart.scales.x;
+        const { top, bottom, right } = chart.chartArea;
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.textBaseline = "top";
+        for (const [index, line] of referenceLines.entries()) {
+          const x = xScale.getPixelForValue(line.rank);
+          if (x < chart.chartArea.left || x > right) continue;
+          ctx.globalAlpha = line.dimmed ? 0.5 : 1;
+          ctx.strokeStyle = line.color;
+          ctx.lineWidth = line.highlighted ? 3 : 1.5;
+          ctx.setLineDash([4, 3]);
+          ctx.beginPath();
+          ctx.moveTo(x, top);
+          ctx.lineTo(x, bottom);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = line.color;
+          ctx.font = `${line.highlighted ? 600 : 400} ${line.highlighted ? 11 : 10}px sans-serif`;
+          const textY = top + 4 + (index % 3) * 13;
+          const metrics = ctx.measureText(line.label);
+          const textX = Math.min(Math.max(x + 4, chart.chartArea.left), right - metrics.width - 2);
+          ctx.fillText(line.label, textX, textY);
+        }
+        ctx.restore();
+      },
+    }),
+    [referenceLines],
+  );
+  const distributionOptions = useMemo<ChartOptions<"line">>(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      normalized: true,
+      parsing: false,
+      interaction: { mode: "nearest", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "rgba(255, 255, 255, 0.96)",
+          borderColor: "rgba(148, 163, 184, 0.4)",
+          borderWidth: 1,
+          titleColor: "rgb(17, 24, 39)",
+          bodyColor: "rgb(75, 85, 99)",
+          callbacks: {
+            title(items) {
+              const point = items[0]?.raw as DistributionPoint | undefined;
+              return `Percentile: ${point?.x ?? ""}%`;
+            },
+            label(item) {
+              const point = item.raw as DistributionPoint;
+              return `${metricConfig.label}: ${metricConfig.format(point.y)}`;
+            },
+            afterLabel(item) {
+              const point = item.raw as DistributionPoint;
+              if (!point.sourceLabel) return "";
+              const sourceLabelName = /^\d{4}-\d{2}(-\d{2})?$/.test(point.sourceLabel)
+                ? "Period"
+                : "Source";
+              return `${sourceLabelName}: ${point.sourceLabel}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          type: "linear",
+          min: 0,
+          max: 100,
+          grid: { color: "rgba(148, 163, 184, 0.2)" },
+          ticks: {
+            color: "rgb(107, 114, 128)",
+            font: { size: 11 },
+            callback(value) {
+              return `${Number(value)}%`;
+            },
+          },
+          title: {
+            display: true,
+            text: "Percentile",
+            color: "rgb(107, 114, 128)",
+            font: { size: 11 },
+          },
+        },
+        y: {
+          grid: { color: "rgba(148, 163, 184, 0.2)" },
+          ticks: {
+            color: "rgb(107, 114, 128)",
+            font: { size: 11 },
+            callback(value) {
+              return metricConfig.format(Number(value));
+            },
+          },
+        },
+      },
+    }),
+    [metricConfig],
+  );
+
+  if (chartData.length < 2) return null;
 
   return (
     <div className="mb-2">
       <p className="text-xs text-text-secondary mb-2">Distribution (sorted ascending)</p>
-      <Suspense fallback={<div className="h-60" />}>
-        <ResponsiveContainer width="100%" height={240}>
-          <AreaChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis
-              dataKey="rank"
-              type="number"
-              domain={[0, 100]}
-              tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value: number) => `${value}%`}
-              label={{
-                value: "Percentile",
-                position: "insideBottomRight",
-                offset: -5,
-                style: { fontSize: 11, fill: "var(--color-text-secondary)" },
-              }}
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value: number) => metricConfig.format(value)}
-              width={80}
-            />
-            <Tooltip content={<DistributionTooltip metricConfig={metricConfig} />} />
-            <Area
-              type="monotone"
-              dataKey="value"
-              fill="var(--color-chart-blue)"
-              stroke="var(--color-chart-blue)"
-              fillOpacity={0.15}
-              strokeWidth={2}
-            />
-            {meanRank != null && (
-              <ReferenceLine
-                x={meanRank}
-                stroke={MEAN_COLOR}
-                strokeDasharray="4 3"
-                strokeWidth={meanHighlighted ? 3 : 1.5}
-                strokeOpacity={highlightedStat == null || meanHighlighted ? 1 : 0.5}
-                label={{
-                  value: `Mean ${metricConfig.format(stats.mean)}`,
-                  position: "top",
-                  style: {
-                    fontSize: meanHighlighted ? 11 : 10,
-                    fontWeight: meanHighlighted ? 600 : 400,
-                    fill: MEAN_COLOR,
-                    opacity: highlightedStat == null || meanHighlighted ? 1 : 0.7,
-                  },
-                }}
-              />
-            )}
-            {PERCENTILE_LINES.map(({ rank, label, color }) => (
-              <ReferenceLine
-                key={rank}
-                x={rank}
-                stroke={color}
-                strokeDasharray="4 3"
-                strokeWidth={highlightedStat === rank ? 3 : 1.5}
-                strokeOpacity={highlightedStat == null || highlightedStat === rank ? 1 : 0.5}
-                label={{
-                  value: `${label} ${metricConfig.format(percentileValues[rank])}`,
-                  position: "top",
-                  style: {
-                    fontSize: highlightedStat === rank ? 11 : 10,
-                    fontWeight: highlightedStat === rank ? 600 : 400,
-                    fill: color,
-                    opacity: highlightedStat == null || highlightedStat === rank ? 1 : 0.7,
-                  },
-                }}
-              />
-            ))}
-          </AreaChart>
-        </ResponsiveContainer>
-      </Suspense>
-    </div>
-  );
-}
-
-function DistributionTooltip({
-  active,
-  payload,
-  label,
-  metricConfig,
-}: RechartsTooltipProps & { metricConfig: MetricConfig }) {
-  if (!active || !payload || payload.length === 0) return null;
-
-  const point = payload[0]?.payload;
-  const value = Number(point?.value ?? 0);
-  const sourceLabel = typeof point?.sourceLabel === "string" ? point.sourceLabel : "";
-  const sourceLabelName = /^\d{4}-\d{2}(-\d{2})?$/.test(sourceLabel) ? "Period" : "Source";
-  const rank = label ?? point?.rank ?? "";
-
-  return (
-    <div className="bg-bg-card border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
-      <p className="font-medium text-text-primary">Percentile: {rank}%</p>
-      <p className="text-text-secondary">
-        {metricConfig.label}:{" "}
-        <span className="text-text-primary">{metricConfig.format(value)}</span>
-      </p>
-      {sourceLabel && (
-        <p className="text-text-secondary">
-          {sourceLabelName}: {sourceLabel}
-        </p>
-      )}
+      <div className="h-60">
+        <Line
+          data={distributionChartData}
+          options={distributionOptions}
+          plugins={[referenceLinePlugin]}
+        />
+      </div>
     </div>
   );
 }

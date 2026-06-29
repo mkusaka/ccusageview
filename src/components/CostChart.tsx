@@ -1,17 +1,13 @@
-import { Suspense, useState, useMemo, useRef } from "react";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  type RechartsTooltipProps,
-  type ChartRowData,
-  syncTooltipByIndexToLocalCoordinate,
-} from "./recharts-components";
+import { useState, useMemo, useRef } from "react";
+import "chart.js/auto";
+import type {
+  Chart as ChartJsInstance,
+  ChartData,
+  ChartDataset,
+  ChartOptions,
+  TooltipModel,
+} from "chart.js";
+import { Line } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import { formatCost } from "../utils/format";
 import type { BreakdownMode } from "../utils/breakdown";
@@ -22,6 +18,14 @@ import { buildCostByTokenType } from "../utils/pricing";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import {
+  asNumber,
+  getChartJsColor,
+  getOrCreateExternalTooltipElement,
+  normalizeStackValue,
+  positionExternalTooltip,
+  withOpacity,
+} from "./chartjs-utils";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -31,6 +35,9 @@ interface Props {
 type ViewMode = "total" | "model" | "provider" | "tokenType";
 type CostBreakdownChartData = ReturnType<typeof buildCostByModel>;
 type TokenTypeCostData = ReturnType<typeof buildCostByTokenType>;
+type CostChartRow = NormalizedEntry | CostBreakdownChartData[number] | TokenTypeCostData[number];
+type CostChartDataset = ChartDataset<"line", number[]>;
+type CostChartJsData = ChartData<"line", number[], string>;
 
 const TOKEN_TYPE_COST_SERIES = [
   { key: "inputCost", name: "Input", color: "var(--color-chart-blue)" },
@@ -281,192 +288,225 @@ function CostAreaChart({
   tokenTypeCostData: TokenTypeCostData;
   toggleSeries: (key: string) => void;
 }) {
+  void syncId;
+  const sourceData = useMemo(
+    () =>
+      (isTokenTypeView
+        ? tokenTypeCostData
+        : isBreakdownView
+          ? breakdownChartData
+          : entries) as CostChartRow[],
+    [breakdownChartData, entries, isBreakdownView, isTokenTypeView, tokenTypeCostData],
+  );
+  const visibleSeries = useMemo(() => {
+    if (isTokenTypeView) {
+      return getVisibleTokenTypeCostSeries(hiddenSeries).map((series, index) => ({
+        key: series.key,
+        label: series.name,
+        color: getChartJsColor(index),
+      }));
+    }
+    if (isBreakdownView) {
+      return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series, index) => ({
+        key: series.key,
+        label: series.label,
+        color: getChartJsColor(index),
+      }));
+    }
+    return [{ key: "cost", label: "Cost", color: getChartJsColor(0) }];
+  }, [breakdownSeries, hiddenSeries, isBreakdownView, isTokenTypeView]);
+  const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
+  const isStackedView = isBreakdownView || isTokenTypeView;
+  const chartJsData = useMemo<CostChartJsData>(() => {
+    const labels = sourceData.map((row) => String(row.label));
+    const datasets: CostChartDataset[] = visibleSeries.map((series, index) => {
+      const color = series.color || getChartJsColor(index);
+      return {
+        type: "line",
+        label: series.label,
+        data: sourceData.map((row) => {
+          const record = row as Record<string, unknown>;
+          return isStackedView && showPercent
+            ? normalizeStackValue(record, series.key, visibleKeys)
+            : (asNumber(record[series.key]) ?? 0);
+        }),
+        borderColor: color,
+        backgroundColor: isStackedView ? withOpacity(color, 0.55) : withOpacity(color, 0.2),
+        borderWidth: isStackedView ? 1 : 2,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: isStackedView ? true : "origin",
+        stack: isStackedView ? "cost" : undefined,
+        tension: 0.25,
+      };
+    });
+    return { labels, datasets };
+  }, [isStackedView, showPercent, sourceData, visibleKeys, visibleSeries]);
+  const chartJsOptions = useMemo<ChartOptions<"line">>(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      normalized: true,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: false,
+          external(context) {
+            renderCostTooltip(context, sourceData, visibleKeys, isStackedView && showPercent);
+          },
+        },
+      },
+      scales: {
+        x: {
+          stacked: isStackedView,
+          grid: { display: false },
+          ticks: {
+            color: "rgb(107, 114, 128)",
+            font: { size: 11 },
+            maxRotation: 0,
+            autoSkip: true,
+          },
+        },
+        y: {
+          stacked: isStackedView,
+          min: 0,
+          max: isStackedView && showPercent ? 1 : undefined,
+          grid: { color: "rgba(148, 163, 184, 0.2)" },
+          ticks: {
+            color: "rgb(107, 114, 128)",
+            font: { size: 11 },
+            callback(value) {
+              return isStackedView && showPercent
+                ? `${(Number(value) * 100).toFixed(0)}%`
+                : `$${Number(value)}`;
+            },
+          },
+        },
+      },
+    }),
+    [isStackedView, showPercent, sourceData, visibleKeys],
+  );
+  const legendItems = isTokenTypeView
+    ? TOKEN_TYPE_COST_SERIES.map((series) => ({
+        key: series.key,
+        name: series.name,
+        color: series.color,
+      }))
+    : isBreakdownView
+      ? breakdownSeries.map((series, index) => ({
+          key: series.key,
+          name: series.label,
+          color: series.color ?? getChartJsColor(index),
+        }))
+      : [];
+
   return (
-    <Suspense fallback={<div className="h-80" />}>
-      <ResponsiveContainer width="100%" height={320}>
-        <AreaChart
-          data={
-            (isTokenTypeView
-              ? tokenTypeCostData
-              : isBreakdownView
-                ? breakdownChartData
-                : entries) as ChartRowData
-          }
-          syncId={syncId}
-          syncMethod={syncTooltipByIndexToLocalCoordinate}
-          stackOffset={(isBreakdownView || isTokenTypeView) && showPercent ? "expand" : undefined}
+    <>
+      <div className="relative h-80">
+        <Line data={chartJsData} options={chartJsOptions} />
+      </div>
+      {legendItems.length > 0 && (
+        <ChartLegend items={legendItems} hiddenSeries={hiddenSeries} toggleSeries={toggleSeries} />
+      )}
+    </>
+  );
+}
+
+function renderCostTooltip(
+  { chart, tooltip }: { chart: ChartJsInstance; tooltip: TooltipModel<"line"> },
+  sourceData: readonly CostChartRow[],
+  visibleKeys: readonly string[],
+  showPercent: boolean,
+) {
+  const tooltipEl = getOrCreateExternalTooltipElement(chart, "cost");
+  if (tooltip.opacity === 0) {
+    tooltipEl.style.opacity = "0";
+    return;
+  }
+  const items = tooltip.dataPoints.filter((item) => {
+    const value = Number(item.parsed.y);
+    return Number.isFinite(value) && value !== 0;
+  });
+  if (items.length === 0) {
+    tooltipEl.style.opacity = "0";
+    return;
+  }
+  tooltipEl.replaceChildren();
+  const title = document.createElement("div");
+  title.textContent = tooltip.title.join(" ");
+  title.style.fontWeight = "600";
+  title.style.marginBottom = "6px";
+  tooltipEl.appendChild(title);
+  const body = document.createElement("div");
+  body.style.display = "grid";
+  body.style.gridTemplateColumns = items.length > 10 ? "repeat(2, minmax(260px, 1fr))" : "1fr";
+  body.style.columnGap = "12px";
+  body.style.rowGap = "3px";
+  const row = sourceData[items[0]?.dataIndex ?? 0] as Record<string, unknown> | undefined;
+  const total = row ? visibleKeys.reduce((sum, key) => sum + (asNumber(row[key]) ?? 0), 0) : 0;
+  for (const item of items) {
+    const line = document.createElement("div");
+    line.style.display = "flex";
+    line.style.alignItems = "center";
+    line.style.gap = "6px";
+    const marker = document.createElement("span");
+    marker.style.width = "8px";
+    marker.style.height = "8px";
+    marker.style.flex = "0 0 auto";
+    marker.style.background = String(item.dataset.borderColor ?? item.dataset.backgroundColor);
+    const key = visibleKeys[item.datasetIndex] ?? "";
+    const raw = asNumber(row?.[key]) ?? 0;
+    const value =
+      showPercent && total > 0
+        ? `${((raw / total) * 100).toFixed(1)}% (${formatCost(raw)})`
+        : formatCost(Number(item.parsed.y ?? 0));
+    const text = document.createElement("span");
+    text.textContent = `${item.dataset.label}: ${value}`;
+    text.style.whiteSpace = "nowrap";
+    line.append(marker, text);
+    body.appendChild(line);
+  }
+  tooltipEl.appendChild(body);
+  positionExternalTooltip(chart, tooltip, tooltipEl);
+}
+
+function ChartLegend({
+  items,
+  hiddenSeries,
+  toggleSeries,
+}: {
+  items: readonly { key: string; name: string; color: string }[];
+  hiddenSeries: Set<string>;
+  toggleSeries: (key: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
+      {items.map((entry) => (
+        <button
+          key={entry.key}
+          type="button"
+          onClick={() => toggleSeries(entry.key)}
+          className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+          style={{
+            opacity: hiddenSeries.has(entry.key) ? 0.3 : 1,
+            fontSize: "inherit",
+            color: "inherit",
+            textDecoration: hiddenSeries.has(entry.key) ? "line-through" : "none",
+          }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-          <XAxis
-            dataKey="label"
-            tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-            tickLine={false}
-            axisLine={false}
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              backgroundColor: entry.color,
+              display: "inline-block",
+            }}
           />
-          <YAxis
-            tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={
-              (isBreakdownView || isTokenTypeView) && showPercent
-                ? (v: number) => `${(v * 100).toFixed(0)}%`
-                : (v: number) => `$${v}`
-            }
-            domain={(isBreakdownView || isTokenTypeView) && showPercent ? [0, 1] : undefined}
-          />
-          <Tooltip
-            content={
-              (isBreakdownView || isTokenTypeView) && showPercent
-                ? ({ active, payload, label }: RechartsTooltipProps) => {
-                    if (!active || !payload?.length) return null;
-                    const total = payload.reduce(
-                      (s: number, p) => s + Number(p.payload?.[String(p.dataKey)] ?? 0),
-                      0,
-                    );
-                    return (
-                      <div
-                        className="px-2.5 py-1.5 rounded-lg text-xs shadow-lg"
-                        style={{
-                          backgroundColor: "var(--color-bg-card)",
-                          border: "1px solid var(--color-border)",
-                        }}
-                      >
-                        <p className="text-text-primary font-medium mb-0.5">{label}</p>
-                        {payload.map((p) => {
-                          const raw = Number(p.payload?.[String(p.dataKey)] ?? 0);
-                          const pct = total > 0 ? (raw / total) * 100 : 0;
-                          return (
-                            <p key={String(p.dataKey)} className="text-text-secondary">
-                              <span style={{ color: p.color }}>■</span> {p.name}: {pct.toFixed(1)}%
-                              ({formatCost(raw)})
-                            </p>
-                          );
-                        })}
-                      </div>
-                    );
-                  }
-                : undefined
-            }
-            formatter={
-              (isBreakdownView || isTokenTypeView) && showPercent
-                ? undefined
-                : (value: unknown, name: unknown) => [formatCost(Number(value ?? 0)), String(name)]
-            }
-            contentStyle={
-              (isBreakdownView || isTokenTypeView) && showPercent
-                ? undefined
-                : {
-                    backgroundColor: "var(--color-bg-card)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: "8px",
-                    fontSize: 12,
-                  }
-            }
-          />
-          {isTokenTypeView ? (
-            <>
-              <Legend
-                content={() => (
-                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
-                    {TOKEN_TYPE_COST_SERIES.map((s) => (
-                      <button
-                        key={s.key}
-                        type="button"
-                        onClick={() => toggleSeries(s.key)}
-                        className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                        style={{
-                          opacity: hiddenSeries.has(s.key) ? 0.3 : 1,
-                          fontSize: "inherit",
-                          color: "inherit",
-                          textDecoration: hiddenSeries.has(s.key) ? "line-through" : "none",
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 10,
-                            height: 10,
-                            backgroundColor: s.color,
-                            display: "inline-block",
-                          }}
-                        />
-                        <span style={{ color: "var(--color-text-secondary)" }}>{s.name}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              />
-              {getVisibleTokenTypeCostSeries(hiddenSeries).map((s) => (
-                <Area
-                  key={s.key}
-                  type="monotone"
-                  dataKey={s.key}
-                  name={s.name}
-                  stackId="1"
-                  fill={s.color}
-                  stroke={s.color}
-                  fillOpacity={0.6}
-                  strokeWidth={1}
-                />
-              ))}
-            </>
-          ) : isBreakdownView ? (
-            <>
-              <Legend
-                content={() => (
-                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
-                    {breakdownSeries.map((s) => (
-                      <button
-                        key={s.key}
-                        type="button"
-                        onClick={() => toggleSeries(s.key)}
-                        className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                        style={{
-                          opacity: hiddenSeries.has(s.key) ? 0.3 : 1,
-                          fontSize: "inherit",
-                          color: "inherit",
-                          textDecoration: hiddenSeries.has(s.key) ? "line-through" : "none",
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 10,
-                            height: 10,
-                            backgroundColor: s.color,
-                            display: "inline-block",
-                          }}
-                        />
-                        <span style={{ color: "var(--color-text-secondary)" }}>{s.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              />
-              {getVisibleChartSeries(breakdownSeries, hiddenSeries).map((s) => (
-                <Area
-                  key={s.key}
-                  type="monotone"
-                  dataKey={s.key}
-                  name={s.label}
-                  stackId="1"
-                  fill={s.color}
-                  stroke={s.color}
-                  fillOpacity={0.6}
-                  strokeWidth={1}
-                />
-              ))}
-            </>
-          ) : (
-            <Area
-              type="monotone"
-              dataKey="cost"
-              fill="var(--color-chart-blue)"
-              stroke="var(--color-chart-blue)"
-              fillOpacity={0.2}
-              strokeWidth={2}
-            />
-          )}
-        </AreaChart>
-      </ResponsiveContainer>
-    </Suspense>
+          <span style={{ color: "var(--color-text-secondary)" }}>{entry.name}</span>
+        </button>
+      ))}
+    </div>
   );
 }

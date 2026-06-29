@@ -1,16 +1,13 @@
-import { Suspense, useMemo, useReducer, useRef } from "react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  type RechartsTooltipProps,
-  type ChartRowData,
-} from "./recharts-components";
+import { useMemo, useReducer, useRef } from "react";
+import "chart.js/auto";
+import type {
+  Chart as ChartJsInstance,
+  ChartData,
+  ChartDataset,
+  ChartOptions,
+  TooltipModel,
+} from "chart.js";
+import { Bar } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatCost, formatTokens } from "../utils/format";
@@ -27,6 +24,14 @@ import {
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import {
+  asNumber,
+  getChartJsColor,
+  getOrCreateExternalTooltipElement,
+  normalizeStackValue,
+  positionExternalTooltip,
+  withOpacity,
+} from "./chartjs-utils";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -35,6 +40,9 @@ interface Props {
 type ViewMode = "total" | "model" | "provider";
 type DayOfWeekData = ReturnType<typeof buildDayOfWeekData>;
 type DayOfWeekBreakdownData = ReturnType<typeof buildDayOfWeekByBreakdown>;
+type DayOfWeekChartRow = DayOfWeekData[number] | DayOfWeekBreakdownData[number];
+type DayOfWeekChartDataset = ChartDataset<"bar", number[]>;
+type DayOfWeekChartJsData = ChartData<"bar", number[], string>;
 interface DayOfWeekState {
   metric: DayOfWeekMetric;
   aggregation: DayOfWeekAggregation;
@@ -92,7 +100,6 @@ const METRICS: Record<DayOfWeekMetric, { label: string; format: (v: number) => s
 };
 
 const METRIC_KEYS = Object.keys(METRICS) as DayOfWeekMetric[];
-const TOOLTIP_WRAPPER_STYLE = { zIndex: 20 };
 const AGGREGATION_LABELS: Record<DayOfWeekAggregation, string> = {
   avg: "Avg",
   max: "Max",
@@ -354,171 +361,244 @@ function DayOfWeekBarChart({
   showPercent: boolean;
   toggleSeries: (key: string) => void;
 }) {
+  const sourceData = useMemo(
+    () => (isBreakdownView ? breakdownData : data) as DayOfWeekChartRow[],
+    [breakdownData, data, isBreakdownView],
+  );
+  const visibleSeries = useMemo(() => {
+    if (!isBreakdownView) {
+      return [
+        { key: aggregation, label: AGGREGATION_LABELS[aggregation], color: getChartJsColor(0) },
+      ];
+    }
+    return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series, index) => ({
+      key: series.key,
+      label: series.label,
+      color: getChartJsColor(index),
+    }));
+  }, [aggregation, breakdownSeries, hiddenSeries, isBreakdownView]);
+  const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
+  const chartJsData = useMemo<DayOfWeekChartJsData>(() => {
+    const labels = sourceData.map((row) => String((row as Record<string, unknown>).day));
+    const datasets: DayOfWeekChartDataset[] = visibleSeries.map((series, index) => {
+      const color = series.color || getChartJsColor(index);
+      return {
+        type: "bar",
+        label: series.label,
+        data: sourceData.map((row) => {
+          const record = row as Record<string, unknown>;
+          return isBreakdownView && showPercent
+            ? normalizeStackValue(record, series.key, visibleKeys)
+            : (asNumber(record[series.key]) ?? 0);
+        }),
+        backgroundColor: withOpacity(color, isBreakdownView ? 0.85 : 0.7),
+        borderColor: color,
+        borderWidth: 0,
+        borderRadius: isBreakdownView ? 0 : 4,
+        stack: isBreakdownView ? "breakdown" : undefined,
+      };
+    });
+    return { labels, datasets };
+  }, [isBreakdownView, showPercent, sourceData, visibleKeys, visibleSeries]);
+  const chartJsOptions = useMemo<ChartOptions<"bar">>(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      normalized: true,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: false,
+          external(context) {
+            renderDayOfWeekTooltip(context, {
+              aggregation,
+              breakdownMode,
+              data,
+              isBreakdownView,
+              metricConfig,
+              showPercent,
+              sourceData,
+              visibleKeys,
+            });
+          },
+        },
+      },
+      scales: {
+        x: {
+          stacked: isBreakdownView,
+          grid: { display: false },
+          ticks: { color: "rgb(107, 114, 128)", font: { size: 11 } },
+        },
+        y: {
+          stacked: isBreakdownView,
+          min: 0,
+          max: isBreakdownView && showPercent ? 1 : undefined,
+          grid: { color: "rgba(148, 163, 184, 0.2)" },
+          ticks: {
+            color: "rgb(107, 114, 128)",
+            font: { size: 11 },
+            callback(value) {
+              return isBreakdownView && showPercent
+                ? `${(Number(value) * 100).toFixed(0)}%`
+                : metricConfig.format(Number(value));
+            },
+          },
+        },
+      },
+    }),
+    [
+      aggregation,
+      breakdownMode,
+      data,
+      isBreakdownView,
+      metricConfig,
+      showPercent,
+      sourceData,
+      visibleKeys,
+    ],
+  );
+
   return (
-    <Suspense fallback={<div className="h-60" />}>
-      <ResponsiveContainer width="100%" height={240}>
-        <BarChart
-          data={(isBreakdownView ? breakdownData : data) as ChartRowData}
-          margin={{ top: 10, right: 20, bottom: 0, left: 10 }}
-          stackOffset={isBreakdownView && showPercent ? "expand" : undefined}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
-          <XAxis
-            dataKey="day"
-            tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={
-              isBreakdownView && showPercent
-                ? (value: number) => `${(value * 100).toFixed(0)}%`
-                : (value: number) => metricConfig.format(value)
-            }
-            width={80}
-            domain={isBreakdownView && showPercent ? [0, 1] : undefined}
-          />
-          {isBreakdownView ? (
-            <>
-              <Tooltip
-                allowEscapeViewBox={{ x: true, y: true }}
-                wrapperStyle={TOOLTIP_WRAPPER_STYLE}
-                content={
-                  showPercent
-                    ? ({ active, payload, label }: RechartsTooltipProps) => {
-                        if (!active || !payload?.length) return null;
-                        const total = payload.reduce(
-                          (sum: number, item) =>
-                            sum + Number(item.payload?.[String(item.dataKey)] ?? 0),
-                          0,
-                        );
-                        return (
-                          <div
-                            className="px-2.5 py-1.5 rounded-lg text-xs shadow-lg"
-                            style={{
-                              backgroundColor: "var(--color-bg-card)",
-                              border: "1px solid var(--color-border)",
-                            }}
-                          >
-                            <p className="text-text-primary font-medium mb-0.5">{label}</p>
-                            {payload.map((item) => {
-                              const raw = Number(item.payload?.[String(item.dataKey)] ?? 0);
-                              const pct = total > 0 ? (raw / total) * 100 : 0;
-                              return (
-                                <p key={String(item.dataKey)} className="text-text-secondary">
-                                  <span style={{ color: item.color }}>■</span> {item.name}:{" "}
-                                  {pct.toFixed(1)}% ({metricConfig.format(raw)})
-                                </p>
-                              );
-                            })}
-                          </div>
-                        );
-                      }
-                    : undefined
-                }
-                formatter={
-                  showPercent
-                    ? undefined
-                    : (value: unknown, name: unknown) => [
-                        metricConfig.format(Number(value ?? 0)),
-                        breakdownMode === "model" ? shortenModelName(String(name)) : String(name),
-                      ]
-                }
-                contentStyle={
-                  showPercent
-                    ? undefined
-                    : {
-                        backgroundColor: "var(--color-bg-card)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: "8px",
-                        fontSize: 12,
-                      }
-                }
-              />
-              <Legend
-                content={() => (
-                  <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
-                    {breakdownSeries.map((series) => (
-                      <button
-                        key={series.key}
-                        type="button"
-                        onClick={() => toggleSeries(series.key)}
-                        className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                        style={{
-                          opacity: hiddenSeries.has(series.key) ? 0.3 : 1,
-                          fontSize: "inherit",
-                          color: "inherit",
-                          textDecoration: hiddenSeries.has(series.key) ? "line-through" : "none",
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 10,
-                            height: 10,
-                            backgroundColor: series.color,
-                            display: "inline-block",
-                          }}
-                        />
-                        <span style={{ color: "var(--color-text-secondary)" }}>{series.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              />
-              {getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series) => (
-                <Bar
-                  key={series.key}
-                  dataKey={series.key}
-                  name={series.label}
-                  stackId="breakdown"
-                  fill={series.color}
-                />
-              ))}
-            </>
-          ) : (
-            <>
-              <Tooltip
-                allowEscapeViewBox={{ x: true, y: true }}
-                wrapperStyle={TOOLTIP_WRAPPER_STYLE}
-                content={({ label }: RechartsTooltipProps) => {
-                  const bucket = data.find((item) => item.day === label);
-                  if (!bucket) return null;
-                  if (bucket.count === 0) return null;
-                  return (
-                    <div
-                      className="px-2.5 py-1.5 rounded-md text-xs shadow-lg"
-                      style={{
-                        backgroundColor: "var(--color-bg-card)",
-                        border: "1px solid var(--color-border)",
-                      }}
-                    >
-                      <p className="text-text-primary font-medium">{bucket.day}</p>
-                      <p className="text-text-secondary">
-                        {AGGREGATION_LABELS[aggregation]}:{" "}
-                        {metricConfig.format(bucket[aggregation])}
-                      </p>
-                      <p className="text-text-secondary">Avg: {metricConfig.format(bucket.avg)}</p>
-                      <p className="text-text-secondary">Max: {metricConfig.format(bucket.max)}</p>
-                      <p className="text-text-secondary">Min: {metricConfig.format(bucket.min)}</p>
-                      <p className="text-text-secondary">Sum: {metricConfig.format(bucket.sum)}</p>
-                      <p className="text-text-secondary">{bucket.count} days</p>
-                    </div>
-                  );
+    <>
+      <div className="relative h-60">
+        <Bar data={chartJsData} options={chartJsOptions} />
+      </div>
+      {isBreakdownView && (
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
+          {breakdownSeries.map((series) => (
+            <button
+              key={series.key}
+              type="button"
+              onClick={() => toggleSeries(series.key)}
+              className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+              style={{
+                opacity: hiddenSeries.has(series.key) ? 0.3 : 1,
+                fontSize: "inherit",
+                color: "inherit",
+                textDecoration: hiddenSeries.has(series.key) ? "line-through" : "none",
+              }}
+            >
+              <span
+                style={{
+                  width: 10,
+                  height: 10,
+                  backgroundColor: series.color,
+                  display: "inline-block",
                 }}
               />
-              <Bar
-                dataKey={aggregation}
-                fill="var(--color-chart-blue)"
-                fillOpacity={0.7}
-                radius={[4, 4, 0, 0]}
-              />
-            </>
-          )}
-        </BarChart>
-      </ResponsiveContainer>
-    </Suspense>
+              <span style={{ color: "var(--color-text-secondary)" }}>{series.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </>
   );
+}
+
+function renderDayOfWeekTooltip(
+  { chart, tooltip }: { chart: ChartJsInstance; tooltip: TooltipModel<"bar"> },
+  {
+    aggregation,
+    breakdownMode,
+    data,
+    isBreakdownView,
+    metricConfig,
+    showPercent,
+    sourceData,
+    visibleKeys,
+  }: {
+    aggregation: DayOfWeekAggregation;
+    breakdownMode: BreakdownMode;
+    data: DayOfWeekData;
+    isBreakdownView: boolean;
+    metricConfig: (typeof METRICS)[DayOfWeekMetric];
+    showPercent: boolean;
+    sourceData: readonly DayOfWeekChartRow[];
+    visibleKeys: readonly string[];
+  },
+) {
+  const tooltipEl = getOrCreateExternalTooltipElement(chart, "day-of-week");
+  if (tooltip.opacity === 0) {
+    tooltipEl.style.opacity = "0";
+    return;
+  }
+  tooltipEl.replaceChildren();
+  if (!isBreakdownView) {
+    const label = tooltip.title[0] ?? "";
+    const bucket = data.find((item) => item.day === label);
+    if (!bucket || bucket.count === 0) {
+      tooltipEl.style.opacity = "0";
+      return;
+    }
+    appendTooltipLine(tooltipEl, bucket.day, true);
+    appendTooltipLine(
+      tooltipEl,
+      `${AGGREGATION_LABELS[aggregation]}: ${metricConfig.format(bucket[aggregation])}`,
+    );
+    for (const key of DAY_OF_WEEK_AGGREGATIONS) {
+      if (key === aggregation) continue;
+      appendTooltipLine(
+        tooltipEl,
+        `${AGGREGATION_LABELS[key]}: ${metricConfig.format(bucket[key])}`,
+      );
+    }
+    appendTooltipLine(tooltipEl, `${bucket.count} days`);
+    positionExternalTooltip(chart, tooltip, tooltipEl);
+    return;
+  }
+
+  const items = tooltip.dataPoints.filter((item) => {
+    const value = Number(item.parsed.y);
+    return Number.isFinite(value) && value !== 0;
+  });
+  if (items.length === 0) {
+    tooltipEl.style.opacity = "0";
+    return;
+  }
+  appendTooltipLine(tooltipEl, tooltip.title.join(" "), true);
+  const row = sourceData[items[0]?.dataIndex ?? 0] as Record<string, unknown> | undefined;
+  const total = row ? visibleKeys.reduce((sum, key) => sum + (asNumber(row[key]) ?? 0), 0) : 0;
+  for (const item of items) {
+    const key = visibleKeys[item.datasetIndex] ?? "";
+    const raw = asNumber(row?.[key]) ?? 0;
+    const label =
+      breakdownMode === "model"
+        ? shortenModelName(String(item.dataset.label ?? ""))
+        : String(item.dataset.label ?? "");
+    const value =
+      showPercent && total > 0
+        ? `${((raw / total) * 100).toFixed(1)}% (${metricConfig.format(raw)})`
+        : metricConfig.format(Number(item.parsed.y ?? 0));
+    appendTooltipLine(tooltipEl, `${label}: ${value}`, false, String(item.dataset.borderColor));
+  }
+  positionExternalTooltip(chart, tooltip, tooltipEl);
+}
+
+function appendTooltipLine(
+  tooltipEl: HTMLDivElement,
+  text: string,
+  isTitle = false,
+  color?: string,
+) {
+  const line = document.createElement("div");
+  line.style.display = "flex";
+  line.style.alignItems = "center";
+  line.style.gap = "6px";
+  line.style.marginBottom = isTitle ? "6px" : "3px";
+  if (color) {
+    const marker = document.createElement("span");
+    marker.style.width = "8px";
+    marker.style.height = "8px";
+    marker.style.flex = "0 0 auto";
+    marker.style.background = color;
+    line.appendChild(marker);
+  }
+  const value = document.createElement("span");
+  value.textContent = text;
+  value.style.whiteSpace = "nowrap";
+  if (isTitle) value.style.fontWeight = "600";
+  line.appendChild(value);
+  tooltipEl.appendChild(line);
 }

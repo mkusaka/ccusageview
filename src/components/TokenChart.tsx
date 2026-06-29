@@ -1,17 +1,13 @@
-import { Suspense, useState, useMemo, useRef } from "react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  type RechartsTooltipProps,
-  type ChartRowData,
-  syncTooltipByIndexToLocalCoordinate,
-} from "./recharts-components";
+import { useState, useMemo, useRef } from "react";
+import "chart.js/auto";
+import type {
+  Chart as ChartJsInstance,
+  ChartData,
+  ChartDataset,
+  ChartOptions,
+  TooltipModel,
+} from "chart.js";
+import { Bar } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatTokens } from "../utils/format";
@@ -27,6 +23,14 @@ import { buildMarkdownSection, pickDataKeys, seriesToColumns } from "../utils/ch
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import {
+  asNumber,
+  getChartJsColor,
+  getOrCreateExternalTooltipElement,
+  normalizeStackValue,
+  positionExternalTooltip,
+  withOpacity,
+} from "./chartjs-utils";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -57,6 +61,9 @@ const TOKEN_TYPE_TABS: { key: ModelTokenType; label: string }[] = [
 
 type ViewMode = "type" | "model" | "provider";
 type TokenBreakdownChartData = ReturnType<typeof buildTokenTypeByModel>;
+type TokenChartRow = NormalizedEntry | TokenBreakdownChartData[number];
+type TokenChartDataset = ChartDataset<"bar", number[]>;
+type TokenChartJsData = ChartData<"bar", number[], string>;
 
 function getVisibleTypeSeries(hiddenSeries: Set<string>) {
   const visible: (typeof TYPE_SERIES)[number][] = [];
@@ -287,143 +294,204 @@ function TokenBarChart({
   breakdownSeries: ChartDataSeries[];
   toggleSeries: (key: string) => void;
 }) {
+  void syncId;
+  const sourceData = useMemo(
+    () => (isBreakdownView ? breakdownChartData : entries) as TokenChartRow[],
+    [breakdownChartData, entries, isBreakdownView],
+  );
+  const visibleSeries = useMemo(() => {
+    if (isBreakdownView) {
+      return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series, index) => ({
+        key: series.key,
+        label: series.label,
+        color: getChartJsColor(index),
+      }));
+    }
+    return getVisibleTypeSeries(hiddenSeries).map((series, index) => ({
+      key: series.key,
+      label: series.name,
+      color: getChartJsColor(index),
+    }));
+  }, [breakdownSeries, hiddenSeries, isBreakdownView]);
+  const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
+  const chartJsData = useMemo<TokenChartJsData>(() => {
+    const labels = sourceData.map((row) => String(row.label));
+    const datasets: TokenChartDataset[] = visibleSeries.map((series, index) => {
+      const color = series.color || getChartJsColor(index);
+      return {
+        type: "bar",
+        label: series.label,
+        data: sourceData.map((row) => {
+          const record = row as Record<string, unknown>;
+          return showPercent
+            ? normalizeStackValue(record, series.key, visibleKeys)
+            : (asNumber(record[series.key]) ?? 0);
+        }),
+        backgroundColor: withOpacity(color, 0.85),
+        borderColor: color,
+        borderWidth: 0,
+        stack: "tokens",
+      };
+    });
+    return { labels, datasets };
+  }, [showPercent, sourceData, visibleKeys, visibleSeries]);
+  const chartJsOptions = useMemo<ChartOptions<"bar">>(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      normalized: true,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          enabled: false,
+          external(context) {
+            renderTokenTooltip(context, sourceData, visibleKeys, showPercent);
+          },
+        },
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { display: false },
+          ticks: {
+            color: "rgb(107, 114, 128)",
+            font: { size: 11 },
+            maxRotation: 0,
+            autoSkip: true,
+          },
+        },
+        y: {
+          stacked: true,
+          min: 0,
+          max: showPercent ? 1 : undefined,
+          grid: { color: "rgba(148, 163, 184, 0.2)" },
+          ticks: {
+            color: "rgb(107, 114, 128)",
+            font: { size: 11 },
+            callback(value) {
+              return showPercent
+                ? `${(Number(value) * 100).toFixed(0)}%`
+                : formatTokens(Number(value));
+            },
+          },
+        },
+      },
+    }),
+    [showPercent, sourceData, visibleKeys],
+  );
+  const legendItems = isBreakdownView
+    ? breakdownSeries.map((series, index) => ({
+        key: series.key,
+        name: series.label,
+        color: series.color ?? getChartJsColor(index),
+      }))
+    : TYPE_SERIES.map((series) => ({ key: series.key, name: series.name, color: series.color }));
+
   return (
-    <Suspense fallback={<div className="h-96" />}>
-      <ResponsiveContainer width="100%" height={380}>
-        <BarChart
-          data={(isBreakdownView ? breakdownChartData : entries) as ChartRowData}
-          syncId={syncId}
-          syncMethod={syncTooltipByIndexToLocalCoordinate}
-          stackOffset={showPercent ? "expand" : undefined}
+    <>
+      <div className="relative h-96">
+        <Bar data={chartJsData} options={chartJsOptions} />
+      </div>
+      <ChartLegend items={legendItems} hiddenSeries={hiddenSeries} toggleSeries={toggleSeries} />
+    </>
+  );
+}
+
+function renderTokenTooltip(
+  { chart, tooltip }: { chart: ChartJsInstance; tooltip: TooltipModel<"bar"> },
+  sourceData: readonly TokenChartRow[],
+  visibleKeys: readonly string[],
+  showPercent: boolean,
+) {
+  const tooltipEl = getOrCreateExternalTooltipElement(chart, "tokens");
+  if (tooltip.opacity === 0) {
+    tooltipEl.style.opacity = "0";
+    return;
+  }
+  const items = tooltip.dataPoints.filter((item) => {
+    const value = Number(item.parsed.y);
+    return Number.isFinite(value) && value !== 0;
+  });
+  if (items.length === 0) {
+    tooltipEl.style.opacity = "0";
+    return;
+  }
+  tooltipEl.replaceChildren();
+  const title = document.createElement("div");
+  title.textContent = tooltip.title.join(" ");
+  title.style.fontWeight = "600";
+  title.style.marginBottom = "6px";
+  tooltipEl.appendChild(title);
+  const body = document.createElement("div");
+  body.style.display = "grid";
+  body.style.gridTemplateColumns = items.length > 10 ? "repeat(2, minmax(260px, 1fr))" : "1fr";
+  body.style.columnGap = "12px";
+  body.style.rowGap = "3px";
+  const row = sourceData[items[0]?.dataIndex ?? 0] as Record<string, unknown> | undefined;
+  const total = row ? visibleKeys.reduce((sum, key) => sum + (asNumber(row[key]) ?? 0), 0) : 0;
+  for (const item of items) {
+    const key = visibleKeys[item.datasetIndex] ?? "";
+    const raw = asNumber(row?.[key]) ?? 0;
+    const value =
+      showPercent && total > 0
+        ? `${((raw / total) * 100).toFixed(1)}% (${formatTokens(raw)})`
+        : formatTokens(Number(item.parsed.y ?? 0));
+    const line = document.createElement("div");
+    line.style.display = "flex";
+    line.style.alignItems = "center";
+    line.style.gap = "6px";
+    const marker = document.createElement("span");
+    marker.style.width = "8px";
+    marker.style.height = "8px";
+    marker.style.flex = "0 0 auto";
+    marker.style.background = String(item.dataset.borderColor ?? item.dataset.backgroundColor);
+    const text = document.createElement("span");
+    text.textContent = `${item.dataset.label}: ${value}`;
+    text.style.whiteSpace = "nowrap";
+    line.append(marker, text);
+    body.appendChild(line);
+  }
+  tooltipEl.appendChild(body);
+  positionExternalTooltip(chart, tooltip, tooltipEl);
+}
+
+function ChartLegend({
+  items,
+  hiddenSeries,
+  toggleSeries,
+}: {
+  items: readonly { key: string; name: string; color: string }[];
+  hiddenSeries: Set<string>;
+  toggleSeries: (key: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
+      {items.map((entry) => (
+        <button
+          key={entry.key}
+          type="button"
+          onClick={() => toggleSeries(entry.key)}
+          className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
+          style={{
+            opacity: hiddenSeries.has(entry.key) ? 0.3 : 1,
+            fontSize: "inherit",
+            color: "inherit",
+            textDecoration: hiddenSeries.has(entry.key) ? "line-through" : "none",
+          }}
         >
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-          <XAxis
-            dataKey="label"
-            tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <YAxis
-            tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={
-              showPercent
-                ? (v: number) => `${(v * 100).toFixed(0)}%`
-                : (v: number) => formatTokens(v)
-            }
-            domain={showPercent ? [0, 1] : undefined}
-          />
-          <Tooltip
-            content={
-              showPercent
-                ? ({ active, payload, label }: RechartsTooltipProps) => {
-                    if (!active || !payload?.length) return null;
-                    const total = payload.reduce(
-                      (s: number, p) => s + Number(p.payload?.[String(p.dataKey)] ?? 0),
-                      0,
-                    );
-                    return (
-                      <div
-                        className="px-2.5 py-1.5 rounded-lg text-xs shadow-lg"
-                        style={{
-                          backgroundColor: "var(--color-bg-card)",
-                          border: "1px solid var(--color-border)",
-                        }}
-                      >
-                        <p className="text-text-primary font-medium mb-0.5">{label}</p>
-                        {payload.map((p) => {
-                          const raw = Number(p.payload?.[String(p.dataKey)] ?? 0);
-                          const pct = total > 0 ? (raw / total) * 100 : 0;
-                          return (
-                            <p key={String(p.dataKey)} className="text-text-secondary">
-                              <span style={{ color: p.color }}>■</span> {p.name}: {pct.toFixed(1)}%
-                              ({formatTokens(raw)})
-                            </p>
-                          );
-                        })}
-                      </div>
-                    );
-                  }
-                : undefined
-            }
-            formatter={
-              showPercent
-                ? undefined
-                : (value: unknown, name: unknown) => [
-                    formatTokens(Number(value ?? 0)),
-                    String(name),
-                  ]
-            }
-            contentStyle={
-              showPercent
-                ? undefined
-                : {
-                    backgroundColor: "var(--color-bg-card)",
-                    border: "1px solid var(--color-border)",
-                    borderRadius: "8px",
-                    fontSize: 12,
-                  }
-            }
-          />
-          <Legend
-            content={() => {
-              const items = isBreakdownView
-                ? breakdownSeries.map((s) => ({ key: s.key, name: s.label, color: s.color }))
-                : TYPE_SERIES.map((s) => ({ key: s.key, name: s.name, color: s.color }));
-              return (
-                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
-                  {items.map((entry) => (
-                    <button
-                      key={entry.key}
-                      type="button"
-                      onClick={() => toggleSeries(entry.key)}
-                      className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-                      style={{
-                        opacity: hiddenSeries.has(entry.key) ? 0.3 : 1,
-                        fontSize: "inherit",
-                        color: "inherit",
-                        textDecoration: hiddenSeries.has(entry.key) ? "line-through" : "none",
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 10,
-                          height: 10,
-                          backgroundColor: entry.color,
-                          display: "inline-block",
-                        }}
-                      />
-                      <span style={{ color: "var(--color-text-secondary)" }}>{entry.name}</span>
-                    </button>
-                  ))}
-                </div>
-              );
+          <span
+            style={{
+              width: 10,
+              height: 10,
+              backgroundColor: entry.color,
+              display: "inline-block",
             }}
           />
-          {isBreakdownView
-            ? getVisibleChartSeries(breakdownSeries, hiddenSeries).map((s) => (
-                <Bar
-                  key={s.key}
-                  dataKey={s.key}
-                  name={s.label}
-                  stackId="tokens"
-                  fill={s.color}
-                  fillOpacity={0.85}
-                />
-              ))
-            : getVisibleTypeSeries(hiddenSeries).map((s) => (
-                <Bar
-                  key={s.key}
-                  dataKey={s.key}
-                  name={s.name}
-                  stackId="tokens"
-                  fill={s.color}
-                  fillOpacity={0.85}
-                />
-              ))}
-        </BarChart>
-      </ResponsiveContainer>
-    </Suspense>
+          <span style={{ color: "var(--color-text-secondary)" }}>{entry.name}</span>
+        </button>
+      ))}
+    </div>
   );
 }

@@ -1,5 +1,7 @@
-import { Suspense, useMemo, useRef, useState } from "react";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "./recharts-components";
+import { useMemo, useRef, useState } from "react";
+import "chart.js/auto";
+import type { ChartData, ChartOptions } from "chart.js";
+import { Doughnut } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import { aggregateBreakdowns, type AggregatedBreakdown } from "../utils/aggregate";
 import type { BreakdownMode } from "../utils/breakdown";
@@ -14,19 +16,11 @@ import {
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import { getChartJsColor, withOpacity } from "./chartjs-utils";
 
 interface Props {
   entries: NormalizedEntry[];
 }
-
-const COLORS = [
-  "var(--color-chart-blue)",
-  "var(--color-chart-green)",
-  "var(--color-chart-orange)",
-  "var(--color-chart-purple)",
-  "var(--color-chart-teal)",
-  "var(--color-chart-red)",
-];
 
 const METRICS = {
   cost: { label: "Cost", format: (v: number) => formatCost(v) },
@@ -97,32 +91,6 @@ interface PieDataItem {
   value: number;
 }
 
-function CustomPieTooltip({
-  active,
-  payload,
-  formatValue,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: PieDataItem }>;
-  formatValue: (v: number) => string;
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-
-  const data = payload[0].payload;
-  return (
-    <div
-      className="rounded-lg px-3 py-2 text-sm shadow-lg"
-      style={{
-        backgroundColor: "var(--color-bg-card)",
-        border: "1px solid var(--color-border)",
-      }}
-    >
-      <p className="font-mono text-xs text-text-secondary mb-1">{data.fullName}</p>
-      <p className="font-medium text-text-primary">{formatValue(data.value)}</p>
-    </div>
-  );
-}
-
 export function ModelBreakdown({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<BreakdownMode>("model");
@@ -153,6 +121,49 @@ export function ModelBreakdown({ entries }: Props) {
     fullName: mode === "model" ? row.key : row.label,
     value: row[metric],
   }));
+  const pieChartData = useMemo<ChartData<"doughnut", number[], string>>(
+    () => ({
+      labels: pieData.map((item) => item.name),
+      datasets: [
+        {
+          data: pieData.map((item) => item.value),
+          backgroundColor: pieData.map((_, index) => withOpacity(getChartJsColor(index), 0.85)),
+          borderColor: "rgb(255, 255, 255)",
+          borderWidth: 2,
+          hoverOffset: 3,
+        },
+      ],
+    }),
+    [pieData],
+  );
+  const pieChartOptions = useMemo<ChartOptions<"doughnut">>(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      cutout: "58%",
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "rgba(255, 255, 255, 0.96)",
+          borderColor: "rgba(148, 163, 184, 0.4)",
+          borderWidth: 1,
+          titleColor: "rgb(75, 85, 99)",
+          bodyColor: "rgb(17, 24, 39)",
+          callbacks: {
+            title(items) {
+              const index = items[0]?.dataIndex ?? 0;
+              return pieData[index]?.fullName ?? "";
+            },
+            label(item) {
+              return metricConfig.format(Number(item.raw ?? 0));
+            },
+          },
+        },
+      },
+    }),
+    [metricConfig, pieData],
+  );
   const chartMarkdown = useMemo(
     () =>
       buildMarkdownSection({
@@ -251,40 +262,16 @@ export function ModelBreakdown({ entries }: Props) {
           <p className="text-xs text-text-secondary px-2 mb-2">
             Click a numeric table header to change the pie metric.
           </p>
-          <Suspense fallback={<div className="h-[300px]" />}>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="45%"
-                  innerRadius={55}
-                  outerRadius={95}
-                  paddingAngle={2}
-                  stroke="var(--color-bg-card)"
-                  strokeWidth={2}
-                >
-                  {pieData.map((item, index) => (
-                    <Cell
-                      key={item.fullName}
-                      fill={COLORS[index % COLORS.length]}
-                      fillOpacity={0.85}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomPieTooltip formatValue={metricConfig.format} />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </Suspense>
+          <div className="h-[300px]">
+            <Doughnut data={pieChartData} options={pieChartOptions} />
+          </div>
           <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 px-2">
             {pieData.map((item, index) => (
               <div key={item.fullName} className="flex items-center gap-1.5">
                 <span
                   className="size-2.5 rounded-full flex-shrink-0"
                   style={{
-                    backgroundColor: COLORS[index % COLORS.length],
+                    backgroundColor: getChartJsColor(index),
                     opacity: 0.85,
                   }}
                 />
