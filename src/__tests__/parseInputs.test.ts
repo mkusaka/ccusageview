@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { parseInputs, createSourceInput } from "../App";
-import type { SourceInput } from "../App";
+import { parseInputs, createSourceInput } from "../utils/inputs";
+import type { SourceInput } from "../utils/inputs";
 
 // Minimal valid daily report in claude format
 const DAILY_CLAUDE = JSON.stringify({

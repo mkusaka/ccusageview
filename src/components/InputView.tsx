@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { createSourceInput } from "../App";
-import type { SourceInput } from "../App";
+import { createSourceInput } from "../utils/inputs";
+import type { SourceInput } from "../utils/inputs";
 
 interface Props {
   inputs: SourceInput[];

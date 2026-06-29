@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { buildHashPayload, restoreFromHash, createSourceInput } from "../App";
-import type { SourceInput } from "../App";
+import { buildHashPayload, restoreFromHash, createSourceInput } from "../utils/inputs";
+import type { SourceInput } from "../utils/inputs";
 
 function inp(content: string, label = "", enabled = true): SourceInput {
   return createSourceInput({ label, content, enabled });
