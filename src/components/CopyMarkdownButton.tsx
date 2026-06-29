@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 interface Props {
-  markdown: string;
+  markdown: string | (() => string);
   title?: string;
 }
 
@@ -10,7 +10,8 @@ export function CopyMarkdownButton({ markdown, title = "Copy as Markdown" }: Pro
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(markdown);
+      const text = typeof markdown === "function" ? markdown() : markdown;
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {

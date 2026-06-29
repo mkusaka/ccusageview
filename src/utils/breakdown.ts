@@ -37,6 +37,8 @@ const PROVIDER_ALIASES: ReadonlyArray<{ provider: string; aliases: readonly stri
   { provider: "Microsoft", aliases: ["microsoft", "phi"] },
 ];
 
+const providerNameCache = new Map<string, string>();
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -51,12 +53,17 @@ function tokenizeModelName(modelName: string): string[] {
 }
 
 export function getProviderName(modelName: string): string {
+  const cached = providerNameCache.get(modelName);
+  if (cached) return cached;
+
   const tokens = tokenizeModelName(modelName);
   for (const { provider, aliases } of PROVIDER_ALIASES) {
     if (tokens.some((token) => aliases.some((alias) => tokenMatchesAlias(token, alias)))) {
+      providerNameCache.set(modelName, provider);
       return provider;
     }
   }
+  providerNameCache.set(modelName, "Unknown");
   return "Unknown";
 }
 
@@ -124,8 +131,10 @@ export function collectBreakdownKeys(entries: NormalizedEntry[], mode: Breakdown
   const keys = new Set<string>();
 
   for (const entry of entries) {
-    for (const key of groupBreakdowns(entry.modelBreakdowns, mode).keys()) {
-      keys.add(key);
+    if (!entry.modelBreakdowns || entry.modelBreakdowns.length === 0) continue;
+
+    for (const breakdown of entry.modelBreakdowns) {
+      keys.add(getBreakdownKey(breakdown.modelName, mode));
     }
   }
 

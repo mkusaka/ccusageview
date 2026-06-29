@@ -3,7 +3,7 @@ import { createContext, use, useEffect } from "react";
 export interface RegisteredMarkdownSection {
   id: string;
   order: number;
-  markdown: string;
+  markdown: string | (() => string);
 }
 
 export type RegisterMarkdownSection = (section: RegisteredMarkdownSection) => () => void;

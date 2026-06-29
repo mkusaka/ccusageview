@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCacheEfficiencyChartDataByBreakdown,
   buildCacheEfficiencyChartData,
   buildCacheEfficiencyChartDataForBreakdowns,
   calculateCacheEfficiency,
@@ -209,6 +210,88 @@ describe("buildCacheEfficiencyChartDataForBreakdowns", () => {
         cacheCreationTokens: 0,
         inputPlusCacheReadTokens: 0,
         cacheReadRate: null,
+      },
+    ]);
+  });
+});
+
+describe("buildCacheEfficiencyChartDataByBreakdown", () => {
+  it("builds stacked input/cache bars and per-model rates per entry", () => {
+    const entries = [
+      makeEntry("day1", {
+        modelBreakdowns: [
+          makeBreakdown("modelA", {
+            inputTokens: 100,
+            cacheReadTokens: 300,
+          }),
+          makeBreakdown("modelB", {
+            inputTokens: 900,
+            cacheReadTokens: 100,
+          }),
+        ],
+      }),
+      makeEntry("day2", {
+        modelBreakdowns: [
+          makeBreakdown("modelA", {
+            inputTokens: 200,
+            cacheReadTokens: 0,
+          }),
+        ],
+      }),
+    ];
+
+    expect(
+      buildCacheEfficiencyChartDataByBreakdown(entries, ["modelA", "modelB"], false, "model"),
+    ).toEqual([
+      {
+        label: "day1",
+        "modelA::inputTokens": 100,
+        "modelA::cacheReadTokens": 300,
+        "modelA::cacheReadRate": 0.75,
+        "modelB::inputTokens": 900,
+        "modelB::cacheReadTokens": 100,
+        "modelB::cacheReadRate": 0.1,
+      },
+      {
+        label: "day2",
+        "modelA::inputTokens": 200,
+        "modelA::cacheReadTokens": 0,
+        "modelA::cacheReadRate": 0,
+      },
+    ]);
+  });
+
+  it("aggregates provider groups before computing each provider rate", () => {
+    const entries = [
+      makeEntry("day1", {
+        modelBreakdowns: [
+          makeBreakdown("claude-sonnet-4-20250514", {
+            inputTokens: 100,
+            cacheReadTokens: 300,
+          }),
+          makeBreakdown("claude-haiku-3-20240307", {
+            inputTokens: 100,
+            cacheReadTokens: 100,
+          }),
+          makeBreakdown("gpt-5-codex", {
+            inputTokens: 500,
+            cacheReadTokens: 0,
+          }),
+        ],
+      }),
+    ];
+
+    expect(
+      buildCacheEfficiencyChartDataByBreakdown(entries, ["Anthropic", "OpenAI"], false, "provider"),
+    ).toEqual([
+      {
+        label: "day1",
+        "Anthropic::inputTokens": 200,
+        "Anthropic::cacheReadTokens": 400,
+        "Anthropic::cacheReadRate": 400 / 600,
+        "OpenAI::inputTokens": 500,
+        "OpenAI::cacheReadTokens": 0,
+        "OpenAI::cacheReadRate": 0,
       },
     ]);
   });

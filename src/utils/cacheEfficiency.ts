@@ -19,6 +19,19 @@ export interface CacheEfficiencyChartDatum extends CacheEfficiencyMetrics {
   label: string;
 }
 
+export type CacheEfficiencyBreakdownMetric = "inputTokens" | "cacheReadTokens" | "cacheReadRate";
+
+export type CacheEfficiencyBreakdownChartDatum = {
+  label: string;
+} & Record<string, string | number | null>;
+
+export function getCacheEfficiencyBreakdownDataKey(
+  breakdownKey: string,
+  metric: CacheEfficiencyBreakdownMetric,
+): string {
+  return `${breakdownKey}::${metric}`;
+}
+
 export function calculateCacheEfficiency(input: CacheEfficiencyInput): CacheEfficiencyMetrics {
   const inputPlusCacheReadTokens = input.inputTokens + input.cacheReadTokens;
 
@@ -92,5 +105,41 @@ export function buildCacheEfficiencyChartDataForBreakdowns(
         cacheCreationTokens,
       }),
     };
+  });
+}
+
+export function buildCacheEfficiencyChartDataByBreakdown(
+  entries: readonly NormalizedEntry[],
+  visibleBreakdowns: readonly string[],
+  includeOther: boolean,
+  mode: BreakdownMode,
+): CacheEfficiencyBreakdownChartDatum[] {
+  const visibleBreakdownSet = new Set(visibleBreakdowns);
+
+  return entries.map((entry) => {
+    const row: CacheEfficiencyBreakdownChartDatum = { label: entry.label };
+
+    const grouped = groupBreakdowns(entry.modelBreakdowns, mode);
+    if (grouped.size === 0) {
+      if (includeOther && visibleBreakdownSet.has("Other")) {
+        const metrics = calculateCacheEfficiency(entry);
+        row[getCacheEfficiencyBreakdownDataKey("Other", "inputTokens")] = metrics.inputTokens;
+        row[getCacheEfficiencyBreakdownDataKey("Other", "cacheReadTokens")] =
+          metrics.cacheReadTokens;
+        row[getCacheEfficiencyBreakdownDataKey("Other", "cacheReadRate")] = metrics.cacheReadRate;
+      }
+      return row;
+    }
+
+    for (const [key, metrics] of grouped.entries()) {
+      if (!visibleBreakdownSet.has(key)) continue;
+
+      const efficiency = calculateCacheEfficiency(metrics);
+      row[getCacheEfficiencyBreakdownDataKey(key, "inputTokens")] = efficiency.inputTokens;
+      row[getCacheEfficiencyBreakdownDataKey(key, "cacheReadTokens")] = efficiency.cacheReadTokens;
+      row[getCacheEfficiencyBreakdownDataKey(key, "cacheReadRate")] = efficiency.cacheReadRate;
+    }
+
+    return row;
   });
 }

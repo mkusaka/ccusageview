@@ -1,24 +1,21 @@
-import { Suspense, useMemo, useRef, useState } from "react";
-import {
-  ResponsiveContainer,
-  ComposedChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  type RechartsTooltipProps,
-  type ChartRowData,
-  syncTooltipByIndexToLocalCoordinate,
-} from "./recharts-components";
+import { Suspense, useCallback, useMemo, useRef, useState } from "react";
+import "chart.js/auto";
+import type {
+  Chart as ChartJsInstance,
+  ChartData,
+  ChartDataset,
+  ChartOptions,
+  TooltipItem,
+  TooltipModel,
+} from "chart.js";
+import { Chart as ReactChart } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
 import {
   buildCacheEfficiencyChartData,
-  buildCacheEfficiencyChartDataForBreakdowns,
+  buildCacheEfficiencyChartDataByBreakdown,
   formatCacheReadRate,
+  getCacheEfficiencyBreakdownDataKey,
   type CacheEfficiencyChartDatum,
 } from "../utils/cacheEfficiency";
 import { formatTokens } from "../utils/format";
@@ -46,14 +43,364 @@ const RATE_SERIES = {
 } as const;
 
 type ViewMode = "total" | "model" | "provider";
+type CacheEfficiencyChartRow = CacheEfficiencyChartDatum | CacheEfficiencyBreakdownChartDatum;
+type CacheEfficiencyBreakdownChartDatum = {
+  label: string;
+} & Record<string, string | number | null>;
+type CacheEfficiencyDataset = ChartDataset<"bar" | "line", (number | null)[]>;
+type CacheEfficiencyChartData = ChartData<"bar" | "line", (number | null)[], string>;
+
+type CacheEfficiencyBreakdownSeries = ChartDataSeries & {
+  inputKey: string;
+  cacheReadKey: string;
+  rateKey: string;
+};
+
+function getVisibleBreakdownSeries(
+  series: ChartDataSeries[],
+  hiddenBreakdowns: Set<string>,
+): CacheEfficiencyBreakdownSeries[] {
+  return series
+    .filter((item) => !hiddenBreakdowns.has(item.key))
+    .map((item) => ({
+      ...item,
+      inputKey: getCacheEfficiencyBreakdownDataKey(item.key, "inputTokens"),
+      cacheReadKey: getCacheEfficiencyBreakdownDataKey(item.key, "cacheReadTokens"),
+      rateKey: getCacheEfficiencyBreakdownDataKey(item.key, "cacheReadRate"),
+    }));
+}
+
+function hasAnyBreakdownData(entries: readonly NormalizedEntry[]): boolean {
+  return entries.some((entry) => entry.modelBreakdowns && entry.modelBreakdowns.length > 0);
+}
+
+const CHART_JS_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#14b8a6", "#ef4444"];
+
+function getChartJsColor(index: number): string {
+  return CHART_JS_COLORS[index % CHART_JS_COLORS.length];
+}
+
+function withOpacity(hex: string, opacity: number): string {
+  const normalized = hex.replace("#", "");
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+function asNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function shouldShowTooltipItem(context: TooltipItem<"bar" | "line">): boolean {
+  const value = context.parsed.y;
+  return typeof value === "number" && Number.isFinite(value) && value !== 0;
+}
+
+function formatTooltipItem(context: TooltipItem<"bar" | "line">): string {
+  const label = context.dataset.label ?? "";
+  const value = context.parsed.y;
+  if (context.dataset.yAxisID === "rate") {
+    return `${label}: ${formatCacheReadRate(value == null ? null : value)}`;
+  }
+  return `${label}: ${formatTokens(value ?? 0)}`;
+}
+
+function getOrCreateTooltipElement(chart: ChartJsInstance): HTMLDivElement {
+  const parent = chart.canvas.parentNode as HTMLElement;
+  let tooltipEl = parent.querySelector<HTMLDivElement>("[data-cache-efficiency-tooltip]");
+
+  if (!tooltipEl) {
+    tooltipEl = document.createElement("div");
+    tooltipEl.dataset.cacheEfficiencyTooltip = "true";
+    tooltipEl.style.position = "absolute";
+    tooltipEl.style.pointerEvents = "none";
+    tooltipEl.style.zIndex = "20";
+    tooltipEl.style.minWidth = "220px";
+    tooltipEl.style.maxWidth = "min(760px, calc(100vw - 32px))";
+    tooltipEl.style.maxHeight = "min(420px, calc(100vh - 32px))";
+    tooltipEl.style.overflowY = "auto";
+    tooltipEl.style.border = "1px solid var(--color-border)";
+    tooltipEl.style.borderRadius = "8px";
+    tooltipEl.style.background = "var(--color-bg-card)";
+    tooltipEl.style.boxShadow = "0 10px 30px rgba(15, 23, 42, 0.18)";
+    tooltipEl.style.color = "var(--color-text-primary)";
+    tooltipEl.style.fontSize = "12px";
+    tooltipEl.style.lineHeight = "1.35";
+    tooltipEl.style.padding = "8px 10px";
+    tooltipEl.style.transition = "opacity 80ms ease";
+    parent.appendChild(tooltipEl);
+  }
+
+  return tooltipEl;
+}
+
+function renderExternalTooltip({
+  chart,
+  tooltip,
+}: {
+  chart: ChartJsInstance;
+  tooltip: TooltipModel<"bar" | "line">;
+}) {
+  const tooltipEl = getOrCreateTooltipElement(chart);
+
+  if (tooltip.opacity === 0) {
+    tooltipEl.style.opacity = "0";
+    return;
+  }
+
+  const items = tooltip.dataPoints.filter(shouldShowTooltipItem);
+  if (items.length === 0) {
+    tooltipEl.style.opacity = "0";
+    return;
+  }
+
+  tooltipEl.replaceChildren();
+
+  const title = document.createElement("div");
+  title.textContent = tooltip.title.join(" ");
+  title.style.fontWeight = "600";
+  title.style.marginBottom = "6px";
+  tooltipEl.appendChild(title);
+
+  const body = document.createElement("div");
+  body.style.display = "grid";
+  body.style.gridTemplateColumns = items.length > 10 ? "repeat(2, minmax(300px, 1fr))" : "1fr";
+  body.style.columnGap = "12px";
+  body.style.rowGap = "3px";
+
+  for (const item of items) {
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.gap = "6px";
+    row.style.minWidth = "0";
+
+    const marker = document.createElement("span");
+    marker.style.width = "8px";
+    marker.style.height = "8px";
+    marker.style.flex = "0 0 auto";
+    marker.style.background = String(item.dataset.borderColor ?? item.dataset.backgroundColor);
+
+    const text = document.createElement("span");
+    text.textContent = formatTooltipItem(item);
+    text.style.minWidth = "0";
+    text.style.whiteSpace = "nowrap";
+
+    row.append(marker, text);
+    body.appendChild(row);
+  }
+
+  tooltipEl.appendChild(body);
+
+  const parent = chart.canvas.parentNode as HTMLElement;
+  const parentRect = parent.getBoundingClientRect();
+  tooltipEl.style.maxHeight = `${Math.max(160, parentRect.height - 16)}px`;
+  const tooltipWidth = tooltipEl.offsetWidth;
+  const tooltipHeight = tooltipEl.offsetHeight;
+  const left = Math.min(
+    Math.max(tooltip.caretX, tooltipWidth / 2 + 8),
+    parentRect.width - tooltipWidth / 2 - 8,
+  );
+  let top = tooltip.caretY - tooltipHeight - 12;
+  if (top < 8) top = tooltip.caretY + 12;
+  if (top + tooltipHeight > parentRect.height - 8) {
+    top = Math.max(8, parentRect.height - tooltipHeight - 8);
+  }
+
+  tooltipEl.style.opacity = "1";
+  tooltipEl.style.left = `${left}px`;
+  tooltipEl.style.top = `${top}px`;
+  tooltipEl.style.transform = "translateX(-50%)";
+}
+
+function buildChartJsData(
+  chartData: readonly CacheEfficiencyChartRow[],
+  isBreakdownView: boolean,
+  visibleBreakdownSeries: readonly CacheEfficiencyBreakdownSeries[],
+): CacheEfficiencyChartData {
+  const labels = chartData.map((row) => row.label);
+
+  if (!isBreakdownView) {
+    return {
+      labels,
+      datasets: [
+        {
+          type: "bar",
+          label: TOKEN_SERIES[0].name,
+          data: chartData.map((row) => asNumber(row.inputTokens) ?? 0),
+          yAxisID: "tokens",
+          stack: "tokens",
+          backgroundColor: getChartJsColor(0),
+          borderColor: getChartJsColor(0),
+          borderWidth: 0,
+          order: 2,
+        },
+        {
+          type: "bar",
+          label: TOKEN_SERIES[1].name,
+          data: chartData.map((row) => asNumber(row.cacheReadTokens) ?? 0),
+          yAxisID: "tokens",
+          stack: "tokens",
+          backgroundColor: getChartJsColor(3),
+          borderColor: getChartJsColor(3),
+          borderWidth: 0,
+          order: 2,
+        },
+        {
+          type: "line",
+          label: RATE_SERIES.name,
+          data: chartData.map((row) => asNumber(row.cacheReadRate)),
+          yAxisID: "rate",
+          borderColor: getChartJsColor(4),
+          backgroundColor: getChartJsColor(4),
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 0,
+          spanGaps: false,
+          order: 1,
+        },
+      ],
+    };
+  }
+
+  const datasets: CacheEfficiencyDataset[] = [];
+
+  for (const [index, series] of visibleBreakdownSeries.entries()) {
+    const color = getChartJsColor(index);
+    datasets.push(
+      {
+        type: "bar",
+        label: `${series.label} Input`,
+        data: chartData.map(
+          (row) => asNumber((row as Record<string, unknown>)[series.inputKey]) ?? 0,
+        ),
+        yAxisID: "tokens",
+        stack: series.key,
+        backgroundColor: withOpacity(color, 0.85),
+        borderColor: color,
+        borderWidth: 0,
+        order: 2,
+      },
+      {
+        type: "bar",
+        label: `${series.label} Cache Read`,
+        data: chartData.map(
+          (row) => asNumber((row as Record<string, unknown>)[series.cacheReadKey]) ?? 0,
+        ),
+        yAxisID: "tokens",
+        stack: series.key,
+        backgroundColor: withOpacity(color, 0.5),
+        borderColor: color,
+        borderWidth: 0,
+        order: 2,
+      },
+      {
+        type: "line",
+        label: `${series.label} ${RATE_SERIES.name}`,
+        data: chartData.map((row) => asNumber((row as Record<string, unknown>)[series.rateKey])),
+        yAxisID: "rate",
+        borderColor: color,
+        backgroundColor: color,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        spanGaps: false,
+        order: 1,
+      },
+    );
+  }
+
+  return { labels, datasets };
+}
+
+function buildChartJsOptions(): ChartOptions<"bar" | "line"> {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    normalized: true,
+    interaction: {
+      mode: "index",
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        enabled: false,
+        filter: shouldShowTooltipItem,
+        external: renderExternalTooltip,
+        callbacks: {
+          label(context: TooltipItem<"bar" | "line">) {
+            return formatTooltipItem(context);
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        stacked: true,
+        grid: {
+          display: false,
+        },
+        ticks: {
+          color: "rgb(107, 114, 128)",
+          font: {
+            size: 11,
+          },
+          maxRotation: 0,
+          autoSkip: true,
+        },
+      },
+      tokens: {
+        type: "linear",
+        position: "left",
+        stacked: true,
+        grid: {
+          color: "rgba(148, 163, 184, 0.2)",
+        },
+        ticks: {
+          color: "rgb(107, 114, 128)",
+          font: {
+            size: 11,
+          },
+          callback(value) {
+            return formatTokens(Number(value));
+          },
+        },
+      },
+      rate: {
+        type: "linear",
+        position: "right",
+        min: 0,
+        max: 1,
+        grid: {
+          drawOnChartArea: false,
+        },
+        ticks: {
+          color: "rgb(107, 114, 128)",
+          font: {
+            size: 11,
+          },
+          callback(value) {
+            return formatCacheReadRate(Number(value));
+          },
+        },
+      },
+    },
+  };
+}
 
 export function CacheEfficiencyChart({ entries, syncId }: Props) {
+  void syncId;
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [hiddenBreakdowns, setHiddenBreakdowns] = useState<Set<string>>(new Set());
   const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
 
-  const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
+  const hasBreakdownData = useMemo(() => hasAnyBreakdownData(entries), [entries]);
   const breakdownKeys = useMemo(
     () => (hasBreakdownData ? collectModels(entries, breakdownMode) : []),
     [entries, hasBreakdownData, breakdownMode],
@@ -63,24 +410,29 @@ export function CacheEfficiencyChart({ entries, syncId }: Props) {
       hasBreakdownData ? buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode) : [],
     [breakdownKeys, entries, hasBreakdownData, breakdownMode],
   );
-  const visibleBreakdowns = useMemo(
-    () => new Set(breakdownKeys.filter((key) => !hiddenBreakdowns.has(key))),
-    [breakdownKeys, hiddenBreakdowns],
-  );
   const includeOther = !hiddenBreakdowns.has("Other");
   const isBreakdownView = viewMode !== "total" && hasBreakdownData;
+  const visibleBreakdownSeries = useMemo(
+    () => getVisibleBreakdownSeries(breakdownSeries, hiddenBreakdowns),
+    [breakdownSeries, hiddenBreakdowns],
+  );
   const chartData = useMemo(
     () =>
       isBreakdownView
-        ? buildCacheEfficiencyChartDataForBreakdowns(
+        ? buildCacheEfficiencyChartDataByBreakdown(
             entries,
-            visibleBreakdowns,
+            visibleBreakdownSeries.map((series) => series.key),
             includeOther,
             breakdownMode,
           )
         : buildCacheEfficiencyChartData(entries),
-    [entries, isBreakdownView, visibleBreakdowns, includeOther, breakdownMode],
+    [entries, isBreakdownView, visibleBreakdownSeries, includeOther, breakdownMode],
   );
+  const chartJsData = useMemo(
+    () => buildChartJsData(chartData, isBreakdownView, visibleBreakdownSeries),
+    [chartData, isBreakdownView, visibleBreakdownSeries],
+  );
+  const chartJsOptions = useMemo(() => buildChartJsOptions(), []);
   const handleViewModeChange = (nextMode: ViewMode) => {
     setViewMode(nextMode);
     setHiddenBreakdowns(new Set());
@@ -93,40 +445,62 @@ export function CacheEfficiencyChart({ entries, syncId }: Props) {
       return next;
     });
   };
-  const chartMarkdown = useMemo(
-    () =>
-      buildMarkdownSection({
-        title: "Cache Efficiency",
-        metadata: [
-          [
-            "View",
-            viewMode === "total" ? "Total" : viewMode === "model" ? "By Model" : "By Provider",
-          ],
-          ["Hidden breakdowns", Array.from(hiddenBreakdowns)],
-          ["Rate definition", "cacheReadTokens / (inputTokens + cacheReadTokens)"],
-        ],
-        tables: [
+  const getChartMarkdown = useCallback(() => {
+    const tables = isBreakdownView
+      ? [
           {
             columns: [
               { key: "label", label: "Label" },
-              { key: "inputTokens", label: "Input", align: "right" },
-              { key: "cacheReadTokens", label: "Cache Read", align: "right" },
-              { key: "inputPlusCacheReadTokens", label: "Input+Read", align: "right" },
-              { key: "cacheReadRate", label: "Cache Read Rate", align: "right" },
+              ...visibleBreakdownSeries.flatMap((series) => [
+                { key: series.inputKey, label: `${series.label} Input`, align: "right" as const },
+                {
+                  key: series.cacheReadKey,
+                  label: `${series.label} Cache Read`,
+                  align: "right" as const,
+                },
+                {
+                  key: series.rateKey,
+                  label: `${series.label} Cache Read Rate`,
+                  align: "right" as const,
+                },
+              ]),
             ],
             rows: chartData as unknown as Record<string, unknown>[],
           },
+        ]
+      : [
+          {
+            columns: [
+              { key: "label", label: "Label" },
+              { key: "inputTokens", label: "Input", align: "right" as const },
+              { key: "cacheReadTokens", label: "Cache Read", align: "right" as const },
+              { key: "inputPlusCacheReadTokens", label: "Input+Read", align: "right" as const },
+              { key: "cacheReadRate", label: "Cache Read Rate", align: "right" as const },
+            ],
+            rows: chartData as unknown as Record<string, unknown>[],
+          },
+        ];
+
+    return buildMarkdownSection({
+      title: "Cache Efficiency",
+      metadata: [
+        [
+          "View",
+          viewMode === "total" ? "Total" : viewMode === "model" ? "By Model" : "By Provider",
         ],
-      }),
-    [chartData, hiddenBreakdowns, viewMode],
-  );
+        ["Hidden breakdowns", Array.from(hiddenBreakdowns)],
+        ["Rate definition", "cacheReadTokens / (inputTokens + cacheReadTokens)"],
+      ],
+      tables,
+    });
+  }, [chartData, hiddenBreakdowns, isBreakdownView, viewMode, visibleBreakdownSeries]);
   const markdownRegistration = useMemo(
     () => ({
       id: "cache-efficiency",
       order: 60,
-      markdown: chartMarkdown,
+      markdown: getChartMarkdown,
     }),
-    [chartMarkdown],
+    [getChartMarkdown],
   );
   useRegisterChartMarkdown(markdownRegistration);
 
@@ -136,7 +510,7 @@ export function CacheEfficiencyChart({ entries, syncId }: Props) {
         <div className="flex items-center gap-1">
           <h3 className="text-sm font-medium text-text-secondary">Cache Efficiency</h3>
           <CopyImageButton targetRef={chartRef} />
-          <CopyMarkdownButton markdown={chartMarkdown} />
+          <CopyMarkdownButton markdown={getChartMarkdown} />
         </div>
         {hasBreakdownData && (
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
@@ -158,62 +532,11 @@ export function CacheEfficiencyChart({ entries, syncId }: Props) {
       </div>
 
       <Suspense fallback={<div className="h-80" />}>
-        <ResponsiveContainer width="100%" height={320}>
-          <ComposedChart
-            data={chartData as unknown as ChartRowData}
-            syncId={syncId}
-            syncMethod={syncTooltipByIndexToLocalCoordinate}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis
-              dataKey="label"
-              tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              yAxisId="tokens"
-              tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value: number) => formatTokens(value)}
-            />
-            <YAxis
-              yAxisId="rate"
-              orientation="right"
-              domain={[0, 1]}
-              tick={{ fontSize: 11, fill: "var(--color-text-secondary)" }}
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(value: number) => formatCacheReadRate(value)}
-              width={56}
-            />
-            <Tooltip content={<CacheEfficiencyTooltip />} />
-            <Legend content={<CacheEfficiencyLegend />} />
-            {TOKEN_SERIES.map((series) => (
-              <Bar
-                key={series.key}
-                yAxisId="tokens"
-                dataKey={series.key}
-                name={series.name}
-                stackId="tokens"
-                fill={series.color}
-                fillOpacity={0.85}
-              />
-            ))}
-            <Line
-              yAxisId="rate"
-              type="monotone"
-              dataKey="cacheReadRate"
-              name={RATE_SERIES.name}
-              stroke={RATE_SERIES.color}
-              strokeWidth={2}
-              dot={false}
-              connectNulls={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+        <div className="relative h-80 overflow-visible">
+          <ReactChart type="bar" data={chartJsData} options={chartJsOptions} />
+        </div>
       </Suspense>
+      <CacheEfficiencyLegend />
       {isBreakdownView && (
         <CacheEfficiencyBreakdownLegend
           breakdownSeries={breakdownSeries}
@@ -282,33 +605,6 @@ function CacheEfficiencyBreakdownLegend({
           <span style={{ color: "var(--color-text-secondary)" }}>{series.label}</span>
         </button>
       ))}
-    </div>
-  );
-}
-
-function CacheEfficiencyTooltip({ active, payload, label }: RechartsTooltipProps) {
-  if (!active || !payload || payload.length === 0) return null;
-
-  const row = payload[0]?.payload as unknown as CacheEfficiencyChartDatum | undefined;
-  if (!row) return null;
-
-  return (
-    <div className="bg-bg-card border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
-      <p className="font-medium text-text-primary mb-1">{label}</p>
-      <p className="text-text-secondary">
-        Cache Read Rate:{" "}
-        <span className="text-text-primary">{formatCacheReadRate(row.cacheReadRate)}</span>
-      </p>
-      <p className="text-text-secondary">
-        Input: <span className="text-text-primary">{formatTokens(row.inputTokens)}</span>
-      </p>
-      <p className="text-text-secondary">
-        Cache Read: <span className="text-text-primary">{formatTokens(row.cacheReadTokens)}</span>
-      </p>
-      <p className="text-text-secondary">
-        Input+Read:{" "}
-        <span className="text-text-primary">{formatTokens(row.inputPlusCacheReadTokens)}</span>
-      </p>
     </div>
   );
 }

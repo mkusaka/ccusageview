@@ -121,7 +121,7 @@ export function Dashboard({ data }: Props) {
     };
   }, []);
 
-  const dashboardMarkdown = useMemo(() => {
+  const getDashboardMarkdown = useCallback(() => {
     const chartSections = Object.values(markdownSectionsById).toSorted((a, b) => a.order - b.order);
     const rangeLabel =
       filteredEntries.length > 0
@@ -139,7 +139,11 @@ export function Dashboard({ data }: Props) {
     ].join("\n");
 
     if (chartSections.length === 0) return header;
-    return `${header}\n\n${chartSections.map((section) => section.markdown).join("\n\n")}`;
+    return `${header}\n\n${chartSections
+      .map((section) =>
+        typeof section.markdown === "function" ? section.markdown() : section.markdown,
+      )
+      .join("\n\n")}`;
   }, [displayLabel, filteredEntries, markdownSectionsById, sourceLabels]);
 
   return (
@@ -154,7 +158,10 @@ export function Dashboard({ data }: Props) {
         )}
 
         <CopyImageButton targetRef={dashboardRef} />
-        <CopyMarkdownButton markdown={dashboardMarkdown} title="Copy all chart data as Markdown" />
+        <CopyMarkdownButton
+          markdown={getDashboardMarkdown}
+          title="Copy all chart data as Markdown"
+        />
 
         {/* Granularity toggle for daily reports */}
         {canToggleGranularity && (
