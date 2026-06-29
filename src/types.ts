@@ -15,21 +15,41 @@ export interface Totals {
   cacheCreationTokens: number;
   cacheReadTokens: number;
   totalTokens: number;
-  totalCost: number;
+  totalCost?: number;
+  costUSD?: number;
 }
 
-// Shared fields for daily/weekly/monthly entries
-export interface TimeEntry {
-  period: string;
+interface UsageMetrics {
   inputTokens: number;
   outputTokens: number;
   cacheCreationTokens: number;
   cacheReadTokens: number;
   totalTokens: number;
+}
+
+interface CodexModelBreakdown extends UsageMetrics {
+  costUSD?: number;
+  isFallback?: boolean;
+  reasoningOutputTokens?: number;
+}
+
+// Shared fields for daily/weekly/monthly entries in ccusage's Claude output
+interface ClaudeTimeEntry extends UsageMetrics {
+  period: string;
   totalCost: number;
   modelsUsed: string[];
   modelBreakdowns: ModelBreakdown[];
 }
+
+// Shared fields for daily/weekly/monthly entries in ccusage's Codex output
+interface CodexTimeEntry extends UsageMetrics {
+  date: string;
+  costUSD: number;
+  models: Record<string, CodexModelBreakdown>;
+  reasoningOutputTokens?: number;
+}
+
+export type TimeEntry = ClaudeTimeEntry | CodexTimeEntry;
 
 export interface DailyReport {
   type: "daily";

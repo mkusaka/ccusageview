@@ -8,6 +8,7 @@ import {
 } from "../normalize";
 import {
   DAILY_REPORT,
+  CODEX_DAILY_REPORT,
   WEEKLY_REPORT,
   MONTHLY_REPORT,
   SESSION_REPORT,
@@ -21,6 +22,24 @@ describe("normalizeEntries", () => {
     expect(entries[0].label).toBe("2025-07-01");
     expect(entries[0].cost).toBe(2.8);
     expect(entries[0].models).toEqual(["claude-sonnet-4-20250514", "claude-haiku-3-20240307"]);
+  });
+
+  it("normalizes codex daily entries", () => {
+    const entries = normalizeEntries(CODEX_DAILY_REPORT);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].label).toBe("2026-06-30");
+    expect(entries[0].cost).toBe(92.3754325);
+    expect(entries[0].models).toEqual(["gpt-5.5"]);
+    expect(entries[0].modelBreakdowns).toEqual([
+      {
+        modelName: "gpt-5.5",
+        inputTokens: 2_212_493,
+        outputTokens: 145_202,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 43_063_296,
+        cost: 92.3754325,
+      },
+    ]);
   });
 
   it("normalizes weekly entries", () => {
@@ -73,6 +92,12 @@ describe("normalizeTotals", () => {
     const totals = normalizeTotals(DAILY_REPORT);
     expect(totals.totalCost).toBe(DAILY_REPORT.totals.totalCost);
     expect(totals.inputTokens).toBe(DAILY_REPORT.totals.inputTokens);
+  });
+
+  it("extracts totals from codex daily report", () => {
+    const totals = normalizeTotals(CODEX_DAILY_REPORT);
+    expect(totals.totalCost).toBe(CODEX_DAILY_REPORT.totals.costUSD);
+    expect(totals.inputTokens).toBe(CODEX_DAILY_REPORT.totals.inputTokens);
   });
 
   it("computes totals from blocks (non-gap entries)", () => {
@@ -174,6 +199,14 @@ describe("aggregateToMonthly", () => {
     expect(monthly[1].label).toBe("2025-08");
   });
 
+  it("aggregates codex daily entries by month", () => {
+    const daily = normalizeEntries(CODEX_DAILY_REPORT);
+    const monthly = aggregateToMonthly(daily);
+    expect(monthly).toHaveLength(1);
+    expect(monthly[0].label).toBe("2026-06");
+    expect(monthly[0].cost).toBeCloseTo(92.3754325);
+  });
+
   it("sums token values for the same month", () => {
     const daily = normalizeEntries(DAILY_REPORT);
     const monthly = aggregateToMonthly(daily);
@@ -218,9 +251,10 @@ describe("computeTotalsFromEntries", () => {
   it("sums all numeric fields from entries", () => {
     const entries = normalizeEntries(DAILY_REPORT);
     const totals = computeTotalsFromEntries(entries);
+    expect(DAILY_REPORT.totals.totalCost).toBeDefined();
     expect(totals.inputTokens).toBe(DAILY_REPORT.totals.inputTokens);
     expect(totals.outputTokens).toBe(DAILY_REPORT.totals.outputTokens);
-    expect(totals.totalCost).toBeCloseTo(DAILY_REPORT.totals.totalCost);
+    expect(totals.totalCost).toBeCloseTo(DAILY_REPORT.totals.totalCost!);
   });
 
   it("returns zeros for empty entries", () => {

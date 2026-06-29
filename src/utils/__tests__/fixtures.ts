@@ -35,7 +35,7 @@ function makeTotals(entries: TimeEntry[]): Totals {
     cacheCreationTokens: entries.reduce((s, e) => s + e.cacheCreationTokens, 0),
     cacheReadTokens: entries.reduce((s, e) => s + e.cacheReadTokens, 0),
     totalTokens: entries.reduce((s, e) => s + e.totalTokens, 0),
-    totalCost: entries.reduce((s, e) => s + e.totalCost, 0),
+    totalCost: entries.reduce((s, e) => s + ("totalCost" in e ? e.totalCost : e.costUSD), 0),
   };
 }
 
@@ -79,6 +79,41 @@ export const DAILY_REPORT: DailyReport = {
   type: "daily",
   daily: DAILY_ENTRIES,
   totals: makeTotals(DAILY_ENTRIES),
+};
+
+export const CODEX_DAILY_REPORT: DailyReport = {
+  type: "daily",
+  daily: [
+    {
+      date: "2026-06-30",
+      inputTokens: 2_212_493,
+      outputTokens: 145_202,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 43_063_296,
+      totalTokens: 45_420_991,
+      costUSD: 92.3754325,
+      reasoningOutputTokens: 28_755,
+      models: {
+        "gpt-5.5": {
+          inputTokens: 2_212_493,
+          outputTokens: 145_202,
+          cacheCreationTokens: 0,
+          cacheReadTokens: 43_063_296,
+          totalTokens: 45_420_991,
+          reasoningOutputTokens: 28_755,
+          isFallback: true,
+        },
+      },
+    },
+  ],
+  totals: {
+    inputTokens: 2_212_493,
+    outputTokens: 145_202,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 43_063_296,
+    totalTokens: 45_420_991,
+    costUSD: 92.3754325,
+  },
 };
 
 const WEEKLY_ENTRIES: TimeEntry[] = [

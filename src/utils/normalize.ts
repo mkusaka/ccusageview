@@ -1,4 +1,4 @@
-import type { ModelBreakdown, ReportData, ReportType } from "../types";
+import type { ModelBreakdown, ReportData, ReportType, TimeEntry } from "../types";
 import { groupEntries, sumEntries } from "./aggregate";
 
 // Unified entry format for chart components
@@ -23,47 +23,53 @@ export interface NormalizedTotals {
   totalCost: number;
 }
 
+function normalizeTimeEntry(e: TimeEntry): NormalizedEntry {
+  if ("period" in e) {
+    return {
+      label: e.period,
+      inputTokens: e.inputTokens,
+      outputTokens: e.outputTokens,
+      cacheCreationTokens: e.cacheCreationTokens,
+      cacheReadTokens: e.cacheReadTokens,
+      totalTokens: e.totalTokens,
+      cost: e.totalCost,
+      models: e.modelsUsed,
+      modelBreakdowns: e.modelBreakdowns,
+    };
+  }
+
+  const modelEntries = Object.entries(e.models);
+  return {
+    label: e.date,
+    inputTokens: e.inputTokens,
+    outputTokens: e.outputTokens,
+    cacheCreationTokens: e.cacheCreationTokens,
+    cacheReadTokens: e.cacheReadTokens,
+    totalTokens: e.totalTokens,
+    cost: e.costUSD,
+    models: modelEntries.map(([modelName]) => modelName),
+    modelBreakdowns: modelEntries.map(([modelName, metrics]) => ({
+      modelName,
+      inputTokens: metrics.inputTokens,
+      outputTokens: metrics.outputTokens,
+      cacheCreationTokens: metrics.cacheCreationTokens,
+      cacheReadTokens: metrics.cacheReadTokens,
+      cost: metrics.costUSD ?? (modelEntries.length === 1 ? e.costUSD : 0),
+    })),
+  };
+}
+
 // Convert any report type to a uniform array of entries
 export function normalizeEntries(report: ReportData): NormalizedEntry[] {
   switch (report.type) {
     case "daily":
-      return report.daily.map((e) => ({
-        label: e.period,
-        inputTokens: e.inputTokens,
-        outputTokens: e.outputTokens,
-        cacheCreationTokens: e.cacheCreationTokens,
-        cacheReadTokens: e.cacheReadTokens,
-        totalTokens: e.totalTokens,
-        cost: e.totalCost,
-        models: e.modelsUsed,
-        modelBreakdowns: e.modelBreakdowns,
-      }));
+      return report.daily.map(normalizeTimeEntry);
 
     case "weekly":
-      return report.weekly.map((e) => ({
-        label: e.period,
-        inputTokens: e.inputTokens,
-        outputTokens: e.outputTokens,
-        cacheCreationTokens: e.cacheCreationTokens,
-        cacheReadTokens: e.cacheReadTokens,
-        totalTokens: e.totalTokens,
-        cost: e.totalCost,
-        models: e.modelsUsed,
-        modelBreakdowns: e.modelBreakdowns,
-      }));
+      return report.weekly.map(normalizeTimeEntry);
 
     case "monthly":
-      return report.monthly.map((e) => ({
-        label: e.period,
-        inputTokens: e.inputTokens,
-        outputTokens: e.outputTokens,
-        cacheCreationTokens: e.cacheCreationTokens,
-        cacheReadTokens: e.cacheReadTokens,
-        totalTokens: e.totalTokens,
-        cost: e.totalCost,
-        models: e.modelsUsed,
-        modelBreakdowns: e.modelBreakdowns,
-      }));
+      return report.monthly.map(normalizeTimeEntry);
 
     case "session":
       return report.sessions
@@ -175,7 +181,7 @@ export function normalizeTotals(report: ReportData): NormalizedTotals {
     cacheCreationTokens: t.cacheCreationTokens,
     cacheReadTokens: t.cacheReadTokens,
     totalTokens: t.totalTokens,
-    totalCost: t.totalCost,
+    totalCost: t.totalCost ?? t.costUSD ?? 0,
   };
 }
 

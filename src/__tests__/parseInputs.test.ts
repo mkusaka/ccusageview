@@ -84,6 +84,41 @@ const DAILY_CLAUDE_3 = JSON.stringify({
   },
 });
 
+const DAILY_CODEX = JSON.stringify({
+  daily: [
+    {
+      date: "2026-06-30",
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 200,
+      totalTokens: 350,
+      costUSD: 0.75,
+      reasoningOutputTokens: 25,
+      models: {
+        "gpt-5.5": {
+          inputTokens: 100,
+          outputTokens: 50,
+          cacheCreationTokens: 0,
+          cacheReadTokens: 200,
+          totalTokens: 350,
+          reasoningOutputTokens: 25,
+          isFallback: false,
+        },
+      },
+    },
+  ],
+  totals: {
+    inputTokens: 100,
+    outputTokens: 50,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 200,
+    totalTokens: 350,
+    costUSD: 0.75,
+    reasoningOutputTokens: 25,
+  },
+});
+
 const SESSION_REPORT = JSON.stringify({
   sessions: [
     {
@@ -150,6 +185,16 @@ describe("parseInputs", () => {
     it("collects source labels", () => {
       const result = parseInputs([inp(DAILY_CLAUDE, "Claude Code")]);
       expect(result.data!.sourceLabels).toEqual(["Claude Code"]);
+    });
+
+    it("parses a single codex daily report", () => {
+      const result = parseInputs([inp(DAILY_CODEX)]);
+      expect(result.error).toBeNull();
+      expect(result.data).not.toBeNull();
+      expect(result.data!.reportType).toBe("daily");
+      expect(result.data!.entries[0].label).toBe("2026-06-30");
+      expect(result.data!.entries[0].cost).toBe(0.75);
+      expect(result.data!.totals.totalCost).toBe(0.75);
     });
 
     it("omits empty labels from sourceLabels", () => {
