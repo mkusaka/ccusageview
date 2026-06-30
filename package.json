@@ -35,7 +35,7 @@
     "@types/node": "24.13.2",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
+    "@vitejs/plugin-react": "6.0.3",
     "esbuild": "0.28.1",
     "html-to-image": "1.11.13",
     "lefthook": "2.1.9",
@@ -46,9 +46,9 @@
     "react-dom": "19.2.7",
     "tailwindcss": "4.3.1",
     "typescript": "6.0.3",
-    "vite": "8.0.16",
+    "vite": "8.1.0",
     "vitest": "4.1.9",
-    "wrangler": "4.103.0"
+    "wrangler": "4.104.0"
   },
   "engines": {
     "node": ">=22"
