@@ -9,6 +9,8 @@ import type {
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { TimeGranularity } from "../utils/projection";
+import { appendProjectedRow, formatProjectionMetadata } from "../utils/projection";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatTokens } from "../utils/format";
 import {
@@ -35,6 +37,7 @@ import {
 interface Props {
   entries: NormalizedEntry[];
   syncId?: string;
+  timeGranularity?: TimeGranularity;
 }
 
 const TYPE_SERIES = [
@@ -84,7 +87,7 @@ function getVisibleChartSeries(
   return visible;
 }
 
-export function TokenChart({ entries, syncId }: Props) {
+export function TokenChart({ entries, syncId, timeGranularity }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("type");
   const [tokenType, setTokenType] = useState<ModelTokenType>("inputTokens");
@@ -122,13 +125,13 @@ export function TokenChart({ entries, syncId }: Props) {
   const isBreakdownView = (viewMode === "model" || viewMode === "provider") && hasBreakdownData;
   const chartMarkdown = useMemo(() => {
     let series: ChartDataSeries[];
-    let data: Record<string, unknown>[];
+    let sourceRows: readonly TokenChartRow[];
     let viewLabel: string;
 
     if (isBreakdownView) {
       viewLabel = viewMode === "provider" ? "By Provider" : "By Model";
       series = getVisibleChartSeries(breakdownSeries, hiddenSeries);
-      data = pickDataKeys(breakdownChartData, ["label", ...series.map((s) => s.key)]);
+      sourceRows = breakdownChartData;
     } else {
       viewLabel = "By Type";
       series = getVisibleTypeSeries(hiddenSeries).map((s) => ({
@@ -136,8 +139,16 @@ export function TokenChart({ entries, syncId }: Props) {
         label: s.name,
         color: s.color,
       }));
-      data = pickDataKeys(entries, ["label", ...series.map((s) => s.key)]);
+      sourceRows = entries;
     }
+    const metricKeys = series.map((s) => s.key);
+    const projected = appendProjectedRow(
+      sourceRows,
+      metricKeys,
+      showPercent ? undefined : timeGranularity,
+    );
+    const projectionMetadata = formatProjectionMetadata(projected.projection);
+    const data = pickDataKeys(projected.rows, ["label", ...metricKeys]);
 
     return buildMarkdownSection({
       title: "Token Breakdown",
@@ -149,6 +160,9 @@ export function TokenChart({ entries, syncId }: Props) {
         ],
         ["Show percent", showPercent],
         ["Hidden series", Array.from(hiddenSeries)],
+        ...(projectionMetadata
+          ? ([["Projection", projectionMetadata]] as [string, unknown][])
+          : []),
       ],
       tables: [
         {
@@ -164,6 +178,7 @@ export function TokenChart({ entries, syncId }: Props) {
     hiddenSeries,
     isBreakdownView,
     showPercent,
+    timeGranularity,
     tokenType,
     viewMode,
   ]);
@@ -269,6 +284,7 @@ export function TokenChart({ entries, syncId }: Props) {
         hiddenSeries={hiddenSeries}
         breakdownChartData={breakdownChartData}
         breakdownSeries={breakdownSeries}
+        timeGranularity={timeGranularity}
         toggleSeries={toggleSeries}
       />
     </div>
@@ -283,6 +299,7 @@ function TokenBarChart({
   hiddenSeries,
   breakdownChartData,
   breakdownSeries,
+  timeGranularity,
   toggleSeries,
 }: {
   entries: NormalizedEntry[];
@@ -292,6 +309,7 @@ function TokenBarChart({
   hiddenSeries: Set<string>;
   breakdownChartData: TokenBreakdownChartData;
   breakdownSeries: ChartDataSeries[];
+  timeGranularity?: TimeGranularity;
   toggleSeries: (key: string) => void;
 }) {
   void syncId;
@@ -314,14 +332,19 @@ function TokenBarChart({
     }));
   }, [breakdownSeries, hiddenSeries, isBreakdownView]);
   const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
+  const projectedSourceData = useMemo(
+    () =>
+      appendProjectedRow(sourceData, visibleKeys, showPercent ? undefined : timeGranularity).rows,
+    [showPercent, sourceData, timeGranularity, visibleKeys],
+  );
   const chartJsData = useMemo<TokenChartJsData>(() => {
-    const labels = sourceData.map((row) => String(row.label));
+    const labels = projectedSourceData.map((row) => String(row.label));
     const datasets: TokenChartDataset[] = visibleSeries.map((series, index) => {
       const color = series.color || getChartJsColor(index);
       return {
         type: "bar",
         label: series.label,
-        data: sourceData.map((row) => {
+        data: projectedSourceData.map((row) => {
           const record = row as Record<string, unknown>;
           return showPercent
             ? normalizeStackValue(record, series.key, visibleKeys)
@@ -334,7 +357,7 @@ function TokenBarChart({
       };
     });
     return { labels, datasets };
-  }, [showPercent, sourceData, visibleKeys, visibleSeries]);
+  }, [projectedSourceData, showPercent, visibleKeys, visibleSeries]);
   const chartJsOptions = useMemo<ChartOptions<"bar">>(
     () => ({
       responsive: true,
@@ -347,7 +370,7 @@ function TokenBarChart({
         tooltip: {
           enabled: false,
           external(context) {
-            renderTokenTooltip(context, sourceData, visibleKeys, showPercent);
+            renderTokenTooltip(context, projectedSourceData, visibleKeys, showPercent);
           },
         },
       },
@@ -379,7 +402,7 @@ function TokenBarChart({
         },
       },
     }),
-    [showPercent, sourceData, visibleKeys],
+    [projectedSourceData, showPercent, visibleKeys],
   );
   const legendItems = isBreakdownView
     ? breakdownSeries.map((series, index) => ({

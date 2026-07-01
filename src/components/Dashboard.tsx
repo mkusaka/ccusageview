@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReportType } from "../types";
 import type { DashboardData } from "../utils/normalize";
+import type { TimeGranularity } from "../utils/projection";
 import {
   aggregateToMonthly,
   aggregateToWeekly,
@@ -31,8 +32,6 @@ const TYPE_LABELS: Record<ReportType, string> = {
   session: "Session Report",
   blocks: "Blocks Report",
 };
-
-type TimeGranularity = "daily" | "weekly" | "monthly";
 
 const GRANULARITY_LABELS: Record<TimeGranularity, string> = {
   daily: "Daily",
@@ -108,6 +107,13 @@ export function Dashboard({ data }: Props) {
   const displayLabel = canToggleGranularity
     ? GRANULARITY_REPORT_LABELS[granularity]
     : TYPE_LABELS[reportType];
+
+  const timeGranularity: TimeGranularity | undefined =
+    reportType === "daily"
+      ? granularity
+      : reportType === "weekly" || reportType === "monthly"
+        ? reportType
+        : undefined;
 
   const registerMarkdownSection = useCallback((section: RegisteredMarkdownSection) => {
     setMarkdownSectionsById((previous) => ({ ...previous, [section.id]: section }));
@@ -204,8 +210,16 @@ export function Dashboard({ data }: Props) {
             <>
               {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
               {showDayOfWeek && <DayOfWeekChart entries={filteredEntries} />}
-              <CostChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
-              <TokenChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
+              <CostChart
+                entries={filteredEntries}
+                syncId={COST_TOKEN_CHART_SYNC_ID}
+                timeGranularity={timeGranularity}
+              />
+              <TokenChart
+                entries={filteredEntries}
+                syncId={COST_TOKEN_CHART_SYNC_ID}
+                timeGranularity={timeGranularity}
+              />
               <CacheEfficiencyChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
               {hasModelBreakdowns && <ModelBreakdown entries={filteredEntries} />}
             </>

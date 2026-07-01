@@ -9,6 +9,8 @@ import type {
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { TimeGranularity } from "../utils/projection";
+import { appendProjectedRow, formatProjectionMetadata } from "../utils/projection";
 import { formatCost } from "../utils/format";
 import type { BreakdownMode } from "../utils/breakdown";
 import { collectModels, buildModelSeries, buildCostByModel, MODEL_COLORS } from "../utils/chart";
@@ -30,6 +32,7 @@ import {
 interface Props {
   entries: NormalizedEntry[];
   syncId?: string;
+  timeGranularity?: TimeGranularity;
 }
 
 type ViewMode = "total" | "model" | "provider" | "tokenType";
@@ -65,7 +68,7 @@ function getVisibleChartSeries(
   return visible;
 }
 
-export function CostChart({ entries, syncId }: Props) {
+export function CostChart({ entries, syncId, timeGranularity }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [showPercent, setShowPercent] = useState(false);
@@ -108,7 +111,7 @@ export function CostChart({ entries, syncId }: Props) {
   const isTokenTypeView = viewMode === "tokenType" && hasTokenTypeCostData;
   const chartMarkdown = useMemo(() => {
     let series: ChartDataSeries[];
-    let data: Record<string, unknown>[];
+    let sourceRows: readonly CostChartRow[];
     let viewLabel: string;
 
     if (isTokenTypeView) {
@@ -118,16 +121,24 @@ export function CostChart({ entries, syncId }: Props) {
         label: s.name,
         color: s.color,
       }));
-      data = pickDataKeys(tokenTypeCostData, ["label", ...series.map((s) => s.key)]);
+      sourceRows = tokenTypeCostData;
     } else if (isBreakdownView) {
       viewLabel = viewMode === "provider" ? "By Provider" : "By Model";
       series = getVisibleChartSeries(breakdownSeries, hiddenSeries);
-      data = pickDataKeys(breakdownChartData, ["label", ...series.map((s) => s.key)]);
+      sourceRows = breakdownChartData;
     } else {
       viewLabel = "Total";
       series = [{ key: "cost", label: "Cost", color: "var(--color-chart-blue)" }];
-      data = pickDataKeys(entries, ["label", "cost"]);
+      sourceRows = entries;
     }
+    const metricKeys = series.map((s) => s.key);
+    const projected = appendProjectedRow(
+      sourceRows,
+      metricKeys,
+      showPercent ? undefined : timeGranularity,
+    );
+    const projectionMetadata = formatProjectionMetadata(projected.projection);
+    const data = pickDataKeys(projected.rows, ["label", ...metricKeys]);
 
     return buildMarkdownSection({
       title: "Cost Over Time",
@@ -135,6 +146,9 @@ export function CostChart({ entries, syncId }: Props) {
         ["View", viewLabel],
         ["Show percent", (isBreakdownView || isTokenTypeView) && showPercent],
         ["Hidden series", Array.from(hiddenSeries)],
+        ...(projectionMetadata
+          ? ([["Projection", projectionMetadata]] as [string, unknown][])
+          : []),
       ],
       tables: [
         {
@@ -151,6 +165,7 @@ export function CostChart({ entries, syncId }: Props) {
     isBreakdownView,
     isTokenTypeView,
     showPercent,
+    timeGranularity,
     tokenTypeCostData,
     viewMode,
   ]);
@@ -259,6 +274,7 @@ export function CostChart({ entries, syncId }: Props) {
         breakdownChartData={breakdownChartData}
         breakdownSeries={breakdownSeries}
         tokenTypeCostData={tokenTypeCostData}
+        timeGranularity={timeGranularity}
         toggleSeries={toggleSeries}
       />
     </div>
@@ -275,6 +291,7 @@ function CostAreaChart({
   breakdownChartData,
   breakdownSeries,
   tokenTypeCostData,
+  timeGranularity,
   toggleSeries,
 }: {
   entries: NormalizedEntry[];
@@ -286,6 +303,7 @@ function CostAreaChart({
   breakdownChartData: CostBreakdownChartData;
   breakdownSeries: ChartDataSeries[];
   tokenTypeCostData: TokenTypeCostData;
+  timeGranularity?: TimeGranularity;
   toggleSeries: (key: string) => void;
 }) {
   void syncId;
@@ -317,14 +335,19 @@ function CostAreaChart({
   }, [breakdownSeries, hiddenSeries, isBreakdownView, isTokenTypeView]);
   const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
   const isStackedView = isBreakdownView || isTokenTypeView;
+  const projectedSourceData = useMemo(
+    () =>
+      appendProjectedRow(sourceData, visibleKeys, showPercent ? undefined : timeGranularity).rows,
+    [showPercent, sourceData, timeGranularity, visibleKeys],
+  );
   const chartJsData = useMemo<CostChartJsData>(() => {
-    const labels = sourceData.map((row) => String(row.label));
+    const labels = projectedSourceData.map((row) => String(row.label));
     const datasets: CostChartDataset[] = visibleSeries.map((series, index) => {
       const color = series.color || getChartJsColor(index);
       return {
         type: "line",
         label: series.label,
-        data: sourceData.map((row) => {
+        data: projectedSourceData.map((row) => {
           const record = row as Record<string, unknown>;
           return isStackedView && showPercent
             ? normalizeStackValue(record, series.key, visibleKeys)
@@ -341,7 +364,7 @@ function CostAreaChart({
       };
     });
     return { labels, datasets };
-  }, [isStackedView, showPercent, sourceData, visibleKeys, visibleSeries]);
+  }, [isStackedView, projectedSourceData, showPercent, visibleKeys, visibleSeries]);
   const chartJsOptions = useMemo<ChartOptions<"line">>(
     () => ({
       responsive: true,
@@ -354,7 +377,12 @@ function CostAreaChart({
         tooltip: {
           enabled: false,
           external(context) {
-            renderCostTooltip(context, sourceData, visibleKeys, isStackedView && showPercent);
+            renderCostTooltip(
+              context,
+              projectedSourceData,
+              visibleKeys,
+              isStackedView && showPercent,
+            );
           },
         },
       },
@@ -386,7 +414,7 @@ function CostAreaChart({
         },
       },
     }),
-    [isStackedView, showPercent, sourceData, visibleKeys],
+    [isStackedView, projectedSourceData, showPercent, visibleKeys],
   );
   const legendItems = isTokenTypeView
     ? TOKEN_TYPE_COST_SERIES.map((series) => ({
