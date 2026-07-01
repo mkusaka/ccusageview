@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appendProjectedRow, getProjectionInfo } from "../projection";
+import { getProjectionInfo, getProjectionMetrics } from "../projection";
 
 describe("getProjectionInfo", () => {
   it("projects the current daily bucket from elapsed time", () => {
@@ -8,7 +8,6 @@ describe("getProjectionInfo", () => {
 
     expect(projection).toMatchObject({
       sourceLabel: "2026-07-02",
-      projectedLabel: "2026-07-02 (projected)",
     });
     expect(projection!.elapsedRatio).toBeCloseTo(0.5);
     expect(projection!.multiplier).toBeCloseTo(2);
@@ -39,33 +38,27 @@ describe("getProjectionInfo", () => {
   });
 });
 
-describe("appendProjectedRow", () => {
-  it("appends projected values for requested metric keys", () => {
+describe("getProjectionMetrics", () => {
+  it("returns projected and remaining values for requested metric keys", () => {
     const now = new Date(2026, 6, 2, 12);
-    const result = appendProjectedRow(
-      [
-        { label: "2026-07-01", cost: 4, inputTokens: 400 },
-        { label: "2026-07-02", cost: 5, inputTokens: 500 },
-      ],
+    const result = getProjectionMetrics(
+      { label: "2026-07-02", cost: 5, inputTokens: 500 },
       ["cost", "inputTokens"],
       "daily",
       now,
     );
 
-    expect(result.rows).toEqual([
-      { label: "2026-07-01", cost: 4, inputTokens: 400 },
-      { label: "2026-07-02", cost: 5, inputTokens: 500 },
-      { label: "2026-07-02 (projected)", cost: 10, inputTokens: 1000 },
-    ]);
+    expect(result.projected).toEqual({ cost: 10, inputTokens: 1000 });
+    expect(result.remaining).toEqual({ cost: 5, inputTokens: 500 });
   });
 
-  it("returns original rows when projection is not available", () => {
+  it("returns empty values when projection is not available", () => {
     const now = new Date(2026, 6, 2, 12);
-    const rows = [{ label: "2026-07-01", cost: 4 }];
 
-    expect(appendProjectedRow(rows, ["cost"], "daily", now)).toEqual({
-      rows,
+    expect(getProjectionMetrics({ label: "2026-07-01", cost: 4 }, ["cost"], "daily", now)).toEqual({
       projection: null,
+      projected: {},
+      remaining: {},
     });
   });
 });

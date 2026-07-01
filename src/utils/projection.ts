@@ -2,14 +2,14 @@ export type TimeGranularity = "daily" | "weekly" | "monthly";
 
 export interface ProjectionInfo {
   sourceLabel: string;
-  projectedLabel: string;
   elapsedRatio: number;
   multiplier: number;
 }
 
-export interface ProjectionResult<T> {
-  rows: T[];
+export interface ProjectionMetrics {
   projection: ProjectionInfo | null;
+  projected: Record<string, number>;
+  remaining: Record<string, number>;
 }
 
 function pad2(value: number): string {
@@ -106,45 +106,42 @@ export function getProjectionInfo(
 
   return {
     sourceLabel,
-    projectedLabel: `${sourceLabel} (projected)`,
     elapsedRatio,
     multiplier: 1 / elapsedRatio,
   };
 }
 
-export function appendProjectedRow<T extends object>(
-  rows: readonly T[],
+export function getProjectionMetrics(
+  row: object | null | undefined,
   metricKeys: readonly string[],
   granularity: TimeGranularity | undefined,
   now = new Date(),
-): ProjectionResult<T> {
-  const last = rows.at(-1);
-  if (!last || metricKeys.length === 0) return { rows: Array.from(rows), projection: null };
+): ProjectionMetrics {
+  const empty = { projection: null, projected: {}, remaining: {} };
+  if (!row || metricKeys.length === 0) return empty;
 
-  const lastRecord = last as Record<string, unknown>;
-  const label = typeof lastRecord.label === "string" ? lastRecord.label : null;
-  if (!label) return { rows: Array.from(rows), projection: null };
+  const record = row as Record<string, unknown>;
+  const label = typeof record.label === "string" ? record.label : null;
+  if (!label) return empty;
 
   const projection = getProjectionInfo(label, granularity, now);
-  if (!projection) return { rows: Array.from(rows), projection: null };
+  if (!projection) return empty;
 
-  const projected: Record<string, unknown> = { ...lastRecord, label: projection.projectedLabel };
+  const projected: Record<string, number> = {};
+  const remaining: Record<string, number> = {};
 
   for (const key of metricKeys) {
-    const value = asFiniteNumber(lastRecord[key]);
+    const value = asFiniteNumber(record[key]);
     if (value == null) continue;
-    projected[key] = value * projection.multiplier;
+    const projectedValue = value * projection.multiplier;
+    projected[key] = projectedValue;
+    remaining[key] = Math.max(0, projectedValue - value);
   }
 
-  return {
-    rows: [...rows, projected as T],
-    projection,
-  };
+  return { projection, projected, remaining };
 }
 
 export function formatProjectionMetadata(projection: ProjectionInfo | null): string | null {
   if (!projection) return null;
-  return `${projection.sourceLabel} -> ${projection.projectedLabel} (${projection.multiplier.toFixed(
-    2,
-  )}x)`;
+  return `${projection.sourceLabel} (${projection.multiplier.toFixed(2)}x)`;
 }

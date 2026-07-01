@@ -10,7 +10,7 @@ import type {
 import { Line } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { TimeGranularity } from "../utils/projection";
-import { appendProjectedRow, formatProjectionMetadata } from "../utils/projection";
+import { formatProjectionMetadata, getProjectionMetrics } from "../utils/projection";
 import { formatCost } from "../utils/format";
 import type { BreakdownMode } from "../utils/breakdown";
 import { collectModels, buildModelSeries, buildCostByModel, MODEL_COLORS } from "../utils/chart";
@@ -39,8 +39,8 @@ type ViewMode = "total" | "model" | "provider" | "tokenType";
 type CostBreakdownChartData = ReturnType<typeof buildCostByModel>;
 type TokenTypeCostData = ReturnType<typeof buildCostByTokenType>;
 type CostChartRow = NormalizedEntry | CostBreakdownChartData[number] | TokenTypeCostData[number];
-type CostChartDataset = ChartDataset<"line", number[]>;
-type CostChartJsData = ChartData<"line", number[], string>;
+type CostChartDataset = ChartDataset<"line", (number | null)[]>;
+type CostChartJsData = ChartData<"line", (number | null)[], string>;
 
 const TOKEN_TYPE_COST_SERIES = [
   { key: "inputCost", name: "Input", color: "var(--color-chart-blue)" },
@@ -66,6 +66,29 @@ function getVisibleChartSeries(
     if (!hiddenSeries.has(item.key)) visible.push(item);
   }
   return visible;
+}
+
+function buildProjectionTableRows(
+  sourceRow: CostChartRow | undefined,
+  series: readonly ChartDataSeries[],
+  projection: ReturnType<typeof getProjectionMetrics>,
+): Record<string, unknown>[] {
+  const projectionInfo = projection.projection;
+  if (!projectionInfo || !sourceRow) return [];
+
+  const record = sourceRow as Record<string, unknown>;
+  return series.flatMap((item) => {
+    const remaining = projection.remaining[item.key] ?? 0;
+    if (remaining <= 0) return [];
+
+    return {
+      label: projectionInfo.sourceLabel,
+      series: item.label,
+      actual: asNumber(record[item.key]) ?? 0,
+      projected: projection.projected[item.key] ?? 0,
+      remaining,
+    };
+  });
 }
 
 export function CostChart({ entries, syncId, timeGranularity }: Props) {
@@ -132,13 +155,14 @@ export function CostChart({ entries, syncId, timeGranularity }: Props) {
       sourceRows = entries;
     }
     const metricKeys = series.map((s) => s.key);
-    const projected = appendProjectedRow(
-      sourceRows,
+    const projection = getProjectionMetrics(
+      sourceRows.at(-1),
       metricKeys,
       showPercent ? undefined : timeGranularity,
     );
-    const projectionMetadata = formatProjectionMetadata(projected.projection);
-    const data = pickDataKeys(projected.rows, ["label", ...metricKeys]);
+    const projectionMetadata = formatProjectionMetadata(projection.projection);
+    const projectionRows = buildProjectionTableRows(sourceRows.at(-1), series, projection);
+    const data = pickDataKeys(sourceRows, ["label", ...metricKeys]);
 
     return buildMarkdownSection({
       title: "Cost Over Time",
@@ -155,6 +179,21 @@ export function CostChart({ entries, syncId, timeGranularity }: Props) {
           columns: seriesToColumns({ key: "label", label: "Label" }, series),
           rows: data,
         },
+        ...(projectionRows.length > 0
+          ? [
+              {
+                title: "Projection",
+                columns: [
+                  { key: "label", label: "Label" },
+                  { key: "series", label: "Series" },
+                  { key: "actual", label: "Actual", align: "right" as const },
+                  { key: "projected", label: "Projected", align: "right" as const },
+                  { key: "remaining", label: "Remaining", align: "right" as const },
+                ],
+                rows: projectionRows,
+              },
+            ]
+          : []),
       ],
     });
   }, [
@@ -335,19 +374,25 @@ function CostAreaChart({
   }, [breakdownSeries, hiddenSeries, isBreakdownView, isTokenTypeView]);
   const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
   const isStackedView = isBreakdownView || isTokenTypeView;
-  const projectedSourceData = useMemo(
+  const projection = useMemo(
     () =>
-      appendProjectedRow(sourceData, visibleKeys, showPercent ? undefined : timeGranularity).rows,
+      getProjectionMetrics(
+        sourceData.at(-1),
+        visibleKeys,
+        showPercent ? undefined : timeGranularity,
+      ),
     [showPercent, sourceData, timeGranularity, visibleKeys],
   );
+  const hasProjection = projection.projection != null;
+  const shouldStack = isStackedView || hasProjection;
   const chartJsData = useMemo<CostChartJsData>(() => {
-    const labels = projectedSourceData.map((row) => String(row.label));
-    const datasets: CostChartDataset[] = visibleSeries.map((series, index) => {
+    const labels = sourceData.map((row) => String(row.label));
+    const actualDatasets: CostChartDataset[] = visibleSeries.map((series, index) => {
       const color = series.color || getChartJsColor(index);
       return {
         type: "line",
         label: series.label,
-        data: projectedSourceData.map((row) => {
+        data: sourceData.map((row) => {
           const record = row as Record<string, unknown>;
           return isStackedView && showPercent
             ? normalizeStackValue(record, series.key, visibleKeys)
@@ -359,12 +404,44 @@ function CostAreaChart({
         pointRadius: 0,
         pointHoverRadius: 0,
         fill: isStackedView ? true : "origin",
-        stack: isStackedView ? "cost" : undefined,
+        stack: shouldStack ? "cost" : undefined,
         tension: 0.25,
       };
     });
-    return { labels, datasets };
-  }, [isStackedView, projectedSourceData, showPercent, visibleKeys, visibleSeries]);
+
+    const projectedDatasets: CostChartDataset[] = hasProjection
+      ? visibleSeries.map((series, index) => {
+          const color = series.color || getChartJsColor(index);
+          return {
+            type: "line",
+            label: `${series.label} projected`,
+            data: sourceData.map((_, rowIndex) =>
+              rowIndex === sourceData.length - 1 ? (projection.remaining[series.key] ?? 0) : null,
+            ),
+            borderColor: withOpacity(color, 0.45),
+            backgroundColor: withOpacity(color, 0.18),
+            borderWidth: 1,
+            borderDash: [4, 3],
+            pointRadius: 3,
+            pointHoverRadius: 4,
+            fill: true,
+            stack: "cost",
+            tension: 0.25,
+          };
+        })
+      : [];
+
+    return { labels, datasets: [...actualDatasets, ...projectedDatasets] };
+  }, [
+    hasProjection,
+    isStackedView,
+    projection.remaining,
+    shouldStack,
+    showPercent,
+    sourceData,
+    visibleKeys,
+    visibleSeries,
+  ]);
   const chartJsOptions = useMemo<ChartOptions<"line">>(
     () => ({
       responsive: true,
@@ -377,12 +454,7 @@ function CostAreaChart({
         tooltip: {
           enabled: false,
           external(context) {
-            renderCostTooltip(
-              context,
-              projectedSourceData,
-              visibleKeys,
-              isStackedView && showPercent,
-            );
+            renderCostTooltip(context, sourceData, visibleKeys, isStackedView && showPercent);
           },
         },
       },
@@ -398,7 +470,7 @@ function CostAreaChart({
           },
         },
         y: {
-          stacked: isStackedView,
+          stacked: shouldStack,
           min: 0,
           max: isStackedView && showPercent ? 1 : undefined,
           grid: { color: "rgba(148, 163, 184, 0.2)" },
@@ -414,7 +486,7 @@ function CostAreaChart({
         },
       },
     }),
-    [isStackedView, projectedSourceData, showPercent, visibleKeys],
+    [isStackedView, shouldStack, showPercent, sourceData, visibleKeys],
   );
   const legendItems = isTokenTypeView
     ? TOKEN_TYPE_COST_SERIES.map((series) => ({
@@ -475,6 +547,10 @@ function renderCostTooltip(
   const row = sourceData[items[0]?.dataIndex ?? 0] as Record<string, unknown> | undefined;
   const total = row ? visibleKeys.reduce((sum, key) => sum + (asNumber(row[key]) ?? 0), 0) : 0;
   for (const item of items) {
+    const keyIndex =
+      visibleKeys.length > 0 ? item.datasetIndex % visibleKeys.length : item.datasetIndex;
+    const key = visibleKeys[keyIndex] ?? "";
+    const isProjectionItem = item.datasetIndex >= visibleKeys.length;
     const line = document.createElement("div");
     line.style.display = "flex";
     line.style.alignItems = "center";
@@ -484,12 +560,11 @@ function renderCostTooltip(
     marker.style.height = "8px";
     marker.style.flex = "0 0 auto";
     marker.style.background = String(item.dataset.borderColor ?? item.dataset.backgroundColor);
-    const key = visibleKeys[item.datasetIndex] ?? "";
-    const raw = asNumber(row?.[key]) ?? 0;
+    const raw = isProjectionItem ? Number(item.parsed.y ?? 0) : (asNumber(row?.[key]) ?? 0);
     const value =
-      showPercent && total > 0
+      !isProjectionItem && showPercent && total > 0
         ? `${((raw / total) * 100).toFixed(1)}% (${formatCost(raw)})`
-        : formatCost(Number(item.parsed.y ?? 0));
+        : formatCost(raw);
     const text = document.createElement("span");
     text.textContent = `${item.dataset.label}: ${value}`;
     text.style.whiteSpace = "nowrap";

@@ -10,7 +10,7 @@ import type {
 import { Bar } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { TimeGranularity } from "../utils/projection";
-import { appendProjectedRow, formatProjectionMetadata } from "../utils/projection";
+import { formatProjectionMetadata, getProjectionMetrics } from "../utils/projection";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatTokens } from "../utils/format";
 import {
@@ -87,6 +87,29 @@ function getVisibleChartSeries(
   return visible;
 }
 
+function buildProjectionTableRows(
+  sourceRow: TokenChartRow | undefined,
+  series: readonly ChartDataSeries[],
+  projection: ReturnType<typeof getProjectionMetrics>,
+): Record<string, unknown>[] {
+  const projectionInfo = projection.projection;
+  if (!projectionInfo || !sourceRow) return [];
+
+  const record = sourceRow as Record<string, unknown>;
+  return series.flatMap((item) => {
+    const remaining = projection.remaining[item.key] ?? 0;
+    if (remaining <= 0) return [];
+
+    return {
+      label: projectionInfo.sourceLabel,
+      series: item.label,
+      actual: asNumber(record[item.key]) ?? 0,
+      projected: projection.projected[item.key] ?? 0,
+      remaining,
+    };
+  });
+}
+
 export function TokenChart({ entries, syncId, timeGranularity }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("type");
@@ -142,13 +165,14 @@ export function TokenChart({ entries, syncId, timeGranularity }: Props) {
       sourceRows = entries;
     }
     const metricKeys = series.map((s) => s.key);
-    const projected = appendProjectedRow(
-      sourceRows,
+    const projection = getProjectionMetrics(
+      sourceRows.at(-1),
       metricKeys,
       showPercent ? undefined : timeGranularity,
     );
-    const projectionMetadata = formatProjectionMetadata(projected.projection);
-    const data = pickDataKeys(projected.rows, ["label", ...metricKeys]);
+    const projectionMetadata = formatProjectionMetadata(projection.projection);
+    const projectionRows = buildProjectionTableRows(sourceRows.at(-1), series, projection);
+    const data = pickDataKeys(sourceRows, ["label", ...metricKeys]);
 
     return buildMarkdownSection({
       title: "Token Breakdown",
@@ -169,6 +193,21 @@ export function TokenChart({ entries, syncId, timeGranularity }: Props) {
           columns: seriesToColumns({ key: "label", label: "Label" }, series),
           rows: data,
         },
+        ...(projectionRows.length > 0
+          ? [
+              {
+                title: "Projection",
+                columns: [
+                  { key: "label", label: "Label" },
+                  { key: "series", label: "Series" },
+                  { key: "actual", label: "Actual", align: "right" as const },
+                  { key: "projected", label: "Projected", align: "right" as const },
+                  { key: "remaining", label: "Remaining", align: "right" as const },
+                ],
+                rows: projectionRows,
+              },
+            ]
+          : []),
       ],
     });
   }, [
@@ -332,19 +371,24 @@ function TokenBarChart({
     }));
   }, [breakdownSeries, hiddenSeries, isBreakdownView]);
   const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
-  const projectedSourceData = useMemo(
+  const projection = useMemo(
     () =>
-      appendProjectedRow(sourceData, visibleKeys, showPercent ? undefined : timeGranularity).rows,
+      getProjectionMetrics(
+        sourceData.at(-1),
+        visibleKeys,
+        showPercent ? undefined : timeGranularity,
+      ),
     [showPercent, sourceData, timeGranularity, visibleKeys],
   );
+  const hasProjection = projection.projection != null;
   const chartJsData = useMemo<TokenChartJsData>(() => {
-    const labels = projectedSourceData.map((row) => String(row.label));
-    const datasets: TokenChartDataset[] = visibleSeries.map((series, index) => {
+    const labels = sourceData.map((row) => String(row.label));
+    const actualDatasets: TokenChartDataset[] = visibleSeries.map((series, index) => {
       const color = series.color || getChartJsColor(index);
       return {
         type: "bar",
         label: series.label,
-        data: projectedSourceData.map((row) => {
+        data: sourceData.map((row) => {
           const record = row as Record<string, unknown>;
           return showPercent
             ? normalizeStackValue(record, series.key, visibleKeys)
@@ -356,8 +400,26 @@ function TokenBarChart({
         stack: "tokens",
       };
     });
-    return { labels, datasets };
-  }, [projectedSourceData, showPercent, visibleKeys, visibleSeries]);
+
+    const projectedDatasets: TokenChartDataset[] = hasProjection
+      ? visibleSeries.map((series, index) => {
+          const color = series.color || getChartJsColor(index);
+          return {
+            type: "bar",
+            label: `${series.label} projected`,
+            data: sourceData.map((_, rowIndex) =>
+              rowIndex === sourceData.length - 1 ? (projection.remaining[series.key] ?? 0) : 0,
+            ),
+            backgroundColor: withOpacity(color, 0.28),
+            borderColor: withOpacity(color, 0.45),
+            borderWidth: 0,
+            stack: "tokens",
+          };
+        })
+      : [];
+
+    return { labels, datasets: [...actualDatasets, ...projectedDatasets] };
+  }, [hasProjection, projection.remaining, showPercent, sourceData, visibleKeys, visibleSeries]);
   const chartJsOptions = useMemo<ChartOptions<"bar">>(
     () => ({
       responsive: true,
@@ -370,7 +432,7 @@ function TokenBarChart({
         tooltip: {
           enabled: false,
           external(context) {
-            renderTokenTooltip(context, projectedSourceData, visibleKeys, showPercent);
+            renderTokenTooltip(context, sourceData, visibleKeys, showPercent);
           },
         },
       },
@@ -402,7 +464,7 @@ function TokenBarChart({
         },
       },
     }),
-    [projectedSourceData, showPercent, visibleKeys],
+    [showPercent, sourceData, visibleKeys],
   );
   const legendItems = isBreakdownView
     ? breakdownSeries.map((series, index) => ({
@@ -455,12 +517,15 @@ function renderTokenTooltip(
   const row = sourceData[items[0]?.dataIndex ?? 0] as Record<string, unknown> | undefined;
   const total = row ? visibleKeys.reduce((sum, key) => sum + (asNumber(row[key]) ?? 0), 0) : 0;
   for (const item of items) {
-    const key = visibleKeys[item.datasetIndex] ?? "";
-    const raw = asNumber(row?.[key]) ?? 0;
+    const keyIndex =
+      visibleKeys.length > 0 ? item.datasetIndex % visibleKeys.length : item.datasetIndex;
+    const key = visibleKeys[keyIndex] ?? "";
+    const isProjectionItem = item.datasetIndex >= visibleKeys.length;
+    const raw = isProjectionItem ? Number(item.parsed.y ?? 0) : (asNumber(row?.[key]) ?? 0);
     const value =
-      showPercent && total > 0
+      !isProjectionItem && showPercent && total > 0
         ? `${((raw / total) * 100).toFixed(1)}% (${formatTokens(raw)})`
-        : formatTokens(Number(item.parsed.y ?? 0));
+        : formatTokens(raw);
     const line = document.createElement("div");
     line.style.display = "flex";
     line.style.alignItems = "center";
