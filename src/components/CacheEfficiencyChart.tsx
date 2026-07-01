@@ -18,7 +18,6 @@ import {
   getCacheEfficiencyBreakdownDataKey,
   type CacheEfficiencyChartDatum,
 } from "../utils/cacheEfficiency";
-import { formatTokens } from "../utils/format";
 import { collectModels, buildModelSeries, MODEL_COLORS } from "../utils/chart";
 import type { ChartDataSeries } from "../utils/chartData";
 import { buildMarkdownSection } from "../utils/chartData";
@@ -38,11 +37,6 @@ interface Props {
   syncId?: string;
 }
 
-const TOKEN_SERIES = [
-  { key: "inputTokens", name: "Input", color: "var(--color-chart-blue)" },
-  { key: "cacheReadTokens", name: "Cache Read", color: "var(--color-chart-purple)" },
-] as const;
-
 const RATE_SERIES = {
   key: "cacheReadRate",
   name: "Cache Read Rate",
@@ -54,8 +48,8 @@ type CacheEfficiencyChartRow = CacheEfficiencyChartDatum | CacheEfficiencyBreakd
 type CacheEfficiencyBreakdownChartDatum = {
   label: string;
 } & Record<string, string | number | null>;
-type CacheEfficiencyDataset = ChartDataset<"bar" | "line", (number | null)[]>;
-type CacheEfficiencyChartData = ChartData<"bar" | "line", (number | null)[], string>;
+type CacheEfficiencyDataset = ChartDataset<"line", (number | null)[]>;
+type CacheEfficiencyChartData = ChartData<"line", (number | null)[], string>;
 
 type CacheEfficiencyBreakdownSeries = ChartDataSeries & {
   inputKey: string;
@@ -81,18 +75,15 @@ function hasAnyBreakdownData(entries: readonly NormalizedEntry[]): boolean {
   return entries.some((entry) => entry.modelBreakdowns && entry.modelBreakdowns.length > 0);
 }
 
-function shouldShowTooltipItem(context: TooltipItem<"bar" | "line">): boolean {
+function shouldShowTooltipItem(context: TooltipItem<"line">): boolean {
   const value = context.parsed.y;
-  return typeof value === "number" && Number.isFinite(value) && value !== 0;
+  return typeof value === "number" && Number.isFinite(value);
 }
 
-function formatTooltipItem(context: TooltipItem<"bar" | "line">): string {
+function formatTooltipItem(context: TooltipItem<"line">): string {
   const label = context.dataset.label ?? "";
   const value = context.parsed.y;
-  if (context.dataset.yAxisID === "rate") {
-    return `${label}: ${formatCacheReadRate(value == null ? null : value)}`;
-  }
-  return `${label}: ${formatTokens(value ?? 0)}`;
+  return `${label}: ${formatCacheReadRate(value == null ? null : value)}`;
 }
 
 function renderExternalTooltip({
@@ -100,7 +91,7 @@ function renderExternalTooltip({
   tooltip,
 }: {
   chart: ChartJsInstance;
-  tooltip: TooltipModel<"bar" | "line">;
+  tooltip: TooltipModel<"line">;
 }) {
   const tooltipEl = getOrCreateExternalTooltipElement(chart, "cache-efficiency");
 
@@ -168,28 +159,6 @@ function buildChartJsData(
       labels,
       datasets: [
         {
-          type: "bar",
-          label: TOKEN_SERIES[0].name,
-          data: chartData.map((row) => asNumber(row.inputTokens) ?? 0),
-          yAxisID: "tokens",
-          stack: "tokens",
-          backgroundColor: getChartJsColor(0),
-          borderColor: getChartJsColor(0),
-          borderWidth: 0,
-          order: 2,
-        },
-        {
-          type: "bar",
-          label: TOKEN_SERIES[1].name,
-          data: chartData.map((row) => asNumber(row.cacheReadTokens) ?? 0),
-          yAxisID: "tokens",
-          stack: "tokens",
-          backgroundColor: getChartJsColor(3),
-          borderColor: getChartJsColor(3),
-          borderWidth: 0,
-          order: 2,
-        },
-        {
           type: "line",
           label: RATE_SERIES.name,
           data: chartData.map((row) => asNumber(row.cacheReadRate)),
@@ -198,9 +167,8 @@ function buildChartJsData(
           backgroundColor: getChartJsColor(4),
           borderWidth: 2,
           pointRadius: 0,
-          pointHoverRadius: 0,
+          pointHoverRadius: 3,
           spanGaps: false,
-          order: 1,
         },
       ],
     };
@@ -210,53 +178,24 @@ function buildChartJsData(
 
   for (const [index, series] of visibleBreakdownSeries.entries()) {
     const color = getChartJsColor(index);
-    datasets.push(
-      {
-        type: "bar",
-        label: `${series.label} Input`,
-        data: chartData.map(
-          (row) => asNumber((row as Record<string, unknown>)[series.inputKey]) ?? 0,
-        ),
-        yAxisID: "tokens",
-        stack: series.key,
-        backgroundColor: withOpacity(color, 0.85),
-        borderColor: color,
-        borderWidth: 0,
-        order: 2,
-      },
-      {
-        type: "bar",
-        label: `${series.label} Cache Read`,
-        data: chartData.map(
-          (row) => asNumber((row as Record<string, unknown>)[series.cacheReadKey]) ?? 0,
-        ),
-        yAxisID: "tokens",
-        stack: series.key,
-        backgroundColor: withOpacity(color, 0.5),
-        borderColor: color,
-        borderWidth: 0,
-        order: 2,
-      },
-      {
-        type: "line",
-        label: `${series.label} ${RATE_SERIES.name}`,
-        data: chartData.map((row) => asNumber((row as Record<string, unknown>)[series.rateKey])),
-        yAxisID: "rate",
-        borderColor: color,
-        backgroundColor: color,
-        borderWidth: 2,
-        pointRadius: 0,
-        pointHoverRadius: 0,
-        spanGaps: false,
-        order: 1,
-      },
-    );
+    datasets.push({
+      type: "line",
+      label: `${series.label} ${RATE_SERIES.name}`,
+      data: chartData.map((row) => asNumber((row as Record<string, unknown>)[series.rateKey])),
+      yAxisID: "rate",
+      borderColor: color,
+      backgroundColor: withOpacity(color, 0.12),
+      borderWidth: 2,
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      spanGaps: false,
+    });
   }
 
   return { labels, datasets };
 }
 
-function buildChartJsOptions(): ChartOptions<"bar" | "line"> {
+function buildChartJsOptions(): ChartOptions<"line"> {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -275,7 +214,7 @@ function buildChartJsOptions(): ChartOptions<"bar" | "line"> {
         filter: shouldShowTooltipItem,
         external: renderExternalTooltip,
         callbacks: {
-          label(context: TooltipItem<"bar" | "line">) {
+          label(context: TooltipItem<"line">) {
             return formatTooltipItem(context);
           },
         },
@@ -283,7 +222,6 @@ function buildChartJsOptions(): ChartOptions<"bar" | "line"> {
     },
     scales: {
       x: {
-        stacked: true,
         grid: {
           display: false,
         },
@@ -296,30 +234,13 @@ function buildChartJsOptions(): ChartOptions<"bar" | "line"> {
           autoSkip: true,
         },
       },
-      tokens: {
-        type: "linear",
-        position: "left",
-        stacked: true,
-        grid: {
-          color: "rgba(148, 163, 184, 0.2)",
-        },
-        ticks: {
-          color: "rgb(107, 114, 128)",
-          font: {
-            size: 11,
-          },
-          callback(value) {
-            return formatTokens(Number(value));
-          },
-        },
-      },
       rate: {
         type: "linear",
-        position: "right",
+        position: "left",
         min: 0,
         max: 1,
         grid: {
-          drawOnChartArea: false,
+          color: "rgba(148, 163, 184, 0.2)",
         },
         ticks: {
           color: "rgb(107, 114, 128)",
@@ -475,10 +396,10 @@ export function CacheEfficiencyChart({ entries, syncId }: Props) {
 
       <Suspense fallback={<div className="h-80" />}>
         <div className="relative h-80 overflow-visible">
-          <ReactChart type="bar" data={chartJsData} options={chartJsOptions} />
+          <ReactChart type="line" data={chartJsData} options={chartJsOptions} />
         </div>
       </Suspense>
-      <CacheEfficiencyLegend />
+      {!isBreakdownView && <CacheEfficiencyLegend />}
       {isBreakdownView && (
         <CacheEfficiencyBreakdownLegend
           breakdownSeries={breakdownSeries}
@@ -493,19 +414,17 @@ export function CacheEfficiencyChart({ entries, syncId }: Props) {
 function CacheEfficiencyLegend() {
   return (
     <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
-      {[...TOKEN_SERIES, RATE_SERIES].map((series) => (
-        <span key={series.key} className="inline-flex items-center gap-1">
-          <span
-            style={{
-              width: 10,
-              height: 10,
-              backgroundColor: series.color,
-              display: "inline-block",
-            }}
-          />
-          <span style={{ color: "var(--color-text-secondary)" }}>{series.name}</span>
-        </span>
-      ))}
+      <span className="inline-flex items-center gap-1">
+        <span
+          style={{
+            width: 10,
+            height: 10,
+            backgroundColor: RATE_SERIES.color,
+            display: "inline-block",
+          }}
+        />
+        <span style={{ color: "var(--color-text-secondary)" }}>{RATE_SERIES.name}</span>
+      </span>
     </div>
   );
 }
