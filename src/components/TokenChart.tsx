@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "chart.js/auto";
 import type {
   Chart as ChartJsInstance,
@@ -27,10 +27,13 @@ import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import {
   asNumber,
+  createVerticalHoverLinePlugin,
   getChartJsColor,
+  getNearestDataIndexForClientX,
   getOrCreateExternalTooltipElement,
   normalizeStackValue,
   positionExternalTooltip,
+  syncChartHoverState,
   withOpacity,
 } from "./chartjs-utils";
 
@@ -38,6 +41,9 @@ interface Props {
   entries: NormalizedEntry[];
   syncId?: string;
   timeGranularity?: TimeGranularity;
+  hoveredDataIndex?: number | null;
+  hoveredSyncSource?: string | null;
+  onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }
 
 const TYPE_SERIES = [
@@ -110,7 +116,14 @@ function buildProjectionTableRows(
   });
 }
 
-export function TokenChart({ entries, syncId, timeGranularity }: Props) {
+export function TokenChart({
+  entries,
+  syncId,
+  timeGranularity,
+  hoveredDataIndex = null,
+  hoveredSyncSource = null,
+  onHoverDataIndexChange,
+}: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("type");
   const [tokenType, setTokenType] = useState<ModelTokenType>("inputTokens");
@@ -325,6 +338,9 @@ export function TokenChart({ entries, syncId, timeGranularity }: Props) {
         breakdownSeries={breakdownSeries}
         timeGranularity={timeGranularity}
         toggleSeries={toggleSeries}
+        hoveredDataIndex={hoveredDataIndex}
+        hoveredSyncSource={hoveredSyncSource}
+        onHoverDataIndexChange={onHoverDataIndexChange}
       />
     </div>
   );
@@ -340,6 +356,9 @@ function TokenBarChart({
   breakdownSeries,
   timeGranularity,
   toggleSeries,
+  hoveredDataIndex,
+  hoveredSyncSource,
+  onHoverDataIndexChange,
 }: {
   entries: NormalizedEntry[];
   syncId?: string;
@@ -350,6 +369,9 @@ function TokenBarChart({
   breakdownSeries: ChartDataSeries[];
   timeGranularity?: TimeGranularity;
   toggleSeries: (key: string) => void;
+  hoveredDataIndex: number | null;
+  hoveredSyncSource: string | null;
+  onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }) {
   void syncId;
   const sourceData = useMemo(
@@ -381,6 +403,16 @@ function TokenBarChart({
     [showPercent, sourceData, timeGranularity, visibleKeys],
   );
   const hasProjection = projection.projection != null;
+  const chartInstanceRef = useRef<ChartJsInstance<"bar"> | null>(null);
+  const hoveredDataIndexRef = useRef<number | null>(hoveredDataIndex);
+  hoveredDataIndexRef.current = hoveredDataIndex;
+  const hoverLinePlugin = useMemo(
+    () => createVerticalHoverLinePlugin<"bar">(hoveredDataIndexRef),
+    [],
+  );
+  useEffect(() => {
+    syncChartHoverState(chartInstanceRef.current, hoveredDataIndex);
+  }, [hoveredDataIndex, hoveredSyncSource]);
   const chartJsData = useMemo<TokenChartJsData>(() => {
     const labels = sourceData.map((row) => String(row.label));
     const actualDatasets: TokenChartDataset[] = visibleSeries.map((series, index) => {
@@ -476,8 +508,21 @@ function TokenBarChart({
 
   return (
     <>
-      <div className="relative h-96">
-        <Bar data={chartJsData} options={chartJsOptions} />
+      <div
+        className="relative h-96"
+        onMouseMove={(event) =>
+          onHoverDataIndexChange?.(
+            getNearestDataIndexForClientX(event.currentTarget, event.clientX, sourceData.length),
+            "tokens",
+          )
+        }
+      >
+        <Bar
+          ref={chartInstanceRef}
+          data={chartJsData}
+          options={chartJsOptions}
+          plugins={[hoverLinePlugin]}
+        />
       </div>
       <ChartLegend items={legendItems} hiddenSeries={hiddenSeries} toggleSeries={toggleSeries} />
     </>

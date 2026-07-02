@@ -510,12 +510,7 @@ function StatisticsCards({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mt-4">
       {items.map((item) => (
-        <div
-          key={item.label}
-          className={item.sourceLabels ? "group/stat relative" : undefined}
-          onMouseEnter={() => onHighlightChange(STAT_HIGHLIGHT_TARGET[item.label] ?? null)}
-          onMouseLeave={() => onHighlightChange(null)}
-        >
+        <div key={item.label} className={item.sourceLabels ? "group/stat relative" : undefined}>
           <p
             className="text-xs uppercase tracking-wide flex items-center gap-1.5"
             style={{ color: item.color ?? "var(--color-text-secondary)" }}
@@ -534,6 +529,8 @@ function StatisticsCards({
                 ? " cursor-help underline decoration-dashed decoration-1 decoration-text-secondary/40 underline-offset-4"
                 : ""
             }`}
+            onMouseEnter={() => onHighlightChange(STAT_HIGHLIGHT_TARGET[item.label] ?? null)}
+            onMouseLeave={() => onHighlightChange(null)}
           >
             {item.value}
           </p>
@@ -676,6 +673,20 @@ function DistributionChart({
           const x = xScale.getPixelForValue(line.rank);
           if (x < chart.chartArea.left || x > right) continue;
           ctx.globalAlpha = line.dimmed ? 0.5 : 1;
+          if (line.highlighted) {
+            ctx.save();
+            ctx.globalAlpha = 0.28;
+            ctx.strokeStyle = line.color;
+            ctx.lineWidth = 9;
+            ctx.shadowColor = line.color;
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.moveTo(x, top);
+            ctx.lineTo(x, bottom);
+            ctx.stroke();
+            ctx.restore();
+            ctx.globalAlpha = 1;
+          }
           ctx.strokeStyle = line.color;
           ctx.lineWidth = line.highlighted ? 3 : 1.5;
           ctx.setLineDash([4, 3]);

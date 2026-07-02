@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import "chart.js/auto";
 import type {
   Chart as ChartJsInstance,
@@ -22,10 +22,13 @@ import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import {
   asNumber,
+  createVerticalHoverLinePlugin,
   getChartJsColor,
+  getNearestDataIndexForClientX,
   getOrCreateExternalTooltipElement,
   normalizeStackValue,
   positionExternalTooltip,
+  syncChartHoverState,
   withOpacity,
 } from "./chartjs-utils";
 
@@ -33,6 +36,9 @@ interface Props {
   entries: NormalizedEntry[];
   syncId?: string;
   timeGranularity?: TimeGranularity;
+  hoveredDataIndex?: number | null;
+  hoveredSyncSource?: string | null;
+  onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }
 
 type ViewMode = "total" | "model" | "provider" | "tokenType";
@@ -91,7 +97,14 @@ function buildProjectionTableRows(
   });
 }
 
-export function CostChart({ entries, syncId, timeGranularity }: Props) {
+export function CostChart({
+  entries,
+  syncId,
+  timeGranularity,
+  hoveredDataIndex = null,
+  hoveredSyncSource = null,
+  onHoverDataIndexChange,
+}: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [showPercent, setShowPercent] = useState(false);
@@ -315,6 +328,9 @@ export function CostChart({ entries, syncId, timeGranularity }: Props) {
         tokenTypeCostData={tokenTypeCostData}
         timeGranularity={timeGranularity}
         toggleSeries={toggleSeries}
+        hoveredDataIndex={hoveredDataIndex}
+        hoveredSyncSource={hoveredSyncSource}
+        onHoverDataIndexChange={onHoverDataIndexChange}
       />
     </div>
   );
@@ -332,6 +348,9 @@ function CostAreaChart({
   tokenTypeCostData,
   timeGranularity,
   toggleSeries,
+  hoveredDataIndex,
+  hoveredSyncSource,
+  onHoverDataIndexChange,
 }: {
   entries: NormalizedEntry[];
   syncId?: string;
@@ -344,6 +363,9 @@ function CostAreaChart({
   tokenTypeCostData: TokenTypeCostData;
   timeGranularity?: TimeGranularity;
   toggleSeries: (key: string) => void;
+  hoveredDataIndex: number | null;
+  hoveredSyncSource: string | null;
+  onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }) {
   void syncId;
   const sourceData = useMemo(
@@ -385,6 +407,16 @@ function CostAreaChart({
   );
   const hasProjection = projection.projection != null;
   const shouldStack = isStackedView || hasProjection;
+  const chartInstanceRef = useRef<ChartJsInstance<"line"> | null>(null);
+  const hoveredDataIndexRef = useRef<number | null>(hoveredDataIndex);
+  hoveredDataIndexRef.current = hoveredDataIndex;
+  const hoverLinePlugin = useMemo(
+    () => createVerticalHoverLinePlugin<"line">(hoveredDataIndexRef),
+    [],
+  );
+  useEffect(() => {
+    syncChartHoverState(chartInstanceRef.current, hoveredDataIndex);
+  }, [hoveredDataIndex, hoveredSyncSource]);
   const chartJsData = useMemo<CostChartJsData>(() => {
     const labels = sourceData.map((row) => String(row.label));
     const actualDatasets: CostChartDataset[] = visibleSeries.map((series, index) => {
@@ -504,8 +536,21 @@ function CostAreaChart({
 
   return (
     <>
-      <div className="relative h-80">
-        <Line data={chartJsData} options={chartJsOptions} />
+      <div
+        className="relative h-80"
+        onMouseMove={(event) =>
+          onHoverDataIndexChange?.(
+            getNearestDataIndexForClientX(event.currentTarget, event.clientX, sourceData.length),
+            "cost",
+          )
+        }
+      >
+        <Line
+          ref={chartInstanceRef}
+          data={chartJsData}
+          options={chartJsOptions}
+          plugins={[hoverLinePlugin]}
+        />
       </div>
       {legendItems.length > 0 && (
         <ChartLegend items={legendItems} hiddenSeries={hiddenSeries} toggleSeries={toggleSeries} />

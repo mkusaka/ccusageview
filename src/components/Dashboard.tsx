@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReportType } from "../types";
 import type { DashboardData } from "../utils/normalize";
 import type { TimeGranularity } from "../utils/projection";
@@ -47,6 +47,11 @@ const GRANULARITY_REPORT_LABELS: Record<TimeGranularity, string> = {
 
 const COST_TOKEN_CHART_SYNC_ID = "cost-token-time-series";
 
+interface SyncedChartHoverState {
+  index: number | null;
+  source: string | null;
+}
+
 export function Dashboard({ data }: Props) {
   const dashboardRef = useRef<HTMLDivElement>(null);
   const [markdownSectionsById, setMarkdownSectionsById] = useState<
@@ -79,10 +84,16 @@ export function Dashboard({ data }: Props) {
 
   // Range slider state — reset when entries change (render-time reset pattern)
   const [range, setRange] = useState<[number, number]>([0, Math.max(0, entries.length - 1)]);
+  const [syncedChartHoverState, setSyncedChartHoverState] = useState<SyncedChartHoverState>({
+    index: null,
+    source: null,
+  });
+  const syncedChartGroupRef = useRef<HTMLDivElement>(null);
   const prevEntries = useRef(entries);
   if (entries !== prevEntries.current) {
     prevEntries.current = entries;
     setRange([0, Math.max(0, entries.length - 1)]);
+    setSyncedChartHoverState({ index: null, source: null });
   }
 
   const isFullRange = range[0] === 0 && range[1] === entries.length - 1;
@@ -103,6 +114,31 @@ export function Dashboard({ data }: Props) {
 
   const showHeatmap = reportType === "daily" || reportType === "weekly";
   const showDayOfWeek = reportType === "daily" && granularity === "daily";
+  const handleSyncedChartHoverIndexChange = useCallback(
+    (nextIndex: number | null, source: string | null = null) => {
+      setSyncedChartHoverState((current) =>
+        current.index === nextIndex && current.source === source
+          ? current
+          : { index: nextIndex, source },
+      );
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const handleDocumentMouseMove = (event: MouseEvent) => {
+      const target = event.target;
+      if (
+        target instanceof Node &&
+        syncedChartGroupRef.current &&
+        !syncedChartGroupRef.current.contains(target)
+      ) {
+        setSyncedChartHoverState({ index: null, source: null });
+      }
+    };
+    window.addEventListener("mousemove", handleDocumentMouseMove);
+    return () => window.removeEventListener("mousemove", handleDocumentMouseMove);
+  }, []);
 
   const displayLabel = canToggleGranularity
     ? GRANULARITY_REPORT_LABELS[granularity]
@@ -210,17 +246,31 @@ export function Dashboard({ data }: Props) {
             <>
               {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
               {showDayOfWeek && <DayOfWeekChart entries={filteredEntries} />}
-              <CostChart
-                entries={filteredEntries}
-                syncId={COST_TOKEN_CHART_SYNC_ID}
-                timeGranularity={timeGranularity}
-              />
-              <TokenChart
-                entries={filteredEntries}
-                syncId={COST_TOKEN_CHART_SYNC_ID}
-                timeGranularity={timeGranularity}
-              />
-              <CacheEfficiencyChart entries={filteredEntries} syncId={COST_TOKEN_CHART_SYNC_ID} />
+              <div ref={syncedChartGroupRef} className="space-y-4">
+                <CostChart
+                  entries={filteredEntries}
+                  syncId={COST_TOKEN_CHART_SYNC_ID}
+                  timeGranularity={timeGranularity}
+                  hoveredDataIndex={syncedChartHoverState.index}
+                  hoveredSyncSource={syncedChartHoverState.source}
+                  onHoverDataIndexChange={handleSyncedChartHoverIndexChange}
+                />
+                <TokenChart
+                  entries={filteredEntries}
+                  syncId={COST_TOKEN_CHART_SYNC_ID}
+                  timeGranularity={timeGranularity}
+                  hoveredDataIndex={syncedChartHoverState.index}
+                  hoveredSyncSource={syncedChartHoverState.source}
+                  onHoverDataIndexChange={handleSyncedChartHoverIndexChange}
+                />
+                <CacheEfficiencyChart
+                  entries={filteredEntries}
+                  syncId={COST_TOKEN_CHART_SYNC_ID}
+                  hoveredDataIndex={syncedChartHoverState.index}
+                  hoveredSyncSource={syncedChartHoverState.source}
+                  onHoverDataIndexChange={handleSyncedChartHoverIndexChange}
+                />
+              </div>
               {hasModelBreakdowns && <ModelBreakdown entries={filteredEntries} />}
             </>
           )}

@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "chart.js/auto";
 import type {
   Chart as ChartJsInstance,
@@ -26,15 +26,21 @@ import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import {
   asNumber,
+  createVerticalHoverLinePlugin,
   getChartJsColor,
+  getNearestDataIndexForClientX,
   getOrCreateExternalTooltipElement,
   positionExternalTooltip,
+  syncChartHoverState,
   withOpacity,
 } from "./chartjs-utils";
 
 interface Props {
   entries: NormalizedEntry[];
   syncId?: string;
+  hoveredDataIndex?: number | null;
+  hoveredSyncSource?: string | null;
+  onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }
 
 const RATE_SERIES = {
@@ -256,9 +262,18 @@ function buildChartJsOptions(): ChartOptions<"line"> {
   };
 }
 
-export function CacheEfficiencyChart({ entries, syncId }: Props) {
+export function CacheEfficiencyChart({
+  entries,
+  syncId,
+  hoveredDataIndex = null,
+  hoveredSyncSource = null,
+  onHoverDataIndexChange,
+}: Props) {
   void syncId;
   const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstanceRef = useRef<ChartJsInstance<"line"> | null>(null);
+  const hoveredDataIndexRef = useRef<number | null>(hoveredDataIndex);
+  hoveredDataIndexRef.current = hoveredDataIndex;
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [hiddenBreakdowns, setHiddenBreakdowns] = useState<Set<string>>(new Set());
   const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
@@ -296,6 +311,13 @@ export function CacheEfficiencyChart({ entries, syncId }: Props) {
     [chartData, isBreakdownView, visibleBreakdownSeries],
   );
   const chartJsOptions = useMemo(() => buildChartJsOptions(), []);
+  const hoverLinePlugin = useMemo(
+    () => createVerticalHoverLinePlugin<"line">(hoveredDataIndexRef),
+    [],
+  );
+  useEffect(() => {
+    syncChartHoverState(chartInstanceRef.current, hoveredDataIndex);
+  }, [hoveredDataIndex, hoveredSyncSource]);
   const handleViewModeChange = (nextMode: ViewMode) => {
     setViewMode(nextMode);
     setHiddenBreakdowns(new Set());
@@ -395,8 +417,22 @@ export function CacheEfficiencyChart({ entries, syncId }: Props) {
       </div>
 
       <Suspense fallback={<div className="h-80" />}>
-        <div className="relative h-80 overflow-visible">
-          <ReactChart type="line" data={chartJsData} options={chartJsOptions} />
+        <div
+          className="relative h-80 overflow-visible"
+          onMouseMove={(event) =>
+            onHoverDataIndexChange?.(
+              getNearestDataIndexForClientX(event.currentTarget, event.clientX, chartData.length),
+              "cache-efficiency",
+            )
+          }
+        >
+          <ReactChart
+            ref={chartInstanceRef}
+            type="line"
+            data={chartJsData}
+            options={chartJsOptions}
+            plugins={[hoverLinePlugin]}
+          />
         </div>
       </Suspense>
       {!isBreakdownView && <CacheEfficiencyLegend />}

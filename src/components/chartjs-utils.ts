@@ -1,4 +1,11 @@
-import type { Chart as ChartJsInstance, TooltipItem, TooltipModel } from "chart.js";
+import type {
+  ActiveDataPoint,
+  Chart as ChartJsInstance,
+  ChartType,
+  Plugin,
+  TooltipItem,
+  TooltipModel,
+} from "chart.js";
 
 export const CHART_JS_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#14b8a6", "#ef4444"];
 
@@ -96,4 +103,87 @@ export function getParsedTooltipValue(
     return Number.isFinite(value) ? value : null;
   }
   return null;
+}
+
+export function createVerticalHoverLinePlugin<TType extends ChartType>(dataIndexRef: {
+  readonly current: number | null;
+}): Plugin<TType> {
+  return {
+    id: "vertical-hover-line",
+    afterDatasetsDraw(chart) {
+      const dataIndex = dataIndexRef.current;
+      if (dataIndex == null) return;
+
+      const element = chart.getDatasetMeta(0).data[dataIndex] as { x?: number } | undefined;
+      const x = element?.x;
+      if (typeof x !== "number") return;
+
+      const { top, bottom, left, right } = chart.chartArea;
+      if (x < left || x > right) return;
+
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.strokeStyle = "rgba(59, 130, 246, 0.72)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, bottom);
+      ctx.stroke();
+      ctx.restore();
+    },
+  };
+}
+
+export function syncChartHoverState<TType extends ChartType>(
+  chart: ChartJsInstance<TType> | null,
+  dataIndex: number | null,
+) {
+  if (!chart) return;
+
+  if (dataIndex == null) {
+    chart.setActiveElements([]);
+    chart.tooltip?.setActiveElements([], {
+      x: (chart.chartArea.left + chart.chartArea.right) / 2,
+      y: (chart.chartArea.top + chart.chartArea.bottom) / 2,
+    });
+    chart.update("none");
+    return;
+  }
+
+  const activeElements: ActiveDataPoint[] = [];
+  for (let datasetIndex = 0; datasetIndex < chart.data.datasets.length; datasetIndex += 1) {
+    if (!chart.isDatasetVisible(datasetIndex)) continue;
+    const element = chart.getDatasetMeta(datasetIndex).data[dataIndex];
+    if (!element) continue;
+    activeElements.push({ datasetIndex, index: dataIndex });
+  }
+
+  const firstElement = chart.getDatasetMeta(0).data[dataIndex] as
+    | { x?: number; y?: number }
+    | undefined;
+  const x =
+    typeof firstElement?.x === "number"
+      ? firstElement.x
+      : (chart.chartArea.left + chart.chartArea.right) / 2;
+  const y =
+    typeof firstElement?.y === "number"
+      ? firstElement.y
+      : (chart.chartArea.top + chart.chartArea.bottom) / 2;
+
+  chart.setActiveElements(activeElements);
+  chart.tooltip?.setActiveElements(activeElements, { x, y });
+  chart.update("none");
+}
+
+export function getNearestDataIndexForClientX(
+  container: HTMLElement,
+  clientX: number,
+  dataLength: number,
+): number | null {
+  if (dataLength <= 0) return null;
+  const rect = container.getBoundingClientRect();
+  const ratio = (clientX - rect.left) / rect.width;
+  if (ratio < 0 || ratio > 1) return null;
+  return Math.min(dataLength - 1, Math.max(0, Math.round(ratio * (dataLength - 1))));
 }
