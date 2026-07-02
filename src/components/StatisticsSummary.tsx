@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import "chart.js/auto";
-import type { ChartData, ChartOptions, Plugin } from "chart.js";
+import type { Chart as ChartJsInstance, ChartData, ChartOptions, Plugin } from "chart.js";
 import { Line } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
@@ -593,6 +593,7 @@ function DistributionChart({
   breakdownKeys: string[];
   highlightedStat: HighlightedStat;
 }) {
+  const chartInstanceRef = useRef<ChartJsInstance<"line"> | null>(null);
   const chartData = useMemo(() => {
     const labeledValues =
       breakdownMode === "total"
@@ -643,6 +644,8 @@ function DistributionChart({
     ],
     [highlightedStat, meanHighlighted, meanRank, metricConfig, percentileValues, stats.mean],
   );
+  const referenceLinesRef = useRef<DistributionLine[]>(referenceLines);
+  referenceLinesRef.current = referenceLines;
   const distributionChartData = useMemo<ChartData<"line", DistributionPoint[], number>>(
     () => ({
       datasets: [
@@ -669,12 +672,13 @@ function DistributionChart({
     () => ({
       id: "distribution-reference-lines",
       afterDatasetsDraw(chart) {
+        const currentReferenceLines = referenceLinesRef.current;
         const xScale = chart.scales.x;
         const { top, bottom, right } = chart.chartArea;
         const ctx = chart.ctx;
         ctx.save();
         ctx.textBaseline = "top";
-        for (const [index, line] of referenceLines.entries()) {
+        for (const [index, line] of currentReferenceLines.entries()) {
           const x = xScale.getPixelForValue(line.rank);
           if (x < chart.chartArea.left || x > right) continue;
           ctx.globalAlpha = line.dimmed ? 0.5 : 1;
@@ -710,8 +714,11 @@ function DistributionChart({
         ctx.restore();
       },
     }),
-    [referenceLines],
+    [],
   );
+  useEffect(() => {
+    chartInstanceRef.current?.update("none");
+  }, [referenceLines]);
   const distributionOptions = useMemo<ChartOptions<"line">>(
     () => ({
       responsive: true,
@@ -790,6 +797,7 @@ function DistributionChart({
       <p className="text-xs text-text-secondary mb-2">Distribution (sorted ascending)</p>
       <div className="h-60">
         <Line
+          ref={chartInstanceRef}
           data={distributionChartData}
           options={distributionOptions}
           plugins={[referenceLinePlugin]}
