@@ -512,7 +512,7 @@ function CostAreaChart({
             callback(value) {
               return isStackedView && showPercent
                 ? `${(Number(value) * 100).toFixed(0)}%`
-                : `$${Number(value)}`;
+                : formatCost(Number(value));
             },
           },
         },
