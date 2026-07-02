@@ -18,7 +18,7 @@ import {
 import { collectModels, buildModelSeries, MODEL_COLORS } from "../utils/chart";
 import type { ChartDataSeries } from "../utils/chartData";
 import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
-import { formatCost, formatTokens, formatSkewness } from "../utils/format";
+import { formatCost, formatCostAxis, formatTokens, formatSkewness } from "../utils/format";
 import { formatCacheReadRate } from "../utils/cacheEfficiency";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
@@ -32,16 +32,21 @@ interface Props {
 interface MetricConfig {
   label: string;
   format: (v: number) => string;
+  axisFormat: (v: number) => string;
 }
 
 const METRICS: Record<StatMetricKey, MetricConfig> = {
-  cost: { label: "Cost", format: formatCost },
-  totalTokens: { label: "Total Tokens", format: formatTokens },
-  inputTokens: { label: "Input", format: formatTokens },
-  outputTokens: { label: "Output", format: formatTokens },
-  cacheCreationTokens: { label: "Cache Create", format: formatTokens },
-  cacheReadTokens: { label: "Cache Read", format: formatTokens },
-  cacheReadRate: { label: "Cache Read Rate", format: formatCacheReadRate },
+  cost: { label: "Cost", format: formatCost, axisFormat: formatCostAxis },
+  totalTokens: { label: "Total Tokens", format: formatTokens, axisFormat: formatTokens },
+  inputTokens: { label: "Input", format: formatTokens, axisFormat: formatTokens },
+  outputTokens: { label: "Output", format: formatTokens, axisFormat: formatTokens },
+  cacheCreationTokens: { label: "Cache Create", format: formatTokens, axisFormat: formatTokens },
+  cacheReadTokens: { label: "Cache Read", format: formatTokens, axisFormat: formatTokens },
+  cacheReadRate: {
+    label: "Cache Read Rate",
+    format: formatCacheReadRate,
+    axisFormat: formatCacheReadRate,
+  },
 };
 
 const METRIC_KEYS = Object.keys(METRICS) as StatMetricKey[];
@@ -769,7 +774,7 @@ function DistributionChart({
             color: "rgb(107, 114, 128)",
             font: { size: 11 },
             callback(value) {
-              return metricConfig.format(Number(value));
+              return metricConfig.axisFormat(Number(value));
             },
           },
         },

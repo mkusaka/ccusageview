@@ -6,6 +6,18 @@ export function formatCost(value: number): string {
   })}`;
 }
 
+// Format a USD cost value for chart axes with less precision as values grow
+export function formatCostAxis(value: number): string {
+  if (!Number.isFinite(value)) return "N/A";
+  const absValue = Math.abs(value);
+  const maximumFractionDigits =
+    absValue >= 10 ? 0 : absValue >= 1 ? 1 : absValue > 0 && absValue < 0.01 ? 4 : 2;
+  return `$${value.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  })}`;
+}
+
 // Format a large token count compactly (e.g. 45736126 -> "45.7M")
 export function formatTokens(value: number): string {
   if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(1)}B`;

@@ -11,7 +11,7 @@ import { Line } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { TimeGranularity } from "../utils/projection";
 import { formatProjectionMetadata, getProjectionMetrics } from "../utils/projection";
-import { formatCost } from "../utils/format";
+import { formatCost, formatCostAxis } from "../utils/format";
 import type { BreakdownMode } from "../utils/breakdown";
 import { collectModels, buildModelSeries, buildCostByModel, MODEL_COLORS } from "../utils/chart";
 import type { ChartDataSeries } from "../utils/chartData";
@@ -512,7 +512,7 @@ function CostAreaChart({
             callback(value) {
               return isStackedView && showPercent
                 ? `${(Number(value) * 100).toFixed(0)}%`
-                : formatCost(Number(value));
+                : formatCostAxis(Number(value));
             },
           },
         },

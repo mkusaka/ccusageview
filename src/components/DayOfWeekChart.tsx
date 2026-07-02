@@ -10,7 +10,7 @@ import type {
 import { Bar } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { BreakdownMode } from "../utils/breakdown";
-import { formatCost, formatTokens } from "../utils/format";
+import { formatCost, formatCostAxis, formatTokens } from "../utils/format";
 import { collectModels, buildModelSeries, shortenModelName, MODEL_COLORS } from "../utils/chart";
 import type { ChartDataSeries, MarkdownColumn } from "../utils/chartData";
 import { buildMarkdownSection, pickDataKeys, seriesToColumns } from "../utils/chartData";
@@ -90,13 +90,16 @@ function dayOfWeekReducer(state: DayOfWeekState, action: DayOfWeekAction): DayOf
   }
 }
 
-const METRICS: Record<DayOfWeekMetric, { label: string; format: (v: number) => string }> = {
-  cost: { label: "Cost", format: formatCost },
-  totalTokens: { label: "Total Tokens", format: formatTokens },
-  inputTokens: { label: "Input", format: formatTokens },
-  outputTokens: { label: "Output", format: formatTokens },
-  cacheCreationTokens: { label: "Cache Create", format: formatTokens },
-  cacheReadTokens: { label: "Cache Read", format: formatTokens },
+const METRICS: Record<
+  DayOfWeekMetric,
+  { label: string; format: (v: number) => string; axisFormat: (v: number) => string }
+> = {
+  cost: { label: "Cost", format: formatCost, axisFormat: formatCostAxis },
+  totalTokens: { label: "Total Tokens", format: formatTokens, axisFormat: formatTokens },
+  inputTokens: { label: "Input", format: formatTokens, axisFormat: formatTokens },
+  outputTokens: { label: "Output", format: formatTokens, axisFormat: formatTokens },
+  cacheCreationTokens: { label: "Cache Create", format: formatTokens, axisFormat: formatTokens },
+  cacheReadTokens: { label: "Cache Read", format: formatTokens, axisFormat: formatTokens },
 };
 
 const METRIC_KEYS = Object.keys(METRICS) as DayOfWeekMetric[];
@@ -442,7 +445,7 @@ function DayOfWeekBarChart({
             callback(value) {
               return isBreakdownView && showPercent
                 ? `${(Number(value) * 100).toFixed(0)}%`
-                : metricConfig.format(Number(value));
+                : metricConfig.axisFormat(Number(value));
             },
           },
         },

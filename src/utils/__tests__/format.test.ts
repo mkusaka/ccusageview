@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   formatCost,
+  formatCostAxis,
   formatTokens,
   formatDate,
   formatMonth,
@@ -18,6 +19,23 @@ describe("formatCost", () => {
   it("formats large values with commas", () => {
     expect(formatCost(1234.56)).toMatchInlineSnapshot(`"$1,234.56"`);
     expect(formatCost(99999.99)).toMatchInlineSnapshot(`"$99,999.99"`);
+  });
+});
+
+describe("formatCostAxis", () => {
+  it("reduces decimal precision as axis values grow", () => {
+    expect(formatCostAxis(0)).toBe("$0");
+    expect(formatCostAxis(1)).toBe("$1");
+    expect(formatCostAxis(1.5)).toBe("$1.5");
+    expect(formatCostAxis(1.25)).toBe("$1.3");
+    expect(formatCostAxis(12.5)).toBe("$13");
+    expect(formatCostAxis(1234.56)).toBe("$1,235");
+  });
+
+  it("preserves precision for very small non-zero axis values", () => {
+    expect(formatCostAxis(0.25)).toBe("$0.25");
+    expect(formatCostAxis(0.01)).toBe("$0.01");
+    expect(formatCostAxis(0.0025)).toBe("$0.0025");
   });
 });
 
