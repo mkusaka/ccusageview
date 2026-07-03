@@ -27,15 +27,17 @@ function getVisibleBreakdownMetricValue(
 
   if (key === "cacheReadRate") {
     let inputTokens = 0;
+    let cacheCreationTokens = 0;
     let cacheReadTokens = 0;
     for (const [name, metrics] of grouped.entries()) {
       if (!visibleModels.has(name)) continue;
       inputTokens += metrics.inputTokens;
+      cacheCreationTokens += metrics.cacheCreationTokens;
       cacheReadTokens += metrics.cacheReadTokens;
       found = true;
     }
     if (!found) return undefined;
-    return getCacheReadRate({ inputTokens, cacheReadTokens });
+    return getCacheReadRate({ inputTokens, cacheCreationTokens, cacheReadTokens });
   }
 
   let sum = 0;

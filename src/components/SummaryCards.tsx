@@ -23,9 +23,9 @@ export function SummaryCards({ totals, entryCount }: Props) {
     {
       label: "Cache Read Rate",
       value: formatCacheReadRate(cacheEfficiency.cacheReadRate),
-      subLabel: `Read ${formatTokens(cacheEfficiency.cacheReadTokens)} / Input+Read ${formatTokens(
-        cacheEfficiency.inputPlusCacheReadTokens,
-      )}`,
+      subLabel: `Read ${formatTokens(
+        cacheEfficiency.cacheReadTokens,
+      )} / Input+Create+Read ${formatTokens(cacheEfficiency.cacheEfficiencyDenominatorTokens)}`,
     },
     { label: "Entries", value: entryCount.toLocaleString("en-US") },
   ];

@@ -59,6 +59,7 @@ type CacheEfficiencyChartData = ChartData<"line", (number | null)[], string>;
 
 type CacheEfficiencyBreakdownSeries = ChartDataSeries & {
   inputKey: string;
+  cacheCreationKey: string;
   cacheReadKey: string;
   rateKey: string;
 };
@@ -70,8 +71,11 @@ function getVisibleBreakdownSeries(
   return series
     .filter((item) => !hiddenBreakdowns.has(item.key))
     .map((item) => ({
-      ...item,
+      key: item.key,
+      label: item.label,
+      color: item.color,
       inputKey: getCacheEfficiencyBreakdownDataKey(item.key, "inputTokens"),
+      cacheCreationKey: getCacheEfficiencyBreakdownDataKey(item.key, "cacheCreationTokens"),
       cacheReadKey: getCacheEfficiencyBreakdownDataKey(item.key, "cacheReadTokens"),
       rateKey: getCacheEfficiencyBreakdownDataKey(item.key, "cacheReadRate"),
     }));
@@ -339,6 +343,11 @@ export function CacheEfficiencyChart({
               ...visibleBreakdownSeries.flatMap((series) => [
                 { key: series.inputKey, label: `${series.label} Input`, align: "right" as const },
                 {
+                  key: series.cacheCreationKey,
+                  label: `${series.label} Cache Create`,
+                  align: "right" as const,
+                },
+                {
                   key: series.cacheReadKey,
                   label: `${series.label} Cache Read`,
                   align: "right" as const,
@@ -358,8 +367,13 @@ export function CacheEfficiencyChart({
             columns: [
               { key: "label", label: "Label" },
               { key: "inputTokens", label: "Input", align: "right" as const },
+              { key: "cacheCreationTokens", label: "Cache Create", align: "right" as const },
               { key: "cacheReadTokens", label: "Cache Read", align: "right" as const },
-              { key: "inputPlusCacheReadTokens", label: "Input+Read", align: "right" as const },
+              {
+                key: "cacheEfficiencyDenominatorTokens",
+                label: "Input+Create+Read",
+                align: "right" as const,
+              },
               { key: "cacheReadRate", label: "Cache Read Rate", align: "right" as const },
             ],
             rows: chartData as unknown as Record<string, unknown>[],
@@ -374,7 +388,10 @@ export function CacheEfficiencyChart({
           viewMode === "total" ? "Total" : viewMode === "model" ? "By Model" : "By Provider",
         ],
         ["Hidden breakdowns", Array.from(hiddenBreakdowns)],
-        ["Rate definition", "cacheReadTokens / (inputTokens + cacheReadTokens)"],
+        [
+          "Rate definition",
+          "cacheReadTokens / (inputTokens + cacheCreationTokens + cacheReadTokens)",
+        ],
       ],
       tables,
     });

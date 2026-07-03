@@ -222,7 +222,7 @@ describe("extractMetric", () => {
     expect(extractMetric([entry], "outputTokens")).toEqual([4]);
     expect(extractMetric([entry], "cacheCreationTokens")).toEqual([5]);
     expect(extractMetric([entry], "cacheReadTokens")).toEqual([6]);
-    expect(extractMetric([entry], "cacheReadRate")).toEqual([6 / 9]);
+    expect(extractMetric([entry], "cacheReadRate")).toEqual([6 / 14]);
   });
 
   it("skips cache read rate values with a zero denominator", () => {
@@ -607,22 +607,30 @@ describe("extractMetricForVisibleModels", () => {
     expect(result).toEqual([10]);
   });
 
-  it("computes cache read rate from visible model input and cache read totals", () => {
+  it("computes cache read rate from visible model input, cache create, and cache read totals", () => {
     const ents = [
       makeEntry("a", {
         modelBreakdowns: [
-          makeBreakdown("modelA", { inputTokens: 100, cacheReadTokens: 300 }),
-          makeBreakdown("modelB", { inputTokens: 900, cacheReadTokens: 100 }),
+          makeBreakdown("modelA", {
+            inputTokens: 100,
+            cacheCreationTokens: 50,
+            cacheReadTokens: 300,
+          }),
+          makeBreakdown("modelB", {
+            inputTokens: 900,
+            cacheCreationTokens: 100,
+            cacheReadTokens: 100,
+          }),
         ],
       }),
     ];
 
     expect(
       extractMetricForVisibleModels(ents, "cacheReadRate", new Set(["modelA"]), false),
-    ).toEqual([0.75]);
+    ).toEqual([300 / 450]);
     expect(
       extractMetricForVisibleModels(ents, "cacheReadRate", new Set(["modelA", "modelB"]), false),
-    ).toEqual([400 / 1_400]);
+    ).toEqual([400 / 1_550]);
   });
 
   it("computes cache read rate for visible providers", () => {
@@ -631,6 +639,7 @@ describe("extractMetricForVisibleModels", () => {
         modelBreakdowns: [
           makeBreakdown("claude-sonnet-4-20250514", {
             inputTokens: 100,
+            cacheCreationTokens: 50,
             cacheReadTokens: 300,
           }),
           makeBreakdown("gpt-5-codex", { inputTokens: 100, cacheReadTokens: 0 }),
@@ -646,7 +655,7 @@ describe("extractMetricForVisibleModels", () => {
       "provider",
     );
 
-    expect(result).toEqual([0.75]);
+    expect(result).toEqual([300 / 450]);
   });
 });
 
@@ -695,7 +704,11 @@ describe("extractMetricForVisibleModelsWithLabels", () => {
     const ents = [
       makeEntry("day1", {
         modelBreakdowns: [
-          makeBreakdown("modelA", { inputTokens: 100, cacheReadTokens: 300 }),
+          makeBreakdown("modelA", {
+            inputTokens: 100,
+            cacheCreationTokens: 50,
+            cacheReadTokens: 300,
+          }),
           makeBreakdown("modelB", { inputTokens: 100, cacheReadTokens: 0 }),
         ],
       }),
@@ -711,7 +724,7 @@ describe("extractMetricForVisibleModelsWithLabels", () => {
       false,
     );
 
-    expect(result).toEqual([{ label: "day1", value: 0.75 }]);
+    expect(result).toEqual([{ label: "day1", value: 300 / 450 }]);
   });
 });
 

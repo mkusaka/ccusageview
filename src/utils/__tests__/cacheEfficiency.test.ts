@@ -40,7 +40,7 @@ function makeBreakdown(
 }
 
 describe("calculateCacheEfficiency", () => {
-  it("computes cacheReadTokens / (inputTokens + cacheReadTokens)", () => {
+  it("computes cacheReadTokens / (inputTokens + cacheCreationTokens + cacheReadTokens)", () => {
     const result = calculateCacheEfficiency({
       inputTokens: 400,
       cacheReadTokens: 600,
@@ -51,8 +51,8 @@ describe("calculateCacheEfficiency", () => {
       inputTokens: 400,
       cacheReadTokens: 600,
       cacheCreationTokens: 100,
-      inputPlusCacheReadTokens: 1_000,
-      cacheReadRate: 0.6,
+      cacheEfficiencyDenominatorTokens: 1_100,
+      cacheReadRate: 600 / 1_100,
     });
   });
 
@@ -64,11 +64,11 @@ describe("calculateCacheEfficiency", () => {
     expect(getCacheReadRate({ inputTokens: 0, cacheReadTokens: 100 })).toBe(1);
   });
 
-  it("returns null when input + cache read denominator is 0", () => {
+  it("returns null when input + cache create + cache read denominator is 0", () => {
     expect(getCacheReadRate({ inputTokens: 0, cacheReadTokens: 0 })).toBeNull();
   });
 
-  it("does not include cache creation tokens in the rate denominator", () => {
+  it("includes cache creation tokens in the rate denominator", () => {
     const lowCreation = getCacheReadRate({
       inputTokens: 100,
       cacheReadTokens: 300,
@@ -81,7 +81,7 @@ describe("calculateCacheEfficiency", () => {
     });
 
     expect(lowCreation).toBe(0.75);
-    expect(highCreation).toBe(lowCreation);
+    expect(highCreation).toBe(300 / 10_400);
   });
 
   it("formats null as N/A and defined rates as percentages", () => {
@@ -126,15 +126,15 @@ describe("buildCacheEfficiencyChartDataForBreakdowns", () => {
         inputTokens: 100,
         cacheReadTokens: 300,
         cacheCreationTokens: 50,
-        inputPlusCacheReadTokens: 400,
-        cacheReadRate: 0.75,
+        cacheEfficiencyDenominatorTokens: 450,
+        cacheReadRate: 300 / 450,
       },
       {
         label: "day2",
         inputTokens: 200,
         cacheReadTokens: 0,
         cacheCreationTokens: 10,
-        inputPlusCacheReadTokens: 200,
+        cacheEfficiencyDenominatorTokens: 210,
         cacheReadRate: 0,
       },
     ]);
@@ -176,8 +176,8 @@ describe("buildCacheEfficiencyChartDataForBreakdowns", () => {
         inputTokens: 200,
         cacheReadTokens: 400,
         cacheCreationTokens: 60,
-        inputPlusCacheReadTokens: 600,
-        cacheReadRate: 400 / 600,
+        cacheEfficiencyDenominatorTokens: 660,
+        cacheReadRate: 400 / 660,
       },
     ]);
   });
@@ -197,8 +197,8 @@ describe("buildCacheEfficiencyChartDataForBreakdowns", () => {
         inputTokens: 100,
         cacheReadTokens: 300,
         cacheCreationTokens: 50,
-        inputPlusCacheReadTokens: 400,
-        cacheReadRate: 0.75,
+        cacheEfficiencyDenominatorTokens: 450,
+        cacheReadRate: 300 / 450,
       },
     ]);
 
@@ -208,7 +208,7 @@ describe("buildCacheEfficiencyChartDataForBreakdowns", () => {
         inputTokens: 0,
         cacheReadTokens: 0,
         cacheCreationTokens: 0,
-        inputPlusCacheReadTokens: 0,
+        cacheEfficiencyDenominatorTokens: 0,
         cacheReadRate: null,
       },
     ]);
@@ -222,10 +222,12 @@ describe("buildCacheEfficiencyChartDataByBreakdown", () => {
         modelBreakdowns: [
           makeBreakdown("modelA", {
             inputTokens: 100,
+            cacheCreationTokens: 50,
             cacheReadTokens: 300,
           }),
           makeBreakdown("modelB", {
             inputTokens: 900,
+            cacheCreationTokens: 100,
             cacheReadTokens: 100,
           }),
         ],
@@ -234,6 +236,7 @@ describe("buildCacheEfficiencyChartDataByBreakdown", () => {
         modelBreakdowns: [
           makeBreakdown("modelA", {
             inputTokens: 200,
+            cacheCreationTokens: 10,
             cacheReadTokens: 0,
           }),
         ],
@@ -246,15 +249,18 @@ describe("buildCacheEfficiencyChartDataByBreakdown", () => {
       {
         label: "day1",
         "modelA::inputTokens": 100,
+        "modelA::cacheCreationTokens": 50,
         "modelA::cacheReadTokens": 300,
-        "modelA::cacheReadRate": 0.75,
+        "modelA::cacheReadRate": 300 / 450,
         "modelB::inputTokens": 900,
+        "modelB::cacheCreationTokens": 100,
         "modelB::cacheReadTokens": 100,
-        "modelB::cacheReadRate": 0.1,
+        "modelB::cacheReadRate": 100 / 1_100,
       },
       {
         label: "day2",
         "modelA::inputTokens": 200,
+        "modelA::cacheCreationTokens": 10,
         "modelA::cacheReadTokens": 0,
         "modelA::cacheReadRate": 0,
       },
@@ -267,10 +273,12 @@ describe("buildCacheEfficiencyChartDataByBreakdown", () => {
         modelBreakdowns: [
           makeBreakdown("claude-sonnet-4-20250514", {
             inputTokens: 100,
+            cacheCreationTokens: 50,
             cacheReadTokens: 300,
           }),
           makeBreakdown("claude-haiku-3-20240307", {
             inputTokens: 100,
+            cacheCreationTokens: 10,
             cacheReadTokens: 100,
           }),
           makeBreakdown("gpt-5-codex", {
@@ -287,9 +295,11 @@ describe("buildCacheEfficiencyChartDataByBreakdown", () => {
       {
         label: "day1",
         "Anthropic::inputTokens": 200,
+        "Anthropic::cacheCreationTokens": 60,
         "Anthropic::cacheReadTokens": 400,
-        "Anthropic::cacheReadRate": 400 / 600,
+        "Anthropic::cacheReadRate": 400 / 660,
         "OpenAI::inputTokens": 500,
+        "OpenAI::cacheCreationTokens": 0,
         "OpenAI::cacheReadTokens": 0,
         "OpenAI::cacheReadRate": 0,
       },
@@ -318,15 +328,15 @@ describe("buildCacheEfficiencyChartData", () => {
         inputTokens: 100,
         cacheReadTokens: 300,
         cacheCreationTokens: 50,
-        inputPlusCacheReadTokens: 400,
-        cacheReadRate: 0.75,
+        cacheEfficiencyDenominatorTokens: 450,
+        cacheReadRate: 300 / 450,
       },
       {
         label: "day2",
         inputTokens: 200,
         cacheReadTokens: 0,
         cacheCreationTokens: 10,
-        inputPlusCacheReadTokens: 200,
+        cacheEfficiencyDenominatorTokens: 210,
         cacheReadRate: 0,
       },
     ]);
