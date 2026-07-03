@@ -89,9 +89,9 @@ function buildStatItems(
   stats: DescriptiveStats,
   format: (v: number) => string,
   sourceMap: Partial<Record<string, string[]>>,
+  options?: { includeSum?: boolean },
 ): StatItem[] {
   const items: StatItem[] = [
-    { label: "Sum", value: format(stats.sum) },
     { label: "Mean", value: format(stats.mean) },
     { label: "Median (P50)", value: format(stats.median) },
     { label: "Min", value: format(stats.min) },
@@ -119,6 +119,10 @@ function buildStatItems(
     },
     { label: "Skewness", value: formatSkewness(stats.skewness) },
   ];
+
+  if (options?.includeSum !== false) {
+    items.unshift({ label: "Sum", value: format(stats.sum) });
+  }
 
   for (const item of items) {
     const color = STAT_LABEL_COLORS[item.label];
@@ -203,7 +207,8 @@ export function StatisticsSummary({ entries }: Props) {
     return findStatSources(labeledValues, stats);
   }, [entries, metric, breakdownMode, visibleBreakdowns, includeOther, stats]);
 
-  const items = stats ? buildStatItems(stats, metricConfig.format, sourceMap) : [];
+  const includeSum = metric !== "cacheReadRate";
+  const items = stats ? buildStatItems(stats, metricConfig.format, sourceMap, { includeSum }) : [];
   const distributionData = useMemo(() => {
     if (!stats) return [];
     const labeledValues =
@@ -224,7 +229,6 @@ export function StatisticsSummary({ entries }: Props) {
 
     const statRows = [
       { stat: "Count", value: stats.count, formatted: String(stats.count) },
-      { stat: "Sum", value: stats.sum, formatted: metricConfig.format(stats.sum) },
       { stat: "Mean", value: stats.mean, formatted: metricConfig.format(stats.mean) },
       {
         stat: "Median (P50)",
@@ -302,6 +306,14 @@ export function StatisticsSummary({ entries }: Props) {
       },
     ];
 
+    if (includeSum) {
+      statRows.splice(1, 0, {
+        stat: "Sum",
+        value: stats.sum,
+        formatted: metricConfig.format(stats.sum),
+      });
+    }
+
     return buildMarkdownSection({
       title: "Statistics",
       metadata: [
@@ -338,7 +350,15 @@ export function StatisticsSummary({ entries }: Props) {
         },
       ],
     });
-  }, [breakdownMode, distributionData, hiddenBreakdowns, metricConfig, sourceMap, stats]);
+  }, [
+    breakdownMode,
+    distributionData,
+    hiddenBreakdowns,
+    includeSum,
+    metricConfig,
+    sourceMap,
+    stats,
+  ]);
   const markdownRegistration = useMemo(
     () =>
       stats
