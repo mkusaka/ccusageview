@@ -28,8 +28,8 @@ import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import {
   asNumber,
   createVerticalHoverLinePlugin,
+  getActiveDataIndex,
   getChartJsColor,
-  getNearestDataIndexForClientX,
   getOrCreateExternalTooltipElement,
   normalizeStackValue,
   positionExternalTooltip,
@@ -459,6 +459,9 @@ function TokenBarChart({
       animation: false,
       normalized: true,
       interaction: { mode: "index", intersect: false },
+      onHover(_event, elements) {
+        onHoverDataIndexChange?.(getActiveDataIndex(elements), "tokens");
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -496,7 +499,7 @@ function TokenBarChart({
         },
       },
     }),
-    [showPercent, sourceData, visibleKeys],
+    [onHoverDataIndexChange, showPercent, sourceData, visibleKeys],
   );
   const legendItems = isBreakdownView
     ? breakdownSeries.map((series, index) => ({
@@ -508,15 +511,7 @@ function TokenBarChart({
 
   return (
     <>
-      <div
-        className="relative h-96"
-        onMouseMove={(event) =>
-          onHoverDataIndexChange?.(
-            getNearestDataIndexForClientX(event.currentTarget, event.clientX, sourceData.length),
-            "tokens",
-          )
-        }
-      >
+      <div className="relative h-96">
         <Bar
           ref={chartInstanceRef}
           data={chartJsData}

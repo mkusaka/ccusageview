@@ -27,8 +27,8 @@ import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import {
   asNumber,
   createVerticalHoverLinePlugin,
+  getActiveDataIndex,
   getChartJsColor,
-  getNearestDataIndexForClientX,
   getOrCreateExternalTooltipElement,
   positionExternalTooltip,
   syncChartHoverState,
@@ -205,7 +205,9 @@ function buildChartJsData(
   return { labels, datasets };
 }
 
-function buildChartJsOptions(): ChartOptions<"line"> {
+function buildChartJsOptions(
+  onHoverDataIndexChange?: (index: number | null, source?: string | null) => void,
+): ChartOptions<"line"> {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -214,6 +216,9 @@ function buildChartJsOptions(): ChartOptions<"line"> {
     interaction: {
       mode: "index",
       intersect: false,
+    },
+    onHover(_event, elements) {
+      onHoverDataIndexChange?.(getActiveDataIndex(elements), "cache-efficiency");
     },
     plugins: {
       legend: {
@@ -314,7 +319,10 @@ export function CacheEfficiencyChart({
     () => buildChartJsData(chartData, isBreakdownView, visibleBreakdownSeries),
     [chartData, isBreakdownView, visibleBreakdownSeries],
   );
-  const chartJsOptions = useMemo(() => buildChartJsOptions(), []);
+  const chartJsOptions = useMemo(
+    () => buildChartJsOptions(onHoverDataIndexChange),
+    [onHoverDataIndexChange],
+  );
   const hoverLinePlugin = useMemo(
     () => createVerticalHoverLinePlugin<"line">(hoveredDataIndexRef),
     [],
@@ -434,15 +442,7 @@ export function CacheEfficiencyChart({
       </div>
 
       <Suspense fallback={<div className="h-80" />}>
-        <div
-          className="relative h-80 overflow-visible"
-          onMouseMove={(event) =>
-            onHoverDataIndexChange?.(
-              getNearestDataIndexForClientX(event.currentTarget, event.clientX, chartData.length),
-              "cache-efficiency",
-            )
-          }
-        >
+        <div className="relative h-80 overflow-visible">
           <ReactChart
             ref={chartInstanceRef}
             type="line"

@@ -23,8 +23,8 @@ import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import {
   asNumber,
   createVerticalHoverLinePlugin,
+  getActiveDataIndex,
   getChartJsColor,
-  getNearestDataIndexForClientX,
   getOrCreateExternalTooltipElement,
   normalizeStackValue,
   positionExternalTooltip,
@@ -481,6 +481,9 @@ function CostAreaChart({
       animation: false,
       normalized: true,
       interaction: { mode: "index", intersect: false },
+      onHover(_event, elements) {
+        onHoverDataIndexChange?.(getActiveDataIndex(elements), "cost");
+      },
       plugins: {
         legend: { display: false },
         tooltip: {
@@ -518,7 +521,7 @@ function CostAreaChart({
         },
       },
     }),
-    [isStackedView, shouldStack, showPercent, sourceData, visibleKeys],
+    [isStackedView, onHoverDataIndexChange, shouldStack, showPercent, sourceData, visibleKeys],
   );
   const legendItems = isTokenTypeView
     ? TOKEN_TYPE_COST_SERIES.map((series) => ({
@@ -536,15 +539,7 @@ function CostAreaChart({
 
   return (
     <>
-      <div
-        className="relative h-80"
-        onMouseMove={(event) =>
-          onHoverDataIndexChange?.(
-            getNearestDataIndexForClientX(event.currentTarget, event.clientX, sourceData.length),
-            "cost",
-          )
-        }
-      >
+      <div className="relative h-80">
         <Line
           ref={chartInstanceRef}
           data={chartJsData}

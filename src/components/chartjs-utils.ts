@@ -176,14 +176,7 @@ export function syncChartHoverState<TType extends ChartType>(
   chart.update("none");
 }
 
-export function getNearestDataIndexForClientX(
-  container: HTMLElement,
-  clientX: number,
-  dataLength: number,
-): number | null {
-  if (dataLength <= 0) return null;
-  const rect = container.getBoundingClientRect();
-  const ratio = (clientX - rect.left) / rect.width;
-  if (ratio < 0 || ratio > 1) return null;
-  return Math.min(dataLength - 1, Math.max(0, Math.round(ratio * (dataLength - 1))));
+export function getActiveDataIndex(elements: readonly { index?: number }[]): number | null {
+  const index = elements[0]?.index;
+  return typeof index === "number" && Number.isInteger(index) ? index : null;
 }
