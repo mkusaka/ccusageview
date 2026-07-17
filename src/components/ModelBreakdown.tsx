@@ -5,6 +5,7 @@ import { Doughnut } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import { aggregateBreakdowns, type AggregatedBreakdown } from "../utils/aggregate";
 import type { BreakdownMode } from "../utils/breakdown";
+import { formatCacheReadRate, getCacheReadRate } from "../utils/cacheEfficiency";
 import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatTokens } from "../utils/format";
 import {
@@ -35,7 +36,7 @@ interface TableColumn {
   label: string;
   align: "left" | "right";
   render: (row: AggregatedBreakdown) => string;
-  sortValue: (row: AggregatedBreakdown) => number | string;
+  sortValue: (row: AggregatedBreakdown) => number | string | null;
 }
 
 function getTableColumns(mode: BreakdownMode): TableColumn[] {
@@ -76,6 +77,13 @@ function getTableColumns(mode: BreakdownMode): TableColumn[] {
       sortValue: (row) => row.cacheReadTokens,
     },
     {
+      key: "cacheReadRate",
+      label: "Cache Rate",
+      align: "right",
+      render: (row) => formatCacheReadRate(getCacheReadRate(row)),
+      sortValue: (row) => getCacheReadRate(row),
+    },
+    {
       key: "cost",
       label: "Cost",
       align: "right",
@@ -106,6 +114,9 @@ export function ModelBreakdown({ entries }: Props) {
     return rows.toSorted((a, b) => {
       const left = column.sortValue(a);
       const right = column.sortValue(b);
+      if (left == null && right == null) return 0;
+      if (left == null) return 1;
+      if (right == null) return -1;
       const comparison = left < right ? -1 : left > right ? 1 : 0;
       return sortDir === "asc" ? comparison : -comparison;
     });
@@ -164,6 +175,14 @@ export function ModelBreakdown({ entries }: Props) {
     }),
     [metricConfig, pieData],
   );
+  const markdownRows = useMemo(
+    () =>
+      sortedRows.map((row) => ({
+        ...row,
+        cacheReadRate: getCacheReadRate(row),
+      })),
+    [sortedRows],
+  );
   const chartMarkdown = useMemo(
     () =>
       buildMarkdownSection({
@@ -190,20 +209,22 @@ export function ModelBreakdown({ entries }: Props) {
               { key: "outputTokens", label: "Output", align: "right" },
               { key: "cacheCreationTokens", label: "Cache Create", align: "right" },
               { key: "cacheReadTokens", label: "Cache Read", align: "right" },
+              { key: "cacheReadRate", label: "Cache Rate", align: "right" },
               { key: "cost", label: "Cost", align: "right" },
             ],
-            rows: pickDataKeys(sortedRows, [
+            rows: pickDataKeys(markdownRows, [
               "label",
               "inputTokens",
               "outputTokens",
               "cacheCreationTokens",
               "cacheReadTokens",
+              "cacheReadRate",
               "cost",
             ]),
           },
         ],
       }),
-    [metricConfig.label, mode, pieData, sortCol, sortDir, sortedRows],
+    [markdownRows, metricConfig.label, mode, pieData, sortCol, sortDir],
   );
   const markdownRegistration = useMemo(
     () =>

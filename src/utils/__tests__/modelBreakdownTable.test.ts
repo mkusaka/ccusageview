@@ -41,6 +41,19 @@ describe("getNextModelBreakdownSortState", () => {
     });
   });
 
+  it("sorts cache read rate descending without changing the pie metric", () => {
+    const current = getNextModelBreakdownSortState(
+      createInitialModelBreakdownSortState(),
+      "outputTokens",
+    );
+
+    expect(getNextModelBreakdownSortState(current, "cacheReadRate")).toEqual({
+      sortCol: "cacheReadRate",
+      sortDir: "desc",
+      metric: "outputTokens",
+    });
+  });
+
   it("toggles the direction when the same column is clicked repeatedly", () => {
     const current = getNextModelBreakdownSortState(createInitialModelBreakdownSortState(), "label");
 

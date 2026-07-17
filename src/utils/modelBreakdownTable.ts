@@ -7,7 +7,7 @@ const MODEL_BREAKDOWN_METRICS = [
 ] as const;
 
 export type ModelBreakdownMetric = (typeof MODEL_BREAKDOWN_METRICS)[number];
-export type ModelBreakdownSortKey = "label" | ModelBreakdownMetric;
+export type ModelBreakdownSortKey = "label" | "cacheReadRate" | ModelBreakdownMetric;
 type ModelBreakdownSortDir = "asc" | "desc";
 
 export interface ModelBreakdownSortState {
@@ -35,11 +35,11 @@ export function getNextModelBreakdownSortState(
     };
   }
 
-  if (nextSortCol === "label") {
+  if (nextSortCol === "label" || nextSortCol === "cacheReadRate") {
     return {
       ...current,
       sortCol: nextSortCol,
-      sortDir: "asc",
+      sortDir: nextSortCol === "label" ? "asc" : "desc",
     };
   }
 
