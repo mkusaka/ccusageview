@@ -27,7 +27,7 @@
   "dependencies": {
     "chart.js": "^4.5.1",
     "hono": "^4.11.9",
-    "nanoid": "^5.1.6",
+    "nanoid": "^6.0.0",
     "react-chartjs-2": "^5.3.1"
   },
   "devDependencies": {
