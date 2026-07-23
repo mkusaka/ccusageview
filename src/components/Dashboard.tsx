@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReportType } from "../types";
 import type { DashboardData } from "../utils/normalize";
 import type { TimeGranularity } from "../utils/projection";
@@ -88,7 +88,6 @@ export function Dashboard({ data }: Props) {
     index: null,
     source: null,
   });
-  const syncedChartGroupRef = useRef<HTMLDivElement>(null);
   const prevEntries = useRef(entries);
   if (entries !== prevEntries.current) {
     prevEntries.current = entries;
@@ -124,21 +123,9 @@ export function Dashboard({ data }: Props) {
     },
     [],
   );
-
-  useEffect(() => {
-    const handleDocumentMouseMove = (event: MouseEvent) => {
-      const target = event.target;
-      if (
-        target instanceof Node &&
-        syncedChartGroupRef.current &&
-        !syncedChartGroupRef.current.contains(target)
-      ) {
-        setSyncedChartHoverState({ index: null, source: null });
-      }
-    };
-    window.addEventListener("mousemove", handleDocumentMouseMove);
-    return () => window.removeEventListener("mousemove", handleDocumentMouseMove);
-  }, []);
+  const handleSyncedChartGroupMouseLeave = useCallback(() => {
+    handleSyncedChartHoverIndexChange(null);
+  }, [handleSyncedChartHoverIndexChange]);
 
   const displayLabel = canToggleGranularity
     ? GRANULARITY_REPORT_LABELS[granularity]
@@ -246,7 +233,7 @@ export function Dashboard({ data }: Props) {
             <>
               {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
               {showDayOfWeek && <DayOfWeekChart entries={filteredEntries} />}
-              <div ref={syncedChartGroupRef} className="space-y-4">
+              <div className="space-y-4" onMouseLeave={handleSyncedChartGroupMouseLeave}>
                 <CostChart
                   entries={filteredEntries}
                   syncId={COST_TOKEN_CHART_SYNC_ID}

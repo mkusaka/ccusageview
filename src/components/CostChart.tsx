@@ -22,12 +22,15 @@ import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import {
   asNumber,
+  buildExternalTooltipSignature,
   createVerticalHoverLinePlugin,
   getActiveDataIndex,
   getChartJsColor,
   getOrCreateExternalTooltipElement,
+  getParsedTooltipValue,
   normalizeStackValue,
   positionExternalTooltip,
+  shouldSyncChartHover,
   syncChartHoverState,
   withOpacity,
 } from "./chartjs-utils";
@@ -415,6 +418,7 @@ function CostAreaChart({
     [],
   );
   useEffect(() => {
+    if (!shouldSyncChartHover(hoveredSyncSource, "cost")) return;
     syncChartHoverState(chartInstanceRef.current, hoveredDataIndex);
   }, [hoveredDataIndex, hoveredSyncSource]);
   const chartJsData = useMemo<CostChartJsData>(() => {
@@ -482,7 +486,9 @@ function CostAreaChart({
       normalized: true,
       interaction: { mode: "index", intersect: false },
       onHover(_event, elements) {
-        onHoverDataIndexChange?.(getActiveDataIndex(elements), "cost");
+        const nextIndex = getActiveDataIndex(elements);
+        hoveredDataIndexRef.current = nextIndex;
+        onHoverDataIndexChange?.(nextIndex, "cost");
       },
       plugins: {
         legend: { display: false },
@@ -573,45 +579,58 @@ function renderCostTooltip(
     tooltipEl.style.opacity = "0";
     return;
   }
-  tooltipEl.replaceChildren();
-  const title = document.createElement("div");
-  title.textContent = tooltip.title.join(" ");
-  title.style.fontWeight = "600";
-  title.style.marginBottom = "6px";
-  tooltipEl.appendChild(title);
-  const body = document.createElement("div");
-  body.style.display = "grid";
-  body.style.gridTemplateColumns = items.length > 10 ? "repeat(2, minmax(260px, 1fr))" : "1fr";
-  body.style.columnGap = "12px";
-  body.style.rowGap = "3px";
   const row = sourceData[items[0]?.dataIndex ?? 0] as Record<string, unknown> | undefined;
   const total = row ? visibleKeys.reduce((sum, key) => sum + (asNumber(row[key]) ?? 0), 0) : 0;
-  for (const item of items) {
-    const keyIndex =
-      visibleKeys.length > 0 ? item.datasetIndex % visibleKeys.length : item.datasetIndex;
-    const key = visibleKeys[keyIndex] ?? "";
-    const isProjectionItem = item.datasetIndex >= visibleKeys.length;
-    const line = document.createElement("div");
-    line.style.display = "flex";
-    line.style.alignItems = "center";
-    line.style.gap = "6px";
-    const marker = document.createElement("span");
-    marker.style.width = "8px";
-    marker.style.height = "8px";
-    marker.style.flex = "0 0 auto";
-    marker.style.background = String(item.dataset.borderColor ?? item.dataset.backgroundColor);
-    const raw = isProjectionItem ? Number(item.parsed.y ?? 0) : (asNumber(row?.[key]) ?? 0);
-    const value =
-      !isProjectionItem && showPercent && total > 0
-        ? `${((raw / total) * 100).toFixed(1)}% (${formatCost(raw)})`
-        : formatCost(raw);
-    const text = document.createElement("span");
-    text.textContent = `${item.dataset.label}: ${value}`;
-    text.style.whiteSpace = "nowrap";
-    line.append(marker, text);
-    body.appendChild(line);
+  const signature = buildExternalTooltipSignature(
+    tooltip.title,
+    items.map((item) => ({
+      dataIndex: item.dataIndex,
+      datasetIndex: item.datasetIndex,
+      value: getParsedTooltipValue(item),
+      label: item.dataset.label ?? "",
+      color: String(item.dataset.borderColor ?? item.dataset.backgroundColor),
+    })),
+  );
+  if (tooltipEl.dataset.chartjsTooltipSignature !== signature) {
+    tooltipEl.replaceChildren();
+    const title = document.createElement("div");
+    title.textContent = tooltip.title.join(" ");
+    title.style.fontWeight = "600";
+    title.style.marginBottom = "6px";
+    tooltipEl.appendChild(title);
+    const body = document.createElement("div");
+    body.style.display = "grid";
+    body.style.gridTemplateColumns = items.length > 10 ? "repeat(2, minmax(260px, 1fr))" : "1fr";
+    body.style.columnGap = "12px";
+    body.style.rowGap = "3px";
+    for (const item of items) {
+      const keyIndex =
+        visibleKeys.length > 0 ? item.datasetIndex % visibleKeys.length : item.datasetIndex;
+      const key = visibleKeys[keyIndex] ?? "";
+      const isProjectionItem = item.datasetIndex >= visibleKeys.length;
+      const line = document.createElement("div");
+      line.style.display = "flex";
+      line.style.alignItems = "center";
+      line.style.gap = "6px";
+      const marker = document.createElement("span");
+      marker.style.width = "8px";
+      marker.style.height = "8px";
+      marker.style.flex = "0 0 auto";
+      marker.style.background = String(item.dataset.borderColor ?? item.dataset.backgroundColor);
+      const raw = isProjectionItem ? Number(item.parsed.y ?? 0) : (asNumber(row?.[key]) ?? 0);
+      const value =
+        !isProjectionItem && showPercent && total > 0
+          ? `${((raw / total) * 100).toFixed(1)}% (${formatCost(raw)})`
+          : formatCost(raw);
+      const text = document.createElement("span");
+      text.textContent = `${item.dataset.label}: ${value}`;
+      text.style.whiteSpace = "nowrap";
+      line.append(marker, text);
+      body.appendChild(line);
+    }
+    tooltipEl.appendChild(body);
+    tooltipEl.dataset.chartjsTooltipSignature = signature;
   }
-  tooltipEl.appendChild(body);
   positionExternalTooltip(chart, tooltip, tooltipEl);
 }
 

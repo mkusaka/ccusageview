@@ -26,11 +26,14 @@ import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import {
   asNumber,
+  buildExternalTooltipSignature,
   createVerticalHoverLinePlugin,
   getActiveDataIndex,
   getChartJsColor,
   getOrCreateExternalTooltipElement,
+  getParsedTooltipValue,
   positionExternalTooltip,
+  shouldSyncChartHover,
   syncChartHoverState,
   withOpacity,
 } from "./chartjs-utils";
@@ -116,43 +119,56 @@ function renderExternalTooltip({
     return;
   }
 
-  tooltipEl.replaceChildren();
+  const signature = buildExternalTooltipSignature(
+    tooltip.title,
+    items.map((item) => ({
+      dataIndex: item.dataIndex,
+      datasetIndex: item.datasetIndex,
+      value: getParsedTooltipValue(item),
+      label: item.dataset.label ?? "",
+      color: String(item.dataset.borderColor ?? item.dataset.backgroundColor),
+    })),
+  );
+  if (tooltipEl.dataset.chartjsTooltipSignature !== signature) {
+    tooltipEl.replaceChildren();
 
-  const title = document.createElement("div");
-  title.textContent = tooltip.title.join(" ");
-  title.style.fontWeight = "600";
-  title.style.marginBottom = "6px";
-  tooltipEl.appendChild(title);
+    const title = document.createElement("div");
+    title.textContent = tooltip.title.join(" ");
+    title.style.fontWeight = "600";
+    title.style.marginBottom = "6px";
+    tooltipEl.appendChild(title);
 
-  const body = document.createElement("div");
-  body.style.display = "grid";
-  body.style.gridTemplateColumns = items.length > 10 ? "repeat(2, minmax(300px, 1fr))" : "1fr";
-  body.style.columnGap = "12px";
-  body.style.rowGap = "3px";
+    const body = document.createElement("div");
+    body.style.display = "grid";
+    body.style.gridTemplateColumns = items.length > 10 ? "repeat(2, minmax(300px, 1fr))" : "1fr";
+    body.style.columnGap = "12px";
+    body.style.rowGap = "3px";
 
-  for (const item of items) {
-    const row = document.createElement("div");
-    row.style.display = "flex";
-    row.style.alignItems = "center";
-    row.style.gap = "6px";
-    row.style.minWidth = "0";
+    for (const item of items) {
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.gap = "6px";
+      row.style.minWidth = "0";
 
-    const marker = document.createElement("span");
-    marker.style.width = "8px";
-    marker.style.height = "8px";
-    marker.style.flex = "0 0 auto";
-    marker.style.background = String(item.dataset.borderColor ?? item.dataset.backgroundColor);
+      const marker = document.createElement("span");
+      marker.style.width = "8px";
+      marker.style.height = "8px";
+      marker.style.flex = "0 0 auto";
+      marker.style.background = String(item.dataset.borderColor ?? item.dataset.backgroundColor);
 
-    const text = document.createElement("span");
-    text.textContent = formatTooltipItem(item);
-    text.style.minWidth = "0";
-    text.style.whiteSpace = "nowrap";
+      const text = document.createElement("span");
+      text.textContent = formatTooltipItem(item);
+      text.style.minWidth = "0";
+      text.style.whiteSpace = "nowrap";
 
-    row.append(marker, text);
-    body.appendChild(row);
+      row.append(marker, text);
+      body.appendChild(row);
+    }
+
+    tooltipEl.appendChild(body);
+    tooltipEl.dataset.chartjsTooltipSignature = signature;
   }
-
-  tooltipEl.appendChild(body);
 
   positionExternalTooltip(chart, tooltip, tooltipEl);
 }
@@ -207,6 +223,7 @@ function buildChartJsData(
 
 function buildChartJsOptions(
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void,
+  hoveredDataIndexRef?: { current: number | null },
 ): ChartOptions<"line"> {
   return {
     responsive: true,
@@ -218,7 +235,9 @@ function buildChartJsOptions(
       intersect: false,
     },
     onHover(_event, elements) {
-      onHoverDataIndexChange?.(getActiveDataIndex(elements), "cache-efficiency");
+      const nextIndex = getActiveDataIndex(elements);
+      if (hoveredDataIndexRef) hoveredDataIndexRef.current = nextIndex;
+      onHoverDataIndexChange?.(nextIndex, "cache-efficiency");
     },
     plugins: {
       legend: {
@@ -320,7 +339,7 @@ export function CacheEfficiencyChart({
     [chartData, isBreakdownView, visibleBreakdownSeries],
   );
   const chartJsOptions = useMemo(
-    () => buildChartJsOptions(onHoverDataIndexChange),
+    () => buildChartJsOptions(onHoverDataIndexChange, hoveredDataIndexRef),
     [onHoverDataIndexChange],
   );
   const hoverLinePlugin = useMemo(
@@ -328,6 +347,7 @@ export function CacheEfficiencyChart({
     [],
   );
   useEffect(() => {
+    if (!shouldSyncChartHover(hoveredSyncSource, "cache-efficiency")) return;
     syncChartHoverState(chartInstanceRef.current, hoveredDataIndex);
   }, [hoveredDataIndex, hoveredSyncSource]);
   const handleViewModeChange = (nextMode: ViewMode) => {

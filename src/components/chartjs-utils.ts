@@ -67,9 +67,9 @@ export function getOrCreateExternalTooltipElement(
   return tooltipEl;
 }
 
-export function positionExternalTooltip(
+export function positionExternalTooltip<TType extends "bar" | "line" | "doughnut">(
   chart: ChartJsInstance,
-  tooltip: TooltipModel<"bar" | "line" | "doughnut">,
+  tooltip: TooltipModel<TType>,
   tooltipEl: HTMLDivElement,
 ) {
   const parent = chart.canvas.parentNode as HTMLElement;
@@ -93,8 +93,8 @@ export function positionExternalTooltip(
   tooltipEl.style.transform = "translateX(-50%)";
 }
 
-export function getParsedTooltipValue(
-  item: TooltipItem<"bar" | "line" | "doughnut">,
+export function getParsedTooltipValue<TType extends "bar" | "line" | "doughnut">(
+  item: TooltipItem<TType>,
 ): number | null {
   const parsed = item.parsed as number | { y?: unknown } | null;
   if (typeof parsed === "number") return Number.isFinite(parsed) ? parsed : null;
@@ -179,4 +179,26 @@ export function syncChartHoverState<TType extends ChartType>(
 export function getActiveDataIndex(elements: readonly { index?: number }[]): number | null {
   const index = elements[0]?.index;
   return typeof index === "number" && Number.isInteger(index) ? index : null;
+}
+
+export function shouldSyncChartHover(
+  hoveredSyncSource: string | null,
+  chartSource: string,
+): boolean {
+  return hoveredSyncSource !== chartSource;
+}
+
+export interface ExternalTooltipSignatureItem {
+  dataIndex: number;
+  datasetIndex: number;
+  value: number | null;
+  label: string;
+  color: string;
+}
+
+export function buildExternalTooltipSignature(
+  title: readonly string[],
+  items: readonly ExternalTooltipSignatureItem[],
+): string {
+  return JSON.stringify([title, items]);
 }
