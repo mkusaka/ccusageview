@@ -24,6 +24,7 @@ import { buildMarkdownSection } from "../utils/chartData";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import { SeriesLegend } from "./SeriesLegend";
 import {
   asNumber,
   buildExternalTooltipSignature,
@@ -478,6 +479,7 @@ export function CacheEfficiencyChart({
           breakdownSeries={breakdownSeries}
           hiddenBreakdowns={hiddenBreakdowns}
           toggleBreakdown={toggleBreakdown}
+          onHiddenBreakdownsChange={setHiddenBreakdowns}
         />
       )}
     </div>
@@ -506,39 +508,25 @@ function CacheEfficiencyBreakdownLegend({
   breakdownSeries,
   hiddenBreakdowns,
   toggleBreakdown,
+  onHiddenBreakdownsChange,
 }: {
   breakdownSeries: ChartDataSeries[];
   hiddenBreakdowns: Set<string>;
   toggleBreakdown: (key: string) => void;
+  onHiddenBreakdownsChange: (hiddenBreakdowns: Set<string>) => void;
 }) {
   if (breakdownSeries.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
-      {breakdownSeries.map((series) => (
-        <button
-          key={series.key}
-          type="button"
-          onClick={() => toggleBreakdown(series.key)}
-          className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-          style={{
-            opacity: hiddenBreakdowns.has(series.key) ? 0.3 : 1,
-            fontSize: "inherit",
-            color: "inherit",
-            textDecoration: hiddenBreakdowns.has(series.key) ? "line-through" : "none",
-          }}
-        >
-          <span
-            style={{
-              width: 10,
-              height: 10,
-              backgroundColor: series.color,
-              display: "inline-block",
-            }}
-          />
-          <span style={{ color: "var(--color-text-secondary)" }}>{series.label}</span>
-        </button>
-      ))}
-    </div>
+    <SeriesLegend
+      items={breakdownSeries.map((series) => ({
+        key: series.key,
+        label: series.label,
+        color: series.color ?? "",
+      }))}
+      hiddenSeries={hiddenBreakdowns}
+      onToggleSeries={toggleBreakdown}
+      onHiddenSeriesChange={onHiddenBreakdownsChange}
+    />
   );
 }

@@ -24,6 +24,7 @@ import {
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import { SeriesLegend } from "./SeriesLegend";
 import {
   asNumber,
   getChartJsColor,
@@ -56,7 +57,8 @@ type DayOfWeekAction =
   | { type: "setAggregation"; aggregation: DayOfWeekAggregation }
   | { type: "setViewMode"; viewMode: ViewMode }
   | { type: "togglePercent" }
-  | { type: "toggleSeries"; key: string };
+  | { type: "toggleSeries"; key: string }
+  | { type: "setHiddenSeries"; hiddenSeries: Set<string> };
 
 const INITIAL_DAY_OF_WEEK_STATE: DayOfWeekState = {
   metric: "cost",
@@ -87,6 +89,8 @@ function dayOfWeekReducer(state: DayOfWeekState, action: DayOfWeekAction): DayOf
       else hiddenSeries.add(action.key);
       return { ...state, hiddenSeries };
     }
+    case "setHiddenSeries":
+      return { ...state, hiddenSeries: action.hiddenSeries };
   }
 }
 
@@ -336,6 +340,9 @@ export function DayOfWeekChart({ entries }: Props) {
         metricConfig={metricConfig}
         showPercent={showPercent}
         toggleSeries={toggleSeries}
+        onHiddenSeriesChange={(nextHiddenSeries) =>
+          dispatch({ type: "setHiddenSeries", hiddenSeries: nextHiddenSeries })
+        }
       />
     </div>
   );
@@ -352,6 +359,7 @@ function DayOfWeekBarChart({
   metricConfig,
   showPercent,
   toggleSeries,
+  onHiddenSeriesChange,
 }: {
   aggregation: DayOfWeekAggregation;
   breakdownData: DayOfWeekBreakdownData;
@@ -363,6 +371,7 @@ function DayOfWeekBarChart({
   metricConfig: (typeof METRICS)[DayOfWeekMetric];
   showPercent: boolean;
   toggleSeries: (key: string) => void;
+  onHiddenSeriesChange: (hiddenSeries: Set<string>) => void;
 }) {
   const sourceData = useMemo(
     () => (isBreakdownView ? breakdownData : data) as DayOfWeekChartRow[],
@@ -469,32 +478,16 @@ function DayOfWeekBarChart({
         <Bar data={chartJsData} options={chartJsOptions} />
       </div>
       {isBreakdownView && (
-        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
-          {breakdownSeries.map((series) => (
-            <button
-              key={series.key}
-              type="button"
-              onClick={() => toggleSeries(series.key)}
-              className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-              style={{
-                opacity: hiddenSeries.has(series.key) ? 0.3 : 1,
-                fontSize: "inherit",
-                color: "inherit",
-                textDecoration: hiddenSeries.has(series.key) ? "line-through" : "none",
-              }}
-            >
-              <span
-                style={{
-                  width: 10,
-                  height: 10,
-                  backgroundColor: series.color,
-                  display: "inline-block",
-                }}
-              />
-              <span style={{ color: "var(--color-text-secondary)" }}>{series.label}</span>
-            </button>
-          ))}
-        </div>
+        <SeriesLegend
+          items={breakdownSeries.map((series) => ({
+            key: series.key,
+            label: series.label,
+            color: series.color ?? "",
+          }))}
+          hiddenSeries={hiddenSeries}
+          onToggleSeries={toggleSeries}
+          onHiddenSeriesChange={onHiddenSeriesChange}
+        />
       )}
     </>
   );

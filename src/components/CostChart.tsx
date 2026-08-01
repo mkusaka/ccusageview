@@ -20,6 +20,7 @@ import { buildCostByTokenType } from "../utils/pricing";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import { SeriesLegend } from "./SeriesLegend";
 import {
   asNumber,
   buildExternalTooltipSignature,
@@ -331,6 +332,7 @@ export function CostChart({
         tokenTypeCostData={tokenTypeCostData}
         timeGranularity={timeGranularity}
         toggleSeries={toggleSeries}
+        onHiddenSeriesChange={setHiddenSeries}
         hoveredDataIndex={hoveredDataIndex}
         hoveredSyncSource={hoveredSyncSource}
         onHoverDataIndexChange={onHoverDataIndexChange}
@@ -351,6 +353,7 @@ function CostAreaChart({
   tokenTypeCostData,
   timeGranularity,
   toggleSeries,
+  onHiddenSeriesChange,
   hoveredDataIndex,
   hoveredSyncSource,
   onHoverDataIndexChange,
@@ -366,6 +369,7 @@ function CostAreaChart({
   tokenTypeCostData: TokenTypeCostData;
   timeGranularity?: TimeGranularity;
   toggleSeries: (key: string) => void;
+  onHiddenSeriesChange: (hiddenSeries: Set<string>) => void;
   hoveredDataIndex: number | null;
   hoveredSyncSource: string | null;
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
@@ -532,13 +536,13 @@ function CostAreaChart({
   const legendItems = isTokenTypeView
     ? TOKEN_TYPE_COST_SERIES.map((series) => ({
         key: series.key,
-        name: series.name,
+        label: series.name,
         color: series.color,
       }))
     : isBreakdownView
       ? breakdownSeries.map((series, index) => ({
           key: series.key,
-          name: series.label,
+          label: series.label,
           color: series.color ?? getChartJsColor(index),
         }))
       : [];
@@ -554,7 +558,12 @@ function CostAreaChart({
         />
       </div>
       {legendItems.length > 0 && (
-        <ChartLegend items={legendItems} hiddenSeries={hiddenSeries} toggleSeries={toggleSeries} />
+        <SeriesLegend
+          items={legendItems}
+          hiddenSeries={hiddenSeries}
+          onToggleSeries={toggleSeries}
+          onHiddenSeriesChange={onHiddenSeriesChange}
+        />
       )}
     </>
   );
@@ -632,43 +641,4 @@ function renderCostTooltip(
     tooltipEl.dataset.chartjsTooltipSignature = signature;
   }
   positionExternalTooltip(chart, tooltip, tooltipEl);
-}
-
-function ChartLegend({
-  items,
-  hiddenSeries,
-  toggleSeries,
-}: {
-  items: readonly { key: string; name: string; color: string }[];
-  hiddenSeries: Set<string>;
-  toggleSeries: (key: string) => void;
-}) {
-  return (
-    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs mt-1">
-      {items.map((entry) => (
-        <button
-          key={entry.key}
-          type="button"
-          onClick={() => toggleSeries(entry.key)}
-          className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-          style={{
-            opacity: hiddenSeries.has(entry.key) ? 0.3 : 1,
-            fontSize: "inherit",
-            color: "inherit",
-            textDecoration: hiddenSeries.has(entry.key) ? "line-through" : "none",
-          }}
-        >
-          <span
-            style={{
-              width: 10,
-              height: 10,
-              backgroundColor: entry.color,
-              display: "inline-block",
-            }}
-          />
-          <span style={{ color: "var(--color-text-secondary)" }}>{entry.name}</span>
-        </button>
-      ))}
-    </div>
-  );
 }

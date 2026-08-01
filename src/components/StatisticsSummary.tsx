@@ -23,6 +23,7 @@ import { formatCacheReadRate } from "../utils/cacheEfficiency";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import { SeriesLegend } from "./SeriesLegend";
 import { getChartJsColor, withOpacity } from "./chartjs-utils";
 
 interface Props {
@@ -410,6 +411,7 @@ export function StatisticsSummary({ entries }: Props) {
         breakdownSeries={breakdownSeries}
         hiddenBreakdowns={hiddenBreakdowns}
         toggleBreakdown={toggleBreakdown}
+        onHiddenBreakdownsChange={setHiddenBreakdowns}
       />
 
       <StatisticsCards items={items} onHighlightChange={setHighlightedStat} />
@@ -487,41 +489,28 @@ function StatisticsBreakdownLegend({
   breakdownSeries,
   hiddenBreakdowns,
   toggleBreakdown,
+  onHiddenBreakdownsChange,
 }: {
   breakdownMode: StatisticsBreakdownMode;
   breakdownSeries: ChartDataSeries[];
   hiddenBreakdowns: Set<string>;
   toggleBreakdown: (key: string) => void;
+  onHiddenBreakdownsChange: (hiddenBreakdowns: Set<string>) => void;
 }) {
   if (breakdownMode === "total" || breakdownSeries.length === 0) return null;
 
   return (
-    <div className="flex justify-center flex-wrap gap-x-4 gap-y-1 text-xs mt-1 mb-3">
-      {breakdownSeries.map((series) => (
-        <button
-          key={series.key}
-          type="button"
-          onClick={() => toggleBreakdown(series.key)}
-          className="inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer"
-          style={{
-            opacity: hiddenBreakdowns.has(series.key) ? 0.3 : 1,
-            fontSize: "inherit",
-            color: "inherit",
-            textDecoration: hiddenBreakdowns.has(series.key) ? "line-through" : "none",
-          }}
-        >
-          <span
-            style={{
-              width: 10,
-              height: 10,
-              backgroundColor: series.color,
-              display: "inline-block",
-            }}
-          />
-          <span style={{ color: "var(--color-text-secondary)" }}>{series.label}</span>
-        </button>
-      ))}
-    </div>
+    <SeriesLegend
+      className="mb-3"
+      items={breakdownSeries.map((series) => ({
+        key: series.key,
+        label: series.label,
+        color: series.color ?? "",
+      }))}
+      hiddenSeries={hiddenBreakdowns}
+      onToggleSeries={toggleBreakdown}
+      onHiddenSeriesChange={onHiddenBreakdownsChange}
+    />
   );
 }
 
