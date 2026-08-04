@@ -8,7 +8,7 @@ blockExoticSubdeps: true
 overrides:
   es-toolkit: 1.50.0
   sharp: 0.35.3
-  "miniflare>undici": 7.29.0
+  "miniflare>undici": 8.9.0
   "vite>postcss": 8.5.23
 trustPolicyExclude:
   - "reselect@5.1.1"
