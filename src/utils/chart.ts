@@ -19,8 +19,12 @@ export const MODEL_COLORS = [
 
 export { shortenModelName } from "./breakdown";
 
-export function collectModels(entries: NormalizedEntry[], mode: BreakdownMode = "model"): string[] {
-  return collectBreakdownKeys(entries, mode);
+export function collectModels(
+  entries: NormalizedEntry[],
+  mode: BreakdownMode = "model",
+  providerFilter?: string,
+): string[] {
+  return collectBreakdownKeys(entries, mode, providerFilter);
 }
 
 export interface SeriesItem {
@@ -34,13 +38,17 @@ export function buildModelSeries(
   entries: NormalizedEntry[],
   colors: string[] = MODEL_COLORS,
   mode: BreakdownMode = "model",
+  providerFilter?: string,
 ): SeriesItem[] {
   const result = allModels.map((m, i) => ({
     key: m,
     label: formatBreakdownLabel(m, mode),
     color: colors[i % colors.length],
   }));
-  if (entries.some((e) => !e.modelBreakdowns || e.modelBreakdowns.length === 0)) {
+  if (
+    providerFilter === undefined &&
+    entries.some((e) => !e.modelBreakdowns || e.modelBreakdowns.length === 0)
+  ) {
     result.push({
       key: OTHER_BREAKDOWN_KEY,
       label: OTHER_BREAKDOWN_KEY,
@@ -56,13 +64,16 @@ function buildMetricByBreakdown(
   entries: NormalizedEntry[],
   metric: ChartBreakdownMetricKey,
   mode: BreakdownMode,
+  providerFilter?: string,
 ): Record<string, string | number>[] {
   return entries.map((entry) => {
     const row: Record<string, string | number> = { label: entry.label };
-    const grouped = groupBreakdowns(entry.modelBreakdowns, mode);
+    const grouped = groupBreakdowns(entry.modelBreakdowns, mode, providerFilter);
 
     if (grouped.size === 0) {
-      row[OTHER_BREAKDOWN_KEY] = metric === "cost" ? entry.cost : entry[metric];
+      if (providerFilter === undefined) {
+        row[OTHER_BREAKDOWN_KEY] = metric === "cost" ? entry.cost : entry[metric];
+      }
       return row;
     }
 
@@ -77,11 +88,13 @@ function buildMetricByBreakdown(
 export function buildCostByModel(
   entries: NormalizedEntry[],
   mode: BreakdownMode = "model",
+  providerFilter?: string,
 ): Record<string, string | number>[] {
-  return buildMetricByBreakdown(entries, "cost", mode);
+  return buildMetricByBreakdown(entries, "cost", mode, providerFilter);
 }
 
 export type ModelTokenType =
+  | "totalTokens"
   | "inputTokens"
   | "outputTokens"
   | "cacheCreationTokens"
@@ -91,6 +104,7 @@ export function buildTokenTypeByModel(
   entries: NormalizedEntry[],
   tokenType: ModelTokenType,
   mode: BreakdownMode = "model",
+  providerFilter?: string,
 ): Record<string, string | number>[] {
-  return buildMetricByBreakdown(entries, tokenType, mode);
+  return buildMetricByBreakdown(entries, tokenType, mode, providerFilter);
 }

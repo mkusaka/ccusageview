@@ -98,6 +98,7 @@ function getBreakdownKey(modelName: string, mode: BreakdownMode): string {
 export function groupBreakdowns(
   breakdowns: ModelBreakdown[] | undefined,
   mode: BreakdownMode,
+  providerFilter?: string,
 ): Map<string, BreakdownMetrics> {
   const grouped = new Map<string, BreakdownMetrics>();
 
@@ -106,6 +107,9 @@ export function groupBreakdowns(
   }
 
   for (const breakdown of breakdowns) {
+    if (providerFilter !== undefined && getProviderName(breakdown.modelName) !== providerFilter) {
+      continue;
+    }
     const key = getBreakdownKey(breakdown.modelName, mode);
     const existing = grouped.get(key);
     if (existing) {
@@ -127,13 +131,20 @@ export function groupBreakdowns(
   return grouped;
 }
 
-export function collectBreakdownKeys(entries: NormalizedEntry[], mode: BreakdownMode): string[] {
+export function collectBreakdownKeys(
+  entries: NormalizedEntry[],
+  mode: BreakdownMode,
+  providerFilter?: string,
+): string[] {
   const keys = new Set<string>();
 
   for (const entry of entries) {
     if (!entry.modelBreakdowns || entry.modelBreakdowns.length === 0) continue;
 
     for (const breakdown of entry.modelBreakdowns) {
+      if (providerFilter !== undefined && getProviderName(breakdown.modelName) !== providerFilter) {
+        continue;
+      }
       keys.add(getBreakdownKey(breakdown.modelName, mode));
     }
   }

@@ -174,6 +174,23 @@ describe("buildModelSeries", () => {
       { key: "OpenAI", label: "OpenAI", color: MODEL_COLORS[1] },
     ]);
   });
+
+  it("does not append Other when a provider filter is active", () => {
+    const entries = [
+      makeEntry("2025-07-01", [SONNET]),
+      makeEntry("block-1", undefined, { cost: 1, models: ["gpt-5-codex"] }),
+    ];
+    const series = buildModelSeries(
+      ["claude-sonnet-4-20250514"],
+      entries,
+      MODEL_COLORS,
+      "model",
+      "Anthropic",
+    );
+
+    expect(series).toHaveLength(1);
+    expect(series[0]?.key).toBe("claude-sonnet-4-20250514");
+  });
 });
 
 describe("buildCostByModel", () => {
@@ -224,6 +241,25 @@ describe("buildCostByModel", () => {
 });
 
 describe("buildTokenTypeByModel", () => {
+  it("extracts totalTokens per model", () => {
+    const entries = [makeEntry("2025-07-01", [SONNET, HAIKU])];
+    const result = buildTokenTypeByModel(entries, "totalTokens");
+
+    expect(result[0]["claude-sonnet-4-20250514"]).toBe(1_420_000);
+    expect(result[0]["claude-haiku-3-20240307"]).toBe(315_000);
+  });
+
+  it("aggregates totalTokens by provider", () => {
+    const entries = [makeEntry("2025-07-01", [SONNET, HAIKU, GPT])];
+    const result = buildTokenTypeByModel(entries, "totalTokens", "provider");
+
+    expect(result[0]).toEqual({
+      label: "2025-07-01",
+      Anthropic: 1_735_000,
+      OpenAI: 435_000,
+    });
+  });
+
   it("extracts inputTokens per model", () => {
     const entries = [makeEntry("2025-07-01", [SONNET, HAIKU])];
     const result = buildTokenTypeByModel(entries, "inputTokens");
@@ -288,6 +324,17 @@ describe("buildTokenTypeByModel", () => {
       label: "2025-07-01",
       Anthropic: 1_000_000,
       OpenAI: 120_000,
+    });
+  });
+
+  it("filters token metrics to models from the selected provider", () => {
+    const entries = [makeEntry("2025-07-01", [SONNET, HAIKU, GPT])];
+    const result = buildTokenTypeByModel(entries, "inputTokens", "model", "Anthropic");
+
+    expect(result[0]).toEqual({
+      label: "2025-07-01",
+      "claude-sonnet-4-20250514": 500_000,
+      "claude-haiku-3-20240307": 100_000,
     });
   });
 });

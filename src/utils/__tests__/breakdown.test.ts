@@ -94,12 +94,29 @@ describe("groupBreakdowns", () => {
       cost: 0.7,
     });
   });
+
+  it("filters model breakdowns by provider", () => {
+    const grouped = groupBreakdowns([SONNET, HAIKU, GPT], "model", "Anthropic");
+
+    expect(Array.from(grouped.keys())).toEqual([
+      "claude-sonnet-4-20250514",
+      "claude-haiku-3-20240307",
+    ]);
+  });
 });
 
 describe("collectBreakdownKeys", () => {
   it("collects provider names across entries", () => {
     const entries = [makeEntry("a", [SONNET, GPT]), makeEntry("b", [HAIKU])];
     expect(collectBreakdownKeys(entries, "provider")).toEqual(["Anthropic", "OpenAI"]);
+  });
+
+  it("collects only models from the selected provider", () => {
+    const entries = [makeEntry("a", [SONNET, HAIKU, GPT])];
+    expect(collectBreakdownKeys(entries, "model", "Anthropic")).toEqual([
+      "claude-haiku-3-20240307",
+      "claude-sonnet-4-20250514",
+    ]);
   });
 });
 
