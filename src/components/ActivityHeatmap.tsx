@@ -28,7 +28,7 @@ const METRICS = {
   inputTokens: { label: "Input", format: (v: number) => formatTokens(v) },
   outputTokens: { label: "Output", format: (v: number) => formatTokens(v) },
   cacheCreationTokens: {
-    label: "Cache Create",
+    label: "Cache Write",
     format: (v: number) => formatTokens(v),
   },
   cacheReadTokens: {

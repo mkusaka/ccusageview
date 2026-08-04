@@ -13,6 +13,14 @@ export function getChartJsColor(index: number): string {
   return CHART_JS_COLORS[index % CHART_JS_COLORS.length];
 }
 
+export function getChartJsColorForSeries(
+  seriesKey: string,
+  series: readonly { key: string }[],
+): string {
+  const index = series.findIndex((item) => item.key === seriesKey);
+  return getChartJsColor(index >= 0 ? index : 0);
+}
+
 export function withOpacity(hex: string, opacity: number): string {
   const normalized = hex.replace("#", "");
   const r = Number.parseInt(normalized.slice(0, 2), 16);

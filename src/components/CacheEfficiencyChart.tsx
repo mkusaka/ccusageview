@@ -31,6 +31,7 @@ import {
   createVerticalHoverLinePlugin,
   getActiveDataIndex,
   getChartJsColor,
+  getChartJsColorForSeries,
   getOrCreateExternalTooltipElement,
   getParsedTooltipValue,
   positionExternalTooltip,
@@ -62,6 +63,7 @@ type CacheEfficiencyDataset = ChartDataset<"line", (number | null)[]>;
 type CacheEfficiencyChartData = ChartData<"line", (number | null)[], string>;
 
 type CacheEfficiencyBreakdownSeries = ChartDataSeries & {
+  chartColor: string;
   inputKey: string;
   cacheCreationKey: string;
   cacheReadKey: string;
@@ -78,6 +80,7 @@ function getVisibleBreakdownSeries(
       key: item.key,
       label: item.label,
       color: item.color,
+      chartColor: getChartJsColorForSeries(item.key, series),
       inputKey: getCacheEfficiencyBreakdownDataKey(item.key, "inputTokens"),
       cacheCreationKey: getCacheEfficiencyBreakdownDataKey(item.key, "cacheCreationTokens"),
       cacheReadKey: getCacheEfficiencyBreakdownDataKey(item.key, "cacheReadTokens"),
@@ -203,8 +206,8 @@ function buildChartJsData(
 
   const datasets: CacheEfficiencyDataset[] = [];
 
-  for (const [index, series] of visibleBreakdownSeries.entries()) {
-    const color = getChartJsColor(index);
+  for (const series of visibleBreakdownSeries) {
+    const color = series.chartColor;
     datasets.push({
       type: "line",
       label: `${series.label} ${RATE_SERIES.name}`,
@@ -373,7 +376,7 @@ export function CacheEfficiencyChart({
                 { key: series.inputKey, label: `${series.label} Input`, align: "right" as const },
                 {
                   key: series.cacheCreationKey,
-                  label: `${series.label} Cache Create`,
+                  label: `${series.label} Cache Write`,
                   align: "right" as const,
                 },
                 {
@@ -396,7 +399,7 @@ export function CacheEfficiencyChart({
             columns: [
               { key: "label", label: "Label" },
               { key: "inputTokens", label: "Input", align: "right" as const },
-              { key: "cacheCreationTokens", label: "Cache Create", align: "right" as const },
+              { key: "cacheCreationTokens", label: "Cache Write", align: "right" as const },
               { key: "cacheReadTokens", label: "Cache Read", align: "right" as const },
               {
                 key: "cacheEfficiencyDenominatorTokens",

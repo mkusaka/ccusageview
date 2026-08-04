@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildExternalTooltipSignature,
+  CHART_JS_COLORS,
   getActiveDataIndex,
+  getChartJsColorForSeries,
   shouldSyncChartHover,
 } from "../chartjs-utils";
 
@@ -13,6 +15,14 @@ describe("getActiveDataIndex", () => {
 
   it("returns null when there are no active elements", () => {
     expect(getActiveDataIndex([])).toBeNull();
+  });
+});
+
+describe("getChartJsColorForSeries", () => {
+  it("keeps a series color when earlier series are hidden", () => {
+    const series = [{ key: "input" }, { key: "output" }, { key: "cacheRead" }];
+
+    expect(getChartJsColorForSeries("cacheRead", series)).toBe(CHART_JS_COLORS[2]);
   });
 });
 

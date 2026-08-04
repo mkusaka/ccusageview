@@ -28,6 +28,7 @@ import { SeriesLegend } from "./SeriesLegend";
 import {
   asNumber,
   getChartJsColor,
+  getChartJsColorForSeries,
   getOrCreateExternalTooltipElement,
   normalizeStackValue,
   positionExternalTooltip,
@@ -102,7 +103,7 @@ const METRICS: Record<
   totalTokens: { label: "Total Tokens", format: formatTokens, axisFormat: formatTokens },
   inputTokens: { label: "Input", format: formatTokens, axisFormat: formatTokens },
   outputTokens: { label: "Output", format: formatTokens, axisFormat: formatTokens },
-  cacheCreationTokens: { label: "Cache Create", format: formatTokens, axisFormat: formatTokens },
+  cacheCreationTokens: { label: "Cache Write", format: formatTokens, axisFormat: formatTokens },
   cacheReadTokens: { label: "Cache Read", format: formatTokens, axisFormat: formatTokens },
 };
 
@@ -383,17 +384,17 @@ function DayOfWeekBarChart({
         { key: aggregation, label: AGGREGATION_LABELS[aggregation], color: getChartJsColor(0) },
       ];
     }
-    return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series, index) => ({
+    return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series) => ({
       key: series.key,
       label: series.label,
-      color: getChartJsColor(index),
+      color: getChartJsColorForSeries(series.key, breakdownSeries),
     }));
   }, [aggregation, breakdownSeries, hiddenSeries, isBreakdownView]);
   const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
   const chartJsData = useMemo<DayOfWeekChartJsData>(() => {
     const labels = sourceData.map((row) => String((row as Record<string, unknown>).day));
-    const datasets: DayOfWeekChartDataset[] = visibleSeries.map((series, index) => {
-      const color = series.color || getChartJsColor(index);
+    const datasets: DayOfWeekChartDataset[] = visibleSeries.map((series) => {
+      const color = series.color;
       return {
         type: "bar",
         label: series.label,

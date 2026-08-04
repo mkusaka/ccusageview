@@ -27,6 +27,7 @@ import {
   createVerticalHoverLinePlugin,
   getActiveDataIndex,
   getChartJsColor,
+  getChartJsColorForSeries,
   getOrCreateExternalTooltipElement,
   getParsedTooltipValue,
   normalizeStackValue,
@@ -386,17 +387,17 @@ function CostAreaChart({
   );
   const visibleSeries = useMemo(() => {
     if (isTokenTypeView) {
-      return getVisibleTokenTypeCostSeries(hiddenSeries).map((series, index) => ({
+      return getVisibleTokenTypeCostSeries(hiddenSeries).map((series) => ({
         key: series.key,
         label: series.name,
-        color: getChartJsColor(index),
+        color: getChartJsColorForSeries(series.key, TOKEN_TYPE_COST_SERIES),
       }));
     }
     if (isBreakdownView) {
-      return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series, index) => ({
+      return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series) => ({
         key: series.key,
         label: series.label,
-        color: getChartJsColor(index),
+        color: getChartJsColorForSeries(series.key, breakdownSeries),
       }));
     }
     return [{ key: "cost", label: "Cost", color: getChartJsColor(0) }];
@@ -427,8 +428,8 @@ function CostAreaChart({
   }, [hoveredDataIndex, hoveredSyncSource]);
   const chartJsData = useMemo<CostChartJsData>(() => {
     const labels = sourceData.map((row) => String(row.label));
-    const actualDatasets: CostChartDataset[] = visibleSeries.map((series, index) => {
-      const color = series.color || getChartJsColor(index);
+    const actualDatasets: CostChartDataset[] = visibleSeries.map((series) => {
+      const color = series.color;
       return {
         type: "line",
         label: series.label,
@@ -450,8 +451,8 @@ function CostAreaChart({
     });
 
     const projectedDatasets: CostChartDataset[] = hasProjection
-      ? visibleSeries.map((series, index) => {
-          const color = series.color || getChartJsColor(index);
+      ? visibleSeries.map((series) => {
+          const color = series.color;
           return {
             type: "line",
             label: `${series.label} projected`,

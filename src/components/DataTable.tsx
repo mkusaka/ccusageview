@@ -41,7 +41,7 @@ const COLUMNS: Column[] = [
   },
   {
     key: "cacheCreationTokens",
-    label: "Cache Create",
+    label: "Cache Write",
     align: "right",
     render: (e) => formatTokens(e.cacheCreationTokens),
     sortValue: (e) => e.cacheCreationTokens,

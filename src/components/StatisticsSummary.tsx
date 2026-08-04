@@ -41,7 +41,7 @@ const METRICS: Record<StatMetricKey, MetricConfig> = {
   totalTokens: { label: "Total Tokens", format: formatTokens, axisFormat: formatTokens },
   inputTokens: { label: "Input", format: formatTokens, axisFormat: formatTokens },
   outputTokens: { label: "Output", format: formatTokens, axisFormat: formatTokens },
-  cacheCreationTokens: { label: "Cache Create", format: formatTokens, axisFormat: formatTokens },
+  cacheCreationTokens: { label: "Cache Write", format: formatTokens, axisFormat: formatTokens },
   cacheReadTokens: { label: "Cache Read", format: formatTokens, axisFormat: formatTokens },
   cacheReadRate: {
     label: "Cache Read Rate",

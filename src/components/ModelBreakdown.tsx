@@ -27,7 +27,7 @@ const METRICS = {
   cost: { label: "Cost", format: (v: number) => formatCost(v) },
   inputTokens: { label: "Input", format: (v: number) => formatTokens(v) },
   outputTokens: { label: "Output", format: (v: number) => formatTokens(v) },
-  cacheCreationTokens: { label: "Cache Create", format: (v: number) => formatTokens(v) },
+  cacheCreationTokens: { label: "Cache Write", format: (v: number) => formatTokens(v) },
   cacheReadTokens: { label: "Cache Read", format: (v: number) => formatTokens(v) },
 } as const satisfies Record<ModelBreakdownMetric, { label: string; format: (v: number) => string }>;
 
@@ -64,7 +64,7 @@ function getTableColumns(mode: BreakdownMode): TableColumn[] {
     },
     {
       key: "cacheCreationTokens",
-      label: "Cache Create",
+      label: "Cache Write",
       align: "right",
       render: (row) => formatTokens(row.cacheCreationTokens),
       sortValue: (row) => row.cacheCreationTokens,
@@ -207,7 +207,7 @@ export function ModelBreakdown({ entries }: Props) {
               { key: "label", label: mode === "model" ? "Model" : "Provider" },
               { key: "inputTokens", label: "Input", align: "right" },
               { key: "outputTokens", label: "Output", align: "right" },
-              { key: "cacheCreationTokens", label: "Cache Create", align: "right" },
+              { key: "cacheCreationTokens", label: "Cache Write", align: "right" },
               { key: "cacheReadTokens", label: "Cache Read", align: "right" },
               { key: "cacheReadRate", label: "Cache Rate", align: "right" },
               { key: "cost", label: "Cost", align: "right" },

@@ -32,6 +32,7 @@ import {
   createVerticalHoverLinePlugin,
   getActiveDataIndex,
   getChartJsColor,
+  getChartJsColorForSeries,
   getOrCreateExternalTooltipElement,
   getParsedTooltipValue,
   normalizeStackValue,
@@ -55,7 +56,7 @@ const TYPE_SERIES = [
   { key: "outputTokens", name: "Output", color: "var(--color-chart-green)" },
   {
     key: "cacheCreationTokens",
-    name: "Cache Create",
+    name: "Cache Write",
     color: "var(--color-chart-orange)",
   },
   {
@@ -68,7 +69,7 @@ const TYPE_SERIES = [
 const TOKEN_TYPE_TABS: { key: ModelTokenType; label: string }[] = [
   { key: "inputTokens", label: "Input" },
   { key: "outputTokens", label: "Output" },
-  { key: "cacheCreationTokens", label: "Cache Create" },
+  { key: "cacheCreationTokens", label: "Cache Write" },
   { key: "cacheReadTokens", label: "Cache Read" },
 ];
 
@@ -387,16 +388,16 @@ function TokenBarChart({
   );
   const visibleSeries = useMemo(() => {
     if (isBreakdownView) {
-      return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series, index) => ({
+      return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series) => ({
         key: series.key,
         label: series.label,
-        color: getChartJsColor(index),
+        color: getChartJsColorForSeries(series.key, breakdownSeries),
       }));
     }
-    return getVisibleTypeSeries(hiddenSeries).map((series, index) => ({
+    return getVisibleTypeSeries(hiddenSeries).map((series) => ({
       key: series.key,
       label: series.name,
-      color: getChartJsColor(index),
+      color: getChartJsColorForSeries(series.key, TYPE_SERIES),
     }));
   }, [breakdownSeries, hiddenSeries, isBreakdownView]);
   const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
@@ -423,8 +424,8 @@ function TokenBarChart({
   }, [hoveredDataIndex, hoveredSyncSource]);
   const chartJsData = useMemo<TokenChartJsData>(() => {
     const labels = sourceData.map((row) => String(row.label));
-    const actualDatasets: TokenChartDataset[] = visibleSeries.map((series, index) => {
-      const color = series.color || getChartJsColor(index);
+    const actualDatasets: TokenChartDataset[] = visibleSeries.map((series) => {
+      const color = series.color;
       return {
         type: "bar",
         label: series.label,
@@ -442,8 +443,8 @@ function TokenBarChart({
     });
 
     const projectedDatasets: TokenChartDataset[] = hasProjection
-      ? visibleSeries.map((series, index) => {
-          const color = series.color || getChartJsColor(index);
+      ? visibleSeries.map((series) => {
+          const color = series.color;
           return {
             type: "bar",
             label: `${series.label} projected`,
