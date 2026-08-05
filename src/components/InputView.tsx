@@ -108,7 +108,6 @@ export function InputView({ inputs, onChange, activeTab, onTabChange, error }: P
         id={labelInputId}
         type="text"
         className="w-full text-xs px-3 py-1.5 mb-1.5 border border-border rounded-md bg-bg-card text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent"
-        placeholder="Source name (optional)"
         value={current.label}
         onChange={(e) => updateCurrent({ label: e.target.value })}
       />

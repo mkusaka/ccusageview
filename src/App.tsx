@@ -153,7 +153,7 @@ function App() {
           </div>
         )}
         {parseResult.data && (
-          <ErrorBoundary message="Failed to load the dashboard.">
+          <ErrorBoundary message="Something went wrong while loading the dashboard.">
             <Suspense
               fallback={
                 <div className="h-96 flex items-center justify-center text-sm text-text-secondary">
