@@ -41,6 +41,7 @@ import {
   syncChartHoverState,
   withOpacity,
 } from "./chartjs-utils";
+import { useProviderSelection } from "./useProviderSelection";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -145,8 +146,10 @@ export function TokenChart({
   const [typeTokenType, setTypeTokenType] = useState<ModelTokenType>("totalTokens");
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
-  const [providerFilter, setProviderFilter] = useState<string | null>(null);
   const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
+  const isProviderModelView = viewMode === "providerModel";
+  const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
+    useProviderSelection(entries, isProviderModelView);
 
   const toggleSeries = (key: string) => {
     setHiddenSeries((prev) => {
@@ -158,49 +161,18 @@ export function TokenChart({
   };
 
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
-  const providerKeys = useMemo(
-    () => (hasBreakdownData ? collectModels(entries, "provider") : []),
-    [entries, hasBreakdownData],
-  );
-  const selectedProvider =
-    providerFilter && providerKeys.includes(providerFilter)
-      ? providerFilter
-      : (providerKeys[0] ?? null);
-  const isProviderModelView = viewMode === "providerModel";
-
-  useEffect(() => {
-    setProviderFilter((current) => {
-      if (current && providerKeys.includes(current)) return current;
-      return providerKeys[0] ?? null;
-    });
-  }, [providerKeys]);
 
   const breakdownKeys = useMemo(
-    () =>
-      hasBreakdownData
-        ? collectModels(entries, breakdownMode, isProviderModelView ? selectedProvider : undefined)
-        : [],
-    [entries, hasBreakdownData, breakdownMode, isProviderModelView, selectedProvider],
+    () => (hasBreakdownData ? collectModels(entries, breakdownMode, activeProviderFilter) : []),
+    [entries, hasBreakdownData, breakdownMode, activeProviderFilter],
   );
 
   const breakdownChartData = useMemo(
     () =>
       hasBreakdownData
-        ? buildTokenTypeByModel(
-            entries,
-            breakdownTokenType,
-            breakdownMode,
-            isProviderModelView ? selectedProvider : undefined,
-          )
+        ? buildTokenTypeByModel(entries, breakdownTokenType, breakdownMode, activeProviderFilter)
         : [],
-    [
-      entries,
-      hasBreakdownData,
-      breakdownTokenType,
-      breakdownMode,
-      isProviderModelView,
-      selectedProvider,
-    ],
+    [entries, hasBreakdownData, breakdownTokenType, breakdownMode, activeProviderFilter],
   );
 
   const breakdownSeries = useMemo(
@@ -211,17 +183,10 @@ export function TokenChart({
             entries,
             MODEL_COLORS,
             breakdownMode,
-            isProviderModelView ? selectedProvider : undefined,
+            activeProviderFilter,
           )
         : [],
-    [
-      breakdownKeys,
-      entries,
-      hasBreakdownData,
-      breakdownMode,
-      isProviderModelView,
-      selectedProvider,
-    ],
+    [breakdownKeys, entries, hasBreakdownData, breakdownMode, activeProviderFilter],
   );
 
   const isBreakdownView =
@@ -414,7 +379,7 @@ export function TokenChart({
           <select
             value={selectedProvider}
             onChange={(event) => {
-              setProviderFilter(event.target.value);
+              selectProvider(event.target.value);
               setHiddenSeries(new Set());
             }}
             className="px-2 py-0.5 text-xs rounded border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent"

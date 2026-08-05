@@ -273,4 +273,25 @@ describe("aggregateBreakdowns", () => {
   it("returns empty array when no entries have breakdowns", () => {
     expect(aggregateBreakdowns([makeEntry("a"), makeEntry("b")], "provider")).toEqual([]);
   });
+
+  it("limits model rows to the selected provider", () => {
+    const entries = [makeEntry("a", { modelBreakdowns: [MB_SONNET, MB_HAIKU, MB_GPT] })];
+
+    const result = aggregateBreakdowns(entries, "model", "Anthropic");
+
+    expect(result.map((entry) => entry.key)).toEqual([
+      "claude-haiku-3-20240307",
+      "claude-sonnet-4-20250514",
+    ]);
+    expect(result.find((entry) => entry.key === "claude-sonnet-4-20250514")).toMatchObject({
+      inputTokens: 500,
+      cost: 1.0,
+    });
+  });
+
+  it("returns empty array when the provider filter matches nothing", () => {
+    const entries = [makeEntry("a", { modelBreakdowns: [MB_SONNET] })];
+
+    expect(aggregateBreakdowns(entries, "model", "OpenAI")).toEqual([]);
+  });
 });

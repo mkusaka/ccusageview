@@ -143,11 +143,16 @@ export function aggregateModelBreakdowns(entries: NormalizedEntry[]): ModelBreak
 export function aggregateBreakdowns(
   entries: NormalizedEntry[],
   mode: BreakdownMode,
+  providerFilter?: string,
 ): AggregatedBreakdown[] {
   const map = new Map<string, BreakdownMetrics>();
 
   for (const entry of entries) {
-    for (const [key, metrics] of groupBreakdowns(entry.modelBreakdowns, mode).entries()) {
+    for (const [key, metrics] of groupBreakdowns(
+      entry.modelBreakdowns,
+      mode,
+      providerFilter,
+    ).entries()) {
       const existing = map.get(key);
       if (existing) {
         for (const metric of BREAKDOWN_NUMERIC_KEYS) {

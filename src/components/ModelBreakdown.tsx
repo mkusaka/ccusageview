@@ -18,6 +18,7 @@ import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { getChartJsColor, withOpacity } from "./chartjs-utils";
+import { useProviderSelection } from "./useProviderSelection";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -93,6 +94,8 @@ function getTableColumns(mode: BreakdownMode): TableColumn[] {
   ];
 }
 
+type ViewMode = BreakdownMode | "providerModel";
+
 interface PieDataItem {
   name: string;
   fullName: string;
@@ -101,10 +104,18 @@ interface PieDataItem {
 
 export function ModelBreakdown({ entries }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<BreakdownMode>("model");
+  const [viewMode, setViewMode] = useState<ViewMode>("model");
   const [sortState, setSortState] = useState(() => createInitialModelBreakdownSortState());
 
-  const rows = useMemo(() => aggregateBreakdowns(entries, mode), [entries, mode]);
+  const isProviderModelView = viewMode === "providerModel";
+  const mode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
+  const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
+    useProviderSelection(entries, isProviderModelView);
+
+  const rows = useMemo(
+    () => aggregateBreakdowns(entries, mode, activeProviderFilter),
+    [entries, mode, activeProviderFilter],
+  );
   const columns = useMemo(() => getTableColumns(mode), [mode]);
   const { metric, sortCol, sortDir } = sortState;
 
@@ -188,7 +199,17 @@ export function ModelBreakdown({ entries }: Props) {
       buildMarkdownSection({
         title: "Breakdown",
         metadata: [
-          ["View", mode === "model" ? "By Model" : "By Provider"],
+          [
+            "View",
+            viewMode === "provider"
+              ? "By Provider"
+              : isProviderModelView
+                ? "By Provider → Model"
+                : "By Model",
+          ],
+          ...(isProviderModelView
+            ? ([["Provider", selectedProvider ?? "None"]] as [string, unknown][])
+            : []),
           ["Pie metric", metricConfig.label],
           ["Sort", `${sortCol} ${sortDir}`],
         ],
@@ -224,7 +245,17 @@ export function ModelBreakdown({ entries }: Props) {
           },
         ],
       }),
-    [markdownRows, metricConfig.label, mode, pieData, sortCol, sortDir],
+    [
+      isProviderModelView,
+      markdownRows,
+      metricConfig.label,
+      mode,
+      pieData,
+      selectedProvider,
+      sortCol,
+      sortDir,
+      viewMode,
+    ],
   );
   const markdownRegistration = useMemo(
     () =>
@@ -255,9 +286,9 @@ export function ModelBreakdown({ entries }: Props) {
         <div className="flex items-center gap-2 overflow-x-auto">
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
             <button
-              onClick={() => setMode("model")}
+              onClick={() => setViewMode("model")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                mode === "model"
+                viewMode === "model"
                   ? "bg-bg-card text-text-primary shadow-sm"
                   : "text-text-secondary hover:text-text-primary"
               }`}
@@ -265,16 +296,42 @@ export function ModelBreakdown({ entries }: Props) {
               By Model
             </button>
             <button
-              onClick={() => setMode("provider")}
+              onClick={() => setViewMode("provider")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                mode === "provider"
+                viewMode === "provider"
                   ? "bg-bg-card text-text-primary shadow-sm"
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
               By Provider
             </button>
+            <button
+              onClick={() => setViewMode("providerModel")}
+              className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
+                viewMode === "providerModel"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Provider → Model
+            </button>
           </div>
+          {isProviderModelView && selectedProvider && (
+            <label className="flex items-center gap-2 w-fit text-xs text-text-secondary shrink-0">
+              <span>Provider</span>
+              <select
+                value={selectedProvider}
+                onChange={(event) => selectProvider(event.target.value)}
+                className="px-2 py-0.5 text-xs rounded border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent"
+              >
+                {providerKeys.map((provider) => (
+                  <option key={provider} value={provider}>
+                    {provider}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </div>
       </div>
 

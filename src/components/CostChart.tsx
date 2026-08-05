@@ -36,6 +36,7 @@ import {
   syncChartHoverState,
   withOpacity,
 } from "./chartjs-utils";
+import { useProviderSelection } from "./useProviderSelection";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -46,7 +47,7 @@ interface Props {
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }
 
-type ViewMode = "total" | "model" | "provider" | "tokenType";
+type ViewMode = "total" | "model" | "provider" | "providerModel" | "tokenType";
 type CostBreakdownChartData = ReturnType<typeof buildCostByModel>;
 type TokenTypeCostData = ReturnType<typeof buildCostByTokenType>;
 type CostChartRow = NormalizedEntry | CostBreakdownChartData[number] | TokenTypeCostData[number];
@@ -115,6 +116,9 @@ export function CostChart({
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
   const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
+  const isProviderModelView = viewMode === "providerModel";
+  const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
+    useProviderSelection(entries, isProviderModelView);
 
   const toggleSeries = (key: string) => {
     setHiddenSeries((prev) => {
@@ -128,19 +132,27 @@ export function CostChart({
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
 
   const breakdownKeys = useMemo(
-    () => (hasBreakdownData ? collectModels(entries, breakdownMode) : []),
-    [entries, hasBreakdownData, breakdownMode],
+    () => (hasBreakdownData ? collectModels(entries, breakdownMode, activeProviderFilter) : []),
+    [entries, hasBreakdownData, breakdownMode, activeProviderFilter],
   );
 
   const breakdownChartData = useMemo(
-    () => (hasBreakdownData ? buildCostByModel(entries, breakdownMode) : []),
-    [entries, hasBreakdownData, breakdownMode],
+    () => (hasBreakdownData ? buildCostByModel(entries, breakdownMode, activeProviderFilter) : []),
+    [entries, hasBreakdownData, breakdownMode, activeProviderFilter],
   );
 
   const breakdownSeries = useMemo(
     () =>
-      hasBreakdownData ? buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode) : [],
-    [breakdownKeys, entries, hasBreakdownData, breakdownMode],
+      hasBreakdownData
+        ? buildModelSeries(
+            breakdownKeys,
+            entries,
+            MODEL_COLORS,
+            breakdownMode,
+            activeProviderFilter,
+          )
+        : [],
+    [breakdownKeys, entries, hasBreakdownData, breakdownMode, activeProviderFilter],
   );
 
   const tokenTypeCostData = useMemo(() => buildCostByTokenType(entries), [entries]);
@@ -148,7 +160,8 @@ export function CostChart({
     (d) => d.inputCost > 0 || d.outputCost > 0 || d.cacheWriteCost > 0 || d.cacheReadCost > 0,
   );
 
-  const isBreakdownView = (viewMode === "model" || viewMode === "provider") && hasBreakdownData;
+  const isBreakdownView =
+    (viewMode === "model" || viewMode === "provider" || isProviderModelView) && hasBreakdownData;
   const isTokenTypeView = viewMode === "tokenType" && hasTokenTypeCostData;
   const chartMarkdown = useMemo(() => {
     let series: ChartDataSeries[];
@@ -164,7 +177,12 @@ export function CostChart({
       }));
       sourceRows = tokenTypeCostData;
     } else if (isBreakdownView) {
-      viewLabel = viewMode === "provider" ? "By Provider" : "By Model";
+      viewLabel =
+        viewMode === "provider"
+          ? "By Provider"
+          : isProviderModelView
+            ? "By Provider → Model"
+            : "By Model";
       series = getVisibleChartSeries(breakdownSeries, hiddenSeries);
       sourceRows = breakdownChartData;
     } else {
@@ -186,6 +204,9 @@ export function CostChart({
       title: "Cost Over Time",
       metadata: [
         ["View", viewLabel],
+        ...(isProviderModelView
+          ? ([["Provider", selectedProvider ?? "None"]] as [string, unknown][])
+          : []),
         ["Show percent", (isBreakdownView || isTokenTypeView) && showPercent],
         ["Hidden series", Array.from(hiddenSeries)],
         ...(projectionMetadata
@@ -220,7 +241,9 @@ export function CostChart({
     entries,
     hiddenSeries,
     isBreakdownView,
+    isProviderModelView,
     isTokenTypeView,
+    selectedProvider,
     showPercent,
     timeGranularity,
     tokenTypeCostData,
@@ -290,6 +313,21 @@ export function CostChart({
                 By Provider
               </button>
             )}
+            {hasBreakdownData && (
+              <button
+                onClick={() => {
+                  setViewMode("providerModel");
+                  setHiddenSeries(new Set());
+                }}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === "providerModel"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Provider → Model
+              </button>
+            )}
             {hasTokenTypeCostData && (
               <button
                 onClick={() => {
@@ -321,6 +359,25 @@ export function CostChart({
           </div>
         )}
       </div>
+      {isProviderModelView && selectedProvider && (
+        <label className="flex items-center gap-2 mb-3 w-fit text-xs text-text-secondary">
+          <span>Provider</span>
+          <select
+            value={selectedProvider}
+            onChange={(event) => {
+              selectProvider(event.target.value);
+              setHiddenSeries(new Set());
+            }}
+            className="px-2 py-0.5 text-xs rounded border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent"
+          >
+            {providerKeys.map((provider) => (
+              <option key={provider} value={provider}>
+                {provider}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <CostAreaChart
         entries={entries}
         syncId={syncId}
