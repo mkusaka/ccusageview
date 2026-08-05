@@ -88,9 +88,10 @@ export function Dashboard({ data }: Props) {
     index: null,
     source: null,
   });
-  const prevEntries = useRef(entries);
-  if (entries !== prevEntries.current) {
-    prevEntries.current = entries;
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [prevEntries, setPrevEntries] = useState(entries);
+  if (entries !== prevEntries) {
+    setPrevEntries(entries);
     setRange([0, Math.max(0, entries.length - 1)]);
     setSyncedChartHoverState({ index: null, source: null });
   }

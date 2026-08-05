@@ -374,10 +374,7 @@ function DayOfWeekBarChart({
   toggleSeries: (key: string) => void;
   onHiddenSeriesChange: (hiddenSeries: Set<string>) => void;
 }) {
-  const sourceData = useMemo(
-    () => (isBreakdownView ? breakdownData : data) as DayOfWeekChartRow[],
-    [breakdownData, data, isBreakdownView],
-  );
+  const sourceData = (isBreakdownView ? breakdownData : data) as DayOfWeekChartRow[];
   const visibleSeries = useMemo(() => {
     if (!isBreakdownView) {
       return [

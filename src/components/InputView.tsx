@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useId } from "react";
 import { createSourceInput } from "../utils/inputs";
 import type { SourceInput } from "../utils/inputs";
 
@@ -12,6 +12,8 @@ interface Props {
 
 export function InputView({ inputs, onChange, activeTab, onTabChange, error }: Props) {
   const current = inputs[activeTab] ?? inputs[0];
+  const labelInputId = useId();
+  const contentInputId = useId();
 
   const updateCurrent = useCallback(
     (patch: Partial<SourceInput>) => {
@@ -27,11 +29,15 @@ export function InputView({ inputs, onChange, activeTab, onTabChange, error }: P
       const file = e.dataTransfer.files[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.addEventListener("load", () => {
-        if (typeof reader.result === "string") {
-          updateCurrent({ content: reader.result });
-        }
-      });
+      reader.addEventListener(
+        "load",
+        () => {
+          if (typeof reader.result === "string") {
+            updateCurrent({ content: reader.result });
+          }
+        },
+        { once: true },
+      );
       reader.readAsText(file);
     },
     [updateCurrent],
@@ -95,7 +101,11 @@ export function InputView({ inputs, onChange, activeTab, onTabChange, error }: P
       )}
 
       {/* Label input */}
+      <label htmlFor={labelInputId} className="block text-xs text-text-secondary mb-1">
+        Source name <span className="text-text-secondary/60">(optional)</span>
+      </label>
       <input
+        id={labelInputId}
         type="text"
         className="w-full text-xs px-3 py-1.5 mb-1.5 border border-border rounded-md bg-bg-card text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent"
         placeholder="Source name (optional)"
@@ -104,7 +114,11 @@ export function InputView({ inputs, onChange, activeTab, onTabChange, error }: P
       />
 
       {/* Textarea */}
+      <label htmlFor={contentInputId} className="block text-xs text-text-secondary mb-1">
+        ccusage JSON
+      </label>
       <textarea
+        id={contentInputId}
         className="w-full h-48 font-mono text-sm p-4 border border-border rounded-lg bg-bg-card text-text-primary placeholder:text-text-secondary/50 resize-y focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent"
         placeholder={'Paste ccusage --json output here\n\n{"daily": [...], "totals": {...}}'}
         value={current.content}

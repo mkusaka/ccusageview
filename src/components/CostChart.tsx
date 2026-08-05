@@ -433,15 +433,9 @@ function CostAreaChart({
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }) {
   void syncId;
-  const sourceData = useMemo(
-    () =>
-      (isTokenTypeView
-        ? tokenTypeCostData
-        : isBreakdownView
-          ? breakdownChartData
-          : entries) as CostChartRow[],
-    [breakdownChartData, entries, isBreakdownView, isTokenTypeView, tokenTypeCostData],
-  );
+  const sourceData = (
+    isTokenTypeView ? tokenTypeCostData : isBreakdownView ? breakdownChartData : entries
+  ) as CostChartRow[];
   const visibleSeries = useMemo(() => {
     if (isTokenTypeView) {
       return getVisibleTokenTypeCostSeries(hiddenSeries).map((series) => ({
@@ -474,6 +468,13 @@ function CostAreaChart({
   const shouldStack = isStackedView || hasProjection;
   const chartInstanceRef = useRef<ChartJsInstance<"line"> | null>(null);
   const hoveredDataIndexRef = useRef<number | null>(hoveredDataIndex);
+  // Deliberate exception to the "no ref writes during render" rule. This ref is a
+  // display-only bridge to Chart.js: it is read solely by the `afterDatasetsDraw`
+  // hook in createVerticalHoverLinePlugin, never by React rendering or by event
+  // branching, so a stale value can only mis-draw the hover line for one frame.
+  // Moving the write into an effect would instead lag the line behind the cursor on
+  // every hover, since Chart.js repaints on its own animation frames rather than
+  // waiting for React effects.
   hoveredDataIndexRef.current = hoveredDataIndex;
   const hoverLinePlugin = useMemo(
     () => createVerticalHoverLinePlugin<"line">(hoveredDataIndexRef),

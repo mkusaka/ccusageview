@@ -366,15 +366,27 @@ export function ModelBreakdown({ entries }: Props) {
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    onClick={() => handleSort(column.key)}
-                    className={`py-2 pr-4 font-medium text-text-secondary cursor-pointer hover:text-text-primary select-none whitespace-nowrap ${
+                    aria-sort={
+                      sortCol === column.key
+                        ? sortDir === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                    className={`py-2 pr-4 font-medium text-text-secondary whitespace-nowrap ${
                       column.align === "right" ? "text-right" : "text-left"
                     }`}
                   >
-                    {column.label}
-                    {sortCol === column.key && (
-                      <span className="ml-1">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleSort(column.key)}
+                      className="hover:text-text-primary select-none whitespace-nowrap"
+                    >
+                      {column.label}
+                      {sortCol === column.key && (
+                        <span className="ml-1">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
+                      )}
+                    </button>
                   </th>
                 ))}
               </tr>

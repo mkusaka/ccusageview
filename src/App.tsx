@@ -1,10 +1,16 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from "react";
 import { buildHash, loadFromHash } from "./utils/compression";
 import { buildHashPayload, createSourceInput, parseInputs, restoreFromHash } from "./utils/inputs";
 import type { SourceInput } from "./utils/inputs";
 import { InputView } from "./components/InputView";
-import { Dashboard } from "./components/Dashboard";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ShareButton } from "./components/ShareButton";
+
+// Chart.js and every chart component live behind this boundary, which keeps them
+// out of the initial bundle — nothing is rendered until usage data is pasted.
+const Dashboard = lazy(() =>
+  import("./components/Dashboard").then((m) => ({ default: m.Dashboard })),
+);
 
 function App() {
   const [inputs, setInputs] = useState<SourceInput[]>([createSourceInput()]);
@@ -146,7 +152,19 @@ function App() {
             })}
           </div>
         )}
-        {parseResult.data && <Dashboard data={parseResult.data} />}
+        {parseResult.data && (
+          <ErrorBoundary message="Failed to load the dashboard.">
+            <Suspense
+              fallback={
+                <div className="h-96 flex items-center justify-center text-sm text-text-secondary">
+                  Loading dashboard…
+                </div>
+              }
+            >
+              <Dashboard data={parseResult.data} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
       </main>
     </div>
   );

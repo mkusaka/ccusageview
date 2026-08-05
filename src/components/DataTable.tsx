@@ -143,15 +143,27 @@ export function DataTable({ entries }: Props) {
                 {COLUMNS.map((col) => (
                   <th
                     key={col.key}
-                    onClick={() => handleSort(col.key)}
-                    className={`py-2 px-3 font-medium text-text-secondary cursor-pointer hover:text-text-primary select-none whitespace-nowrap ${
+                    aria-sort={
+                      sortCol === col.key
+                        ? sortDir === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
+                    className={`py-2 px-3 font-medium text-text-secondary whitespace-nowrap ${
                       col.align === "right" ? "text-right" : "text-left"
                     }`}
                   >
-                    {col.label}
-                    {sortCol === col.key && (
-                      <span className="ml-1">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleSort(col.key)}
+                      className="hover:text-text-primary select-none whitespace-nowrap"
+                    >
+                      {col.label}
+                      {sortCol === col.key && (
+                        <span className="ml-1">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
+                      )}
+                    </button>
                   </th>
                 ))}
               </tr>

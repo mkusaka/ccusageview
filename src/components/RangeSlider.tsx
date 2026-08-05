@@ -49,6 +49,8 @@ export function RangeSlider({
         {/* Start handle */}
         <input
           type="range"
+          aria-label="Range start"
+          aria-valuetext={startLabel}
           min={0}
           max={max}
           value={start}
@@ -60,6 +62,8 @@ export function RangeSlider({
         {/* End handle */}
         <input
           type="range"
+          aria-label="Range end"
+          aria-valuetext={endLabel}
           min={0}
           max={max}
           value={end}

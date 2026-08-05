@@ -461,10 +461,7 @@ function TokenBarChart({
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }) {
   void syncId;
-  const sourceData = useMemo(
-    () => (isBreakdownView ? breakdownChartData : entries) as TokenChartRow[],
-    [breakdownChartData, entries, isBreakdownView],
-  );
+  const sourceData = (isBreakdownView ? breakdownChartData : entries) as TokenChartRow[];
   const visibleSeries = useMemo(() => {
     if (isBreakdownView) {
       return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series) => ({
@@ -492,6 +489,13 @@ function TokenBarChart({
   const hasProjection = projection.projection != null;
   const chartInstanceRef = useRef<ChartJsInstance<"bar"> | null>(null);
   const hoveredDataIndexRef = useRef<number | null>(hoveredDataIndex);
+  // Deliberate exception to the "no ref writes during render" rule. This ref is a
+  // display-only bridge to Chart.js: it is read solely by the `afterDatasetsDraw`
+  // hook in createVerticalHoverLinePlugin, never by React rendering or by event
+  // branching, so a stale value can only mis-draw the hover line for one frame.
+  // Moving the write into an effect would instead lag the line behind the cursor on
+  // every hover, since Chart.js repaints on its own animation frames rather than
+  // waiting for React effects.
   hoveredDataIndexRef.current = hoveredDataIndex;
   const hoverLinePlugin = useMemo(
     () => createVerticalHoverLinePlugin<"bar">(hoveredDataIndexRef),

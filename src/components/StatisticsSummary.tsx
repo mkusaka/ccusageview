@@ -654,6 +654,13 @@ function DistributionChart({
     [highlightedStat, meanHighlighted, meanRank, metricConfig, percentileValues, stats.mean],
   );
   const referenceLinesRef = useRef<DistributionLine[]>(referenceLines);
+  // Deliberate exception to the "no ref writes during render" rule. This ref is a
+  // display-only bridge to Chart.js: it is read solely by the `afterDatasetsDraw`
+  // hook of `referenceLinePlugin`, never by React rendering or by event branching,
+  // so a stale value can only mis-draw the reference lines for one frame. Moving the
+  // write into an effect would instead draw them one frame behind on every update,
+  // since Chart.js repaints on its own animation frames rather than waiting for
+  // React effects.
   referenceLinesRef.current = referenceLines;
   const distributionChartData = useMemo<ChartData<"line", DistributionPoint[], number>>(
     () => ({

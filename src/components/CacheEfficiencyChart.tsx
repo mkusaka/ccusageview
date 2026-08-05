@@ -74,9 +74,10 @@ function getVisibleBreakdownSeries(
   series: ChartDataSeries[],
   hiddenBreakdowns: Set<string>,
 ): CacheEfficiencyBreakdownSeries[] {
-  return series
-    .filter((item) => !hiddenBreakdowns.has(item.key))
-    .map((item) => ({
+  const visible: CacheEfficiencyBreakdownSeries[] = [];
+  for (const item of series) {
+    if (hiddenBreakdowns.has(item.key)) continue;
+    visible.push({
       key: item.key,
       label: item.label,
       color: item.color,
@@ -85,7 +86,9 @@ function getVisibleBreakdownSeries(
       cacheCreationKey: getCacheEfficiencyBreakdownDataKey(item.key, "cacheCreationTokens"),
       cacheReadKey: getCacheEfficiencyBreakdownDataKey(item.key, "cacheReadTokens"),
       rateKey: getCacheEfficiencyBreakdownDataKey(item.key, "cacheReadRate"),
-    }));
+    });
+  }
+  return visible;
 }
 
 function hasAnyBreakdownData(entries: readonly NormalizedEntry[]): boolean {
@@ -305,6 +308,13 @@ export function CacheEfficiencyChart({
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstanceRef = useRef<ChartJsInstance<"line"> | null>(null);
   const hoveredDataIndexRef = useRef<number | null>(hoveredDataIndex);
+  // Deliberate exception to the "no ref writes during render" rule. This ref is a
+  // display-only bridge to Chart.js: it is read solely by the `afterDatasetsDraw`
+  // hook in createVerticalHoverLinePlugin, never by React rendering or by event
+  // branching, so a stale value can only mis-draw the hover line for one frame.
+  // Moving the write into an effect would instead lag the line behind the cursor on
+  // every hover, since Chart.js repaints on its own animation frames rather than
+  // waiting for React effects.
   hoveredDataIndexRef.current = hoveredDataIndex;
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [hiddenBreakdowns, setHiddenBreakdowns] = useState<Set<string>>(new Set());
