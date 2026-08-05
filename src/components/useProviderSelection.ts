@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { collectModels } from "../utils/chart";
 import type { NormalizedEntry } from "../utils/normalize";
 
@@ -14,30 +14,26 @@ export interface ProviderSelection {
 
 /**
  * Shared state for the "By Provider → Model" drill-down views.
- * Keeps the selection valid as entries change, falling back to the first provider.
+ *
+ * The selection is derived during render rather than synced with an effect: when the
+ * requested provider is absent from the current entries we fall back to the first one,
+ * and it becomes selected again if it reappears (e.g. after widening a date range).
  */
 export function useProviderSelection(
   entries: NormalizedEntry[],
   isActive: boolean,
 ): ProviderSelection {
-  const [providerFilter, setProviderFilter] = useState<string | null>(null);
+  const [requestedProvider, setRequestedProvider] = useState<string | null>(null);
   const providerKeys = useMemo(() => collectModels(entries, "provider"), [entries]);
   const selectedProvider =
-    providerFilter && providerKeys.includes(providerFilter)
-      ? providerFilter
+    requestedProvider && providerKeys.includes(requestedProvider)
+      ? requestedProvider
       : (providerKeys[0] ?? null);
-
-  useEffect(() => {
-    setProviderFilter((current) => {
-      if (current && providerKeys.includes(current)) return current;
-      return providerKeys[0] ?? null;
-    });
-  }, [providerKeys]);
 
   return {
     providerKeys,
     selectedProvider,
     activeProviderFilter: isActive && selectedProvider !== null ? selectedProvider : undefined,
-    selectProvider: setProviderFilter,
+    selectProvider: setRequestedProvider,
   };
 }

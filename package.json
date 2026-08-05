@@ -22,7 +22,8 @@
     "cf:dev": "pnpm build && wrangler dev",
     "cf:upload": "pnpm build && wrangler versions upload",
     "cf:deploy": "pnpm build && wrangler deploy",
-    "prepublishOnly": "pnpm build:cli"
+    "prepublishOnly": "pnpm build:cli",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
