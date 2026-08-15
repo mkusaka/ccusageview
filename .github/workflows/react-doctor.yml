@@ -30,12 +30,14 @@ concurrency:
 jobs:
   react-doctor:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
-      - uses: millionco/react-doctor@v2
+      - uses: millionco/react-doctor@01820bb4fd4d0a4aebcd8df2b2a143a098649cb2 # v2.2.8
         # Advisory: findings are reported in the run summary and the commit
         # status (score + counts), but never fail the job. To gate later, add
         # `blocking: error`. Full reference: https://www.react.doctor/ci
