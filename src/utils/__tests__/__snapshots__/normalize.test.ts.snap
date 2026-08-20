@@ -1,5 +1,54 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`aggregateToDaily > snapshot: daily aggregation from hourly 1`] = `
+[
+  {
+    "cacheCreationTokens": 0,
+    "cacheReadTokens": 355968,
+    "cost": 0.05806446,
+    "inputTokens": 217006,
+    "label": "2026-08-12",
+    "modelBreakdowns": [
+      {
+        "cacheCreationTokens": 0,
+        "cacheReadTokens": 355968,
+        "cost": 0.05806446,
+        "inputTokens": 217006,
+        "modelName": "gpt-5.6-luna",
+        "outputTokens": 6286,
+      },
+    ],
+    "models": [
+      "gpt-5.6-luna",
+    ],
+    "outputTokens": 6286,
+    "totalTokens": 579260,
+  },
+  {
+    "cacheCreationTokens": 0,
+    "cacheReadTokens": 80000,
+    "cost": 0.013,
+    "inputTokens": 50000,
+    "label": "2026-08-13",
+    "modelBreakdowns": [
+      {
+        "cacheCreationTokens": 100000,
+        "cacheReadTokens": 800000,
+        "cost": 2.5,
+        "inputTokens": 500000,
+        "modelName": "claude-sonnet-4-20250514",
+        "outputTokens": 20000,
+      },
+    ],
+    "models": [
+      "claude-sonnet-4-20250514",
+    ],
+    "outputTokens": 1000,
+    "totalTokens": 131000,
+  },
+]
+`;
+
 exports[`aggregateToMonthly > snapshot: monthly aggregation from daily 1`] = `
 [
   {

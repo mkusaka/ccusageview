@@ -69,6 +69,12 @@ export interface MonthlyReport {
   totals: Totals;
 }
 
+export interface HourlyReport {
+  type: "hourly";
+  hourly: TimeEntry[];
+  totals: Totals;
+}
+
 interface SessionEntry {
   sessionId: string;
   inputTokens: number;
@@ -118,6 +124,12 @@ export interface BlocksReport {
   blocks: BlockEntry[];
 }
 
-export type ReportData = DailyReport | WeeklyReport | MonthlyReport | SessionReport | BlocksReport;
+export type ReportData =
+  | DailyReport
+  | WeeklyReport
+  | MonthlyReport
+  | HourlyReport
+  | SessionReport
+  | BlocksReport;
 
 export type ReportType = ReportData["type"];

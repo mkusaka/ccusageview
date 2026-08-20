@@ -3,6 +3,7 @@ import type {
   DailyReport,
   WeeklyReport,
   MonthlyReport,
+  HourlyReport,
   SessionReport,
   BlocksReport,
   Totals,
@@ -156,6 +157,66 @@ export const MONTHLY_REPORT: MonthlyReport = {
   totals: makeTotals(MONTHLY_ENTRIES),
 };
 
+const HOURLY_ENTRIES: TimeEntry[] = [
+  {
+    period: "2026-08-12T17",
+    inputTokens: 144_671,
+    outputTokens: 4_191,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 237_312,
+    totalTokens: 386_174,
+    totalCost: 0.03870964,
+    modelsUsed: ["gpt-5.6-luna"],
+    modelBreakdowns: [
+      {
+        modelName: "gpt-5.6-luna",
+        inputTokens: 144_671,
+        outputTokens: 4_191,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 237_312,
+        cost: 0.03870964,
+      },
+    ],
+  },
+  {
+    period: "2026-08-12T18",
+    inputTokens: 72_335,
+    outputTokens: 2_095,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 118_656,
+    totalTokens: 193_086,
+    totalCost: 0.01935482,
+    modelsUsed: ["gpt-5.6-luna"],
+    modelBreakdowns: [
+      {
+        modelName: "gpt-5.6-luna",
+        inputTokens: 72_335,
+        outputTokens: 2_095,
+        cacheCreationTokens: 0,
+        cacheReadTokens: 118_656,
+        cost: 0.01935482,
+      },
+    ],
+  },
+  {
+    period: "2026-08-13T09",
+    inputTokens: 50_000,
+    outputTokens: 1_000,
+    cacheCreationTokens: 0,
+    cacheReadTokens: 80_000,
+    totalTokens: 131_000,
+    totalCost: 0.013,
+    modelsUsed: ["claude-sonnet-4-20250514"],
+    modelBreakdowns: [MB_SONNET],
+  },
+];
+
+export const HOURLY_REPORT: HourlyReport = {
+  type: "hourly",
+  hourly: HOURLY_ENTRIES,
+  totals: makeTotals(HOURLY_ENTRIES),
+};
+
 export const SESSION_REPORT: SessionReport = {
   type: "session",
   sessions: [
@@ -285,5 +346,10 @@ export function rawSession() {
 
 export function rawBlocks() {
   const { type: _, ...rest } = BLOCKS_REPORT;
+  return rest;
+}
+
+export function rawHourly() {
+  const { type: _, ...rest } = HOURLY_REPORT;
   return rest;
 }

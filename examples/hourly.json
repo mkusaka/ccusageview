@@ -1,0 +1,78 @@
+{
+  "hourly": [
+    {
+      "agent": "all",
+      "period": "2026-08-12T17",
+      "inputTokens": 144671,
+      "outputTokens": 4191,
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 237312,
+      "totalTokens": 386174,
+      "totalCost": 0.03870964,
+      "modelsUsed": ["gpt-5.6-luna"],
+      "modelBreakdowns": [
+        {
+          "modelName": "gpt-5.6-luna",
+          "inputTokens": 144671,
+          "outputTokens": 4191,
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 237312,
+          "cost": 0.03870964
+        }
+      ],
+      "metadata": { "agents": [] }
+    },
+    {
+      "agent": "all",
+      "period": "2026-08-12T18",
+      "inputTokens": 72335,
+      "outputTokens": 2095,
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 118656,
+      "totalTokens": 193086,
+      "totalCost": 0.01935482,
+      "modelsUsed": ["gpt-5.6-luna"],
+      "modelBreakdowns": [
+        {
+          "modelName": "gpt-5.6-luna",
+          "inputTokens": 72335,
+          "outputTokens": 2095,
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 118656,
+          "cost": 0.01935482
+        }
+      ],
+      "metadata": { "agents": [] }
+    },
+    {
+      "agent": "all",
+      "period": "2026-08-13T09",
+      "inputTokens": 50000,
+      "outputTokens": 1000,
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 80000,
+      "totalTokens": 131000,
+      "totalCost": 0.013,
+      "modelsUsed": ["claude-sonnet-4-20250514"],
+      "modelBreakdowns": [
+        {
+          "modelName": "claude-sonnet-4-20250514",
+          "inputTokens": 50000,
+          "outputTokens": 1000,
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 80000,
+          "cost": 0.013
+        }
+      ],
+      "metadata": { "agents": [] }
+    }
+  ],
+  "totals": {
+    "inputTokens": 267006,
+    "outputTokens": 7286,
+    "cacheCreationTokens": 0,
+    "cacheReadTokens": 435968,
+    "totalTokens": 710260,
+    "totalCost": 0.07106446
+  }
+}

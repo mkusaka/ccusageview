@@ -71,6 +71,9 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
     case "monthly":
       return report.monthly.map(normalizeTimeEntry);
 
+    case "hourly":
+      return report.hourly.map(normalizeTimeEntry);
+
     case "session":
       return report.sessions
         .toSorted((a, b) => new Date(a.lastActivity).getTime() - new Date(b.lastActivity).getTime())
@@ -156,6 +159,14 @@ export function aggregateToMonthly(dailyEntries: NormalizedEntry[]): NormalizedE
   return groupEntries(dailyEntries, (e) => {
     const month = e.label.slice(0, 7);
     return /^\d{4}-\d{2}$/.test(month) ? month : null;
+  });
+}
+
+// Aggregate hourly entries into daily entries (frontend computation)
+export function aggregateToDaily(hourlyEntries: NormalizedEntry[]): NormalizedEntry[] {
+  return groupEntries(hourlyEntries, (e) => {
+    const day = e.label.slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
   });
 }
 

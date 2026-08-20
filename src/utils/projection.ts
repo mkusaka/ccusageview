@@ -1,4 +1,4 @@
-export type TimeGranularity = "daily" | "weekly" | "monthly";
+export type TimeGranularity = "hourly" | "daily" | "weekly" | "monthly";
 
 export interface ProjectionInfo {
   sourceLabel: string;
@@ -24,6 +24,10 @@ function formatMonthLabel(date: Date): string {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}`;
 }
 
+function formatHourLabel(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}`;
+}
+
 function startOfDay(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
@@ -40,6 +44,10 @@ function startOfMonth(date: Date): Date {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
+function startOfHour(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours());
+}
+
 function addDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
@@ -48,6 +56,12 @@ function addDays(date: Date, days: number): Date {
 
 function addMonths(date: Date, months: number): Date {
   return new Date(date.getFullYear(), date.getMonth() + months, 1);
+}
+
+function addHours(date: Date, hours: number): Date {
+  const next = new Date(date);
+  next.setHours(next.getHours() + hours);
+  return next;
 }
 
 function getElapsedRatio(start: Date, end: Date, now: Date): number | null {
@@ -61,6 +75,15 @@ function getCurrentPeriod(
   granularity: TimeGranularity,
   now: Date,
 ): { label: string; start: Date; end: Date } {
+  if (granularity === "hourly") {
+    const start = startOfHour(now);
+    return {
+      label: formatHourLabel(now),
+      start,
+      end: addHours(start, 1),
+    };
+  }
+
   if (granularity === "monthly") {
     const start = startOfMonth(now);
     return {

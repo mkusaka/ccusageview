@@ -2,6 +2,17 @@ import { describe, expect, it } from "vitest";
 import { getProjectionInfo, getProjectionMetrics } from "../projection";
 
 describe("getProjectionInfo", () => {
+  it("projects the current hourly bucket from elapsed time", () => {
+    const now = new Date(2026, 6, 2, 17, 30);
+    const projection = getProjectionInfo("2026-07-02T17", "hourly", now);
+
+    expect(projection).toMatchObject({
+      sourceLabel: "2026-07-02T17",
+    });
+    expect(projection!.elapsedRatio).toBeCloseTo(0.5);
+    expect(projection!.multiplier).toBeCloseTo(2);
+  });
+
   it("projects the current daily bucket from elapsed time", () => {
     const now = new Date(2026, 6, 2, 12);
     const projection = getProjectionInfo("2026-07-02", "daily", now);
@@ -30,8 +41,9 @@ describe("getProjectionInfo", () => {
   });
 
   it("does not project past buckets", () => {
-    const now = new Date(2026, 6, 2, 12);
+    const now = new Date(2026, 6, 2, 17, 30);
 
+    expect(getProjectionInfo("2026-07-02T16", "hourly", now)).toBeNull();
     expect(getProjectionInfo("2026-07-01", "daily", now)).toBeNull();
     expect(getProjectionInfo("2026-06-22", "weekly", now)).toBeNull();
     expect(getProjectionInfo("2026-06", "monthly", now)).toBeNull();

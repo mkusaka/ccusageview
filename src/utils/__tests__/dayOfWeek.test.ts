@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { ModelBreakdown } from "../../types";
-import { buildDayOfWeekByBreakdown, buildDayOfWeekData, type DayOfWeekMetric } from "../dayOfWeek";
+import {
+  buildDayOfWeekByBreakdown,
+  buildDayOfWeekData,
+  buildHourOfDayByBreakdown,
+  buildHourOfDayData,
+  type DayOfWeekMetric,
+  type HourOfDayMetric,
+} from "../dayOfWeek";
 import type { NormalizedEntry } from "../normalize";
 
 function makeEntry(
@@ -66,6 +73,10 @@ const GPT: ModelBreakdown = {
 
 function getBucket(metric: DayOfWeekMetric, label: string, entries: NormalizedEntry[]) {
   return buildDayOfWeekData(entries, metric).find((bucket) => bucket.day === label);
+}
+
+function getHourBucket(metric: HourOfDayMetric, hour: number, entries: NormalizedEntry[]) {
+  return buildHourOfDayData(entries, metric).find((bucket) => bucket.hour === hour);
 }
 
 describe("buildDayOfWeekData", () => {
@@ -177,6 +188,124 @@ describe("buildDayOfWeekByBreakdown", () => {
       day: "Mon",
       Anthropic: 6,
       Other: 0,
+    });
+  });
+});
+
+describe("buildHourOfDayData", () => {
+  it("computes avg/max/min/sum for each hour bucket", () => {
+    const entries = [
+      makeEntry("2026-08-12T17", undefined, { cost: 2 }),
+      makeEntry("2026-08-12T17", undefined, { cost: 6 }),
+      makeEntry("2026-08-12T18", undefined, { cost: 5 }),
+    ];
+
+    const hour17 = getHourBucket("cost", 17, entries);
+    const hour18 = getHourBucket("cost", 18, entries);
+
+    expect(hour17).toEqual({
+      hour: 17,
+      avg: 4,
+      max: 6,
+      min: 2,
+      sum: 8,
+      count: 2,
+    });
+    expect(hour18).toEqual({
+      hour: 18,
+      avg: 5,
+      max: 5,
+      min: 5,
+      sum: 5,
+      count: 1,
+    });
+  });
+
+  it("parses T17 labels without constructing an invalid Date", () => {
+    const entries = [makeEntry("2026-08-12T17", [SONNET])];
+
+    const hour17 = getHourBucket("cost", 17, entries);
+    expect(hour17).toEqual({
+      hour: 17,
+      avg: 6,
+      max: 6,
+      min: 6,
+      sum: 6,
+      count: 1,
+    });
+  });
+
+  it("skips labels that do not match the hourly pattern", () => {
+    const entries = [makeEntry("2026-08-12", undefined, { cost: 5 })];
+
+    expect(buildHourOfDayData(entries, "cost").every((bucket) => bucket.count === 0)).toBe(true);
+  });
+});
+
+describe("buildHourOfDayByBreakdown", () => {
+  it("aggregates hour-of-day breakdowns for avg and sum", () => {
+    const entries = [
+      makeEntry("2026-08-12T17", [SONNET, GPT]),
+      makeEntry("2026-08-12T17", [HAIKU]),
+    ];
+
+    const avgRows = buildHourOfDayByBreakdown(
+      entries,
+      "cost",
+      ["Anthropic", "OpenAI"],
+      "provider",
+      "avg",
+    );
+    const sumRows = buildHourOfDayByBreakdown(
+      entries,
+      "cost",
+      ["Anthropic", "OpenAI"],
+      "provider",
+      "sum",
+    );
+
+    expect(avgRows[17]).toEqual({
+      hour: 17,
+      Anthropic: 3.5,
+      OpenAI: 1.5,
+    });
+    expect(sumRows[17]).toEqual({
+      hour: 17,
+      Anthropic: 7,
+      OpenAI: 3,
+    });
+  });
+
+  it("uses the hour representative entry for max and min", () => {
+    const entries = [
+      makeEntry("2026-08-12T17", [SONNET, GPT]),
+      makeEntry("2026-08-12T17", [HAIKU]),
+    ];
+
+    const maxRows = buildHourOfDayByBreakdown(
+      entries,
+      "cost",
+      ["Anthropic", "OpenAI"],
+      "provider",
+      "max",
+    );
+    const minRows = buildHourOfDayByBreakdown(
+      entries,
+      "cost",
+      ["Anthropic", "OpenAI"],
+      "provider",
+      "min",
+    );
+
+    expect(maxRows[17]).toEqual({
+      hour: 17,
+      Anthropic: 6,
+      OpenAI: 3,
+    });
+    expect(minRows[17]).toEqual({
+      hour: 17,
+      Anthropic: 1,
+      OpenAI: 0,
     });
   });
 });
