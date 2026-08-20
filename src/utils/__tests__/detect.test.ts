@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { detectReportType } from "../detect";
-import { rawDaily, rawWeekly, rawMonthly, rawSession, rawBlocks } from "./fixtures";
+import { rawDaily, rawWeekly, rawMonthly, rawHourly, rawSession, rawBlocks } from "./fixtures";
 
 describe("detectReportType", () => {
   it("detects daily report", () => {
@@ -16,6 +16,11 @@ describe("detectReportType", () => {
   it("detects monthly report", () => {
     const result = detectReportType(rawMonthly());
     expect(result.type).toBe("monthly");
+  });
+
+  it("detects hourly report", () => {
+    const result = detectReportType(rawHourly());
+    expect(result.type).toBe("hourly");
   });
 
   it("detects session report", () => {

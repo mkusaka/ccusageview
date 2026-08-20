@@ -3,6 +3,7 @@ import type { ReportType } from "../types";
 import type { DashboardData } from "../utils/normalize";
 import type { TimeGranularity } from "../utils/projection";
 import {
+  aggregateToDaily,
   aggregateToMonthly,
   aggregateToWeekly,
   computeTotalsFromEntries,
@@ -17,6 +18,7 @@ import { ActivityHeatmap } from "./ActivityHeatmap";
 import { DataTable } from "./DataTable";
 import { StatisticsSummary } from "./StatisticsSummary";
 import { DayOfWeekChart } from "./DayOfWeekChart";
+import { HourOfDayChart } from "./HourOfDayChart";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { RangeSlider } from "./RangeSlider";
@@ -29,17 +31,20 @@ const TYPE_LABELS: Record<ReportType, string> = {
   daily: "Daily Report",
   weekly: "Weekly Report",
   monthly: "Monthly Report",
+  hourly: "Hourly Report",
   session: "Session Report",
   blocks: "Blocks Report",
 };
 
 const GRANULARITY_LABELS: Record<TimeGranularity, string> = {
+  hourly: "Hourly",
   daily: "Daily",
   weekly: "Weekly",
   monthly: "Monthly",
 };
 
 const GRANULARITY_REPORT_LABELS: Record<TimeGranularity, string> = {
+  hourly: "Hourly Report",
   daily: "Daily Report",
   weekly: "Weekly Report",
   monthly: "Monthly Report",
@@ -57,11 +62,17 @@ export function Dashboard({ data }: Props) {
   const [markdownSectionsById, setMarkdownSectionsById] = useState<
     Record<string, RegisteredMarkdownSection>
   >({});
-  const { entries: dailyEntries, totals, reportType, sourceLabels } = data;
+  const { entries: baseEntries, totals, reportType, sourceLabels } = data;
+  const isHourly = reportType === "hourly";
 
-  // Daily reports can be viewed as weekly or monthly too
-  const canToggleGranularity = reportType === "daily";
-  const [granularity, setGranularity] = useState<TimeGranularity>("daily");
+  // Daily and hourly reports can be viewed at coarser granularities too
+  const canToggleGranularity = reportType === "daily" || reportType === "hourly";
+  const [granularity, setGranularity] = useState<TimeGranularity>(isHourly ? "hourly" : "daily");
+
+  const dailyEntries = useMemo(
+    () => (isHourly ? aggregateToDaily(baseEntries) : baseEntries),
+    [isHourly, baseEntries],
+  );
 
   const weeklyEntries = useMemo(
     () => (canToggleGranularity ? aggregateToWeekly(dailyEntries) : []),
@@ -75,12 +86,14 @@ export function Dashboard({ data }: Props) {
 
   // Pick entries based on the active granularity
   const entries = canToggleGranularity
-    ? granularity === "weekly"
-      ? weeklyEntries
-      : granularity === "monthly"
-        ? monthlyEntries
-        : dailyEntries
-    : dailyEntries;
+    ? granularity === "hourly"
+      ? baseEntries
+      : granularity === "weekly"
+        ? weeklyEntries
+        : granularity === "monthly"
+          ? monthlyEntries
+          : dailyEntries
+    : baseEntries;
 
   // Range slider state — reset when entries change (render-time reset pattern)
   const [range, setRange] = useState<[number, number]>([0, Math.max(0, entries.length - 1)]);
@@ -112,8 +125,11 @@ export function Dashboard({ data }: Props) {
     (e) => e.modelBreakdowns && e.modelBreakdowns.length > 0,
   );
 
-  const showHeatmap = reportType === "daily" || reportType === "weekly";
-  const showDayOfWeek = reportType === "daily" && granularity === "daily";
+  const showHeatmap = reportType === "daily" || reportType === "weekly" || reportType === "hourly";
+  const showDayOfWeek =
+    (reportType === "daily" && granularity === "daily") ||
+    (reportType === "hourly" && granularity !== "hourly");
+  const showHourOfDay = reportType === "hourly" && granularity === "hourly";
   const handleSyncedChartHoverIndexChange = useCallback(
     (nextIndex: number | null, source: string | null = null) => {
       setSyncedChartHoverState((current) =>
@@ -133,7 +149,7 @@ export function Dashboard({ data }: Props) {
     : TYPE_LABELS[reportType];
 
   const timeGranularity: TimeGranularity | undefined =
-    reportType === "daily"
+    reportType === "daily" || reportType === "hourly"
       ? granularity
       : reportType === "weekly" || reportType === "monthly"
         ? reportType
@@ -193,10 +209,13 @@ export function Dashboard({ data }: Props) {
           title="Copy all chart data as Markdown"
         />
 
-        {/* Granularity toggle for daily reports */}
+        {/* Granularity toggle for daily and hourly reports */}
         {canToggleGranularity && (
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 ml-auto">
-            {(["daily", "weekly", "monthly"] as const).map((g) => (
+            {(isHourly
+              ? (["hourly", "daily", "weekly", "monthly"] as const)
+              : (["daily", "weekly", "monthly"] as const)
+            ).map((g) => (
               <button
                 key={g}
                 onClick={() => setGranularity(g)}
@@ -233,7 +252,12 @@ export function Dashboard({ data }: Props) {
           {filteredEntries.length > 0 && (
             <>
               {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
-              {showDayOfWeek && <DayOfWeekChart entries={filteredEntries} />}
+              {showDayOfWeek && (
+                <DayOfWeekChart
+                  entries={reportType === "hourly" ? dailyEntries : filteredEntries}
+                />
+              )}
+              {showHourOfDay && <HourOfDayChart entries={filteredEntries} />}
               <div className="space-y-4" onMouseLeave={handleSyncedChartGroupMouseLeave}>
                 <CostChart
                   entries={filteredEntries}

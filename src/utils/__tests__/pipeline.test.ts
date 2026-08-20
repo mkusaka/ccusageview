@@ -3,12 +3,14 @@ import { detectReportType } from "../detect.ts";
 import {
   normalizeEntries,
   normalizeTotals,
+  aggregateToDaily,
   aggregateToWeekly,
   aggregateToMonthly,
 } from "../normalize.ts";
 import dailyJson from "../../../examples/daily.json";
 import weeklyJson from "../../../examples/weekly.json";
 import monthlyJson from "../../../examples/monthly.json";
+import hourlyJson from "../../../examples/hourly.json";
 import sessionJson from "../../../examples/session.json";
 import blocksJson from "../../../examples/blocks.json";
 
@@ -101,6 +103,41 @@ describe("E2E pipeline: example files", () => {
     });
   });
 
+  describe("hourly.json", () => {
+    const report = detectReportType(hourlyJson);
+
+    it("detects as hourly", () => {
+      expect(report.type).toBe("hourly");
+    });
+
+    it("normalizes entries", () => {
+      const entries = normalizeEntries(report);
+      expect(entries).toHaveLength(3);
+      expect(entries[0].label).toBe("2026-08-12T17");
+      expect(entries[0].cost).toBe(0.03870964);
+    });
+
+    it("computes totals", () => {
+      const totals = normalizeTotals(report);
+      expect(totals.totalCost).toBe(0.07106446);
+      expect(totals.totalTokens).toBe(710260);
+    });
+
+    it("aggregates to daily", () => {
+      const entries = normalizeEntries(report);
+      const daily = aggregateToDaily(entries);
+      expect(daily).toHaveLength(2);
+      expect(daily[0].label).toBe("2026-08-12");
+      expect(daily[0].inputTokens).toBe(217006);
+    });
+
+    it("preserves modelBreakdowns through pipeline", () => {
+      const entries = normalizeEntries(report);
+      expect(entries[0].modelBreakdowns).toHaveLength(1);
+      expect(entries[0].modelBreakdowns![0].modelName).toBe("gpt-5.6-luna");
+    });
+  });
+
   describe("session.json", () => {
     const report = detectReportType(sessionJson);
 
@@ -151,6 +188,7 @@ describe("E2E pipeline: example files", () => {
       ["daily", dailyJson],
       ["weekly", weeklyJson],
       ["monthly", monthlyJson],
+      ["hourly", hourlyJson],
       ["session", sessionJson],
       ["blocks", blocksJson],
     ] as const)("%s: produces non-empty normalized entries", (_, data) => {
@@ -169,6 +207,7 @@ describe("E2E pipeline: example files", () => {
       ["daily", dailyJson],
       ["weekly", weeklyJson],
       ["monthly", monthlyJson],
+      ["hourly", hourlyJson],
       ["session", sessionJson],
       ["blocks", blocksJson],
     ] as const)("%s: produces valid totals", (_, data) => {

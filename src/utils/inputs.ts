@@ -140,7 +140,7 @@ export function restoreFromHash(json: string): SourceInput[] | null {
       // Reports are objects with keys like daily/weekly/monthly/sessions/blocks
       if (parsed.length > 0 && typeof parsed[0] === "object" && parsed[0] !== null) {
         const firstKeys = Object.keys(parsed[0]);
-        const reportKeys = new Set(["daily", "weekly", "monthly", "sessions", "blocks"]);
+        const reportKeys = new Set(["daily", "weekly", "monthly", "hourly", "sessions", "blocks"]);
         if (firstKeys.some((k) => reportKeys.has(k))) {
           return parsed.map((item: unknown) =>
             createSourceInput({

@@ -7,7 +7,7 @@ A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppi
 ## Features
 
 - **Interactive dashboard** — cost chart, token chart, model/provider breakdown, activity heatmap, and data table
-- **Multiple report types** — daily, weekly, monthly, session, and blocks
+- **Multiple report types** — daily, weekly, monthly, hourly, session, and blocks
 - **Multi-source comparison** — load multiple JSON files with labels and toggle them on/off
 - **Shareable URLs** — data is compressed into the URL hash, or use short URLs via `/s/:id`
 - **Copy as image** — export individual charts or the entire dashboard to clipboard
@@ -22,6 +22,14 @@ npx ccusage daily --json | npx ccusageview
 ```
 
 This compresses the JSON data into a URL and opens it in your browser.
+
+### Hourly reports from ccost
+
+```sh
+ccost hourly --json | npx ccusageview
+```
+
+`ccost hourly --json` gives you hour-level granularity **with per-model breakdowns** (`modelBreakdowns`). ccusage's `blocks` report cannot do this — even with `--breakdown`, its JSON only lists `models: string[]`.
 
 ### Open a file
 

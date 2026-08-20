@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeEntries,
   normalizeTotals,
+  aggregateToDaily,
   aggregateToWeekly,
   aggregateToMonthly,
   computeTotalsFromEntries,
@@ -11,6 +12,7 @@ import {
   CODEX_DAILY_REPORT,
   WEEKLY_REPORT,
   MONTHLY_REPORT,
+  HOURLY_REPORT,
   SESSION_REPORT,
   BLOCKS_REPORT,
 } from "./fixtures";
@@ -52,6 +54,14 @@ describe("normalizeEntries", () => {
     const entries = normalizeEntries(MONTHLY_REPORT);
     expect(entries).toHaveLength(1);
     expect(entries[0].label).toBe("2025-07");
+  });
+
+  it("normalizes hourly entries", () => {
+    const entries = normalizeEntries(HOURLY_REPORT);
+    expect(entries).toHaveLength(3);
+    expect(entries[0].label).toBe("2026-08-12T17");
+    expect(entries[0].cost).toBe(0.03870964);
+    expect(entries[0].models).toEqual(["gpt-5.6-luna"]);
   });
 
   it("normalizes session entries sorted by lastActivity", () => {
@@ -244,6 +254,49 @@ describe("aggregateToMonthly", () => {
   it("snapshot: monthly aggregation from daily", () => {
     const daily = normalizeEntries(DAILY_REPORT);
     expect(aggregateToMonthly(daily)).toMatchSnapshot();
+  });
+});
+
+describe("aggregateToDaily", () => {
+  it("aggregates hourly entries by day", () => {
+    const hourly = normalizeEntries(HOURLY_REPORT);
+    const daily = aggregateToDaily(hourly);
+    expect(daily).toHaveLength(2);
+    expect(daily[0].label).toBe("2026-08-12");
+    expect(daily[1].label).toBe("2026-08-13");
+    expect(daily[0].inputTokens).toBe(217_006);
+    expect(daily[0].cost).toBeCloseTo(0.05806446);
+  });
+
+  it("preserves modelBreakdowns by model name", () => {
+    const hourly = normalizeEntries(HOURLY_REPORT);
+    const daily = aggregateToDaily(hourly);
+    const firstDayBreakdowns = daily[0].modelBreakdowns;
+    expect(firstDayBreakdowns).toBeDefined();
+    expect(firstDayBreakdowns!.length).toBe(1);
+    expect(firstDayBreakdowns![0].inputTokens).toBe(217_006);
+  });
+
+  it("skips entries with non-hourly labels", () => {
+    const entries = [
+      {
+        label: "session-abc",
+        inputTokens: 100,
+        outputTokens: 50,
+        cacheCreationTokens: 10,
+        cacheReadTokens: 200,
+        totalTokens: 360,
+        cost: 0.5,
+        models: ["model-a"],
+      },
+    ];
+    const daily = aggregateToDaily(entries);
+    expect(daily).toHaveLength(0);
+  });
+
+  it("snapshot: daily aggregation from hourly", () => {
+    const hourly = normalizeEntries(HOURLY_REPORT);
+    expect(aggregateToDaily(hourly)).toMatchSnapshot();
   });
 });
 

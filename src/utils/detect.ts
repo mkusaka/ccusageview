@@ -3,6 +3,7 @@ import type {
   DailyReport,
   WeeklyReport,
   MonthlyReport,
+  HourlyReport,
   SessionReport,
   BlocksReport,
 } from "../types";
@@ -24,6 +25,9 @@ export function detectReportType(data: unknown): ReportData {
   if ("monthly" in obj && Array.isArray(obj.monthly)) {
     return { ...obj, type: "monthly" } as MonthlyReport;
   }
+  if ("hourly" in obj && Array.isArray(obj.hourly)) {
+    return { ...obj, type: "hourly" } as HourlyReport;
+  }
   if ("sessions" in obj && Array.isArray(obj.sessions)) {
     return { ...obj, type: "session" } as SessionReport;
   }
@@ -32,6 +36,6 @@ export function detectReportType(data: unknown): ReportData {
   }
 
   throw new Error(
-    "Unrecognized report format. Expected one of: daily, weekly, monthly, sessions, blocks",
+    "Unrecognized report format. Expected one of: daily, weekly, monthly, hourly, sessions, blocks",
   );
 }
