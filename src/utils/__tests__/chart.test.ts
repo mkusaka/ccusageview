@@ -5,6 +5,8 @@ import {
   buildModelSeries,
   buildCostByModel,
   buildTokenTypeByModel,
+  buildTokenTypeStacks,
+  getTokenStackKey,
   MODEL_COLORS,
 } from "../chart.ts";
 import type { NormalizedEntry } from "../normalize.ts";
@@ -335,6 +337,37 @@ describe("buildTokenTypeByModel", () => {
       label: "2025-07-01",
       "claude-sonnet-4-20250514": 500_000,
       "claude-haiku-3-20240307": 100_000,
+    });
+  });
+});
+
+describe("buildTokenTypeStacks", () => {
+  it("builds per-model token type stacks", () => {
+    const result = buildTokenTypeStacks([makeEntry("2025-07-01", [SONNET, HAIKU])]);
+
+    expect(result[0]).toEqual({
+      label: "2025-07-01",
+      [getTokenStackKey("claude-sonnet-4-20250514", "inputTokens")]: 500_000,
+      [getTokenStackKey("claude-sonnet-4-20250514", "outputTokens")]: 20_000,
+      [getTokenStackKey("claude-sonnet-4-20250514", "cacheCreationTokens")]: 100_000,
+      [getTokenStackKey("claude-sonnet-4-20250514", "cacheReadTokens")]: 800_000,
+      [getTokenStackKey("claude-haiku-3-20240307", "inputTokens")]: 100_000,
+      [getTokenStackKey("claude-haiku-3-20240307", "outputTokens")]: 5_000,
+      [getTokenStackKey("claude-haiku-3-20240307", "cacheCreationTokens")]: 10_000,
+      [getTokenStackKey("claude-haiku-3-20240307", "cacheReadTokens")]: 200_000,
+    });
+  });
+
+  it("groups stack data by provider or the selected provider's models", () => {
+    const entries = [makeEntry("2025-07-01", [SONNET, HAIKU, GPT])];
+
+    expect(buildTokenTypeStacks(entries, "provider")[0]).toMatchObject({
+      [getTokenStackKey("Anthropic", "inputTokens")]: 600_000,
+      [getTokenStackKey("OpenAI", "inputTokens")]: 300_000,
+    });
+    expect(buildTokenTypeStacks(entries, "model", "Anthropic")[0]).toMatchObject({
+      [getTokenStackKey("claude-sonnet-4-20250514", "cacheReadTokens")]: 800_000,
+      [getTokenStackKey("claude-haiku-3-20240307", "cacheReadTokens")]: 200_000,
     });
   });
 });

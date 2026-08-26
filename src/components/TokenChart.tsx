@@ -17,9 +17,11 @@ import {
   collectModels,
   buildModelSeries,
   buildTokenTypeByModel,
+  buildTokenTypeStacks,
+  getTokenStackKey,
   MODEL_COLORS,
 } from "../utils/chart";
-import type { ModelTokenType } from "../utils/chart";
+import type { ModelTokenType, TokenBreakdownChartRow } from "../utils/chart";
 import type { ChartDataSeries } from "../utils/chartData";
 import { buildMarkdownSection, pickDataKeys, seriesToColumns } from "../utils/chartData";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
@@ -68,19 +70,27 @@ const TYPE_SERIES = [
   },
 ] as const;
 
-const TOKEN_TYPE_TABS: { key: ModelTokenType; label: string }[] = [
+const TOKEN_TYPE_TABS: { key: ModelTokenType | "stack"; label: string }[] = [
   { key: "totalTokens", label: "Total" },
   { key: "inputTokens", label: "Input" },
   { key: "outputTokens", label: "Output" },
   { key: "cacheCreationTokens", label: "Cache Write" },
   { key: "cacheReadTokens", label: "Cache Read" },
+  { key: "stack", label: "Stack" },
 ];
 
 type ViewMode = "type" | "model" | "provider" | "providerModel";
 type TokenTypeSeries = (typeof TYPE_SERIES)[number];
-type TokenBreakdownChartData = ReturnType<typeof buildTokenTypeByModel>;
-type TokenChartRow = NormalizedEntry | TokenBreakdownChartData[number];
+type StackTokenType = Exclude<ModelTokenType, "totalTokens">;
+type BreakdownTokenType = ModelTokenType | "stack";
+type TokenChartRow = NormalizedEntry | TokenBreakdownChartRow;
 type TokenChartDataset = ChartDataset<"bar", number[]>;
+
+interface TokenChartSeries extends ChartDataSeries {
+  color: string;
+  stack: string;
+  stackKeys?: string[];
+}
 type TokenChartJsData = ChartData<"bar", number[], string>;
 
 function getVisibleTypeSeries(
@@ -103,6 +113,19 @@ function getVisibleChartSeries(
     if (!hiddenSeries.has(item.key)) visible.push(item);
   }
   return visible;
+}
+
+function getTokenStackSeries(
+  breakdownSeries: ChartDataSeries[],
+  hiddenSeries: Set<string>,
+): ChartDataSeries[] {
+  return getVisibleChartSeries(breakdownSeries, hiddenSeries).flatMap((breakdown) =>
+    TYPE_SERIES.map((type) => ({
+      key: getTokenStackKey(breakdown.key, type.key as StackTokenType),
+      label: `${breakdown.label}: ${type.name}`,
+      color: type.color,
+    })),
+  );
 }
 
 function buildProjectionTableRows(
@@ -138,7 +161,7 @@ export function TokenChart({
 }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("type");
-  const [breakdownTokenType, setBreakdownTokenType] = useState<ModelTokenType>("inputTokens");
+  const [breakdownTokenType, setBreakdownTokenType] = useState<BreakdownTokenType>("inputTokens");
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
   const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
@@ -164,8 +187,16 @@ export function TokenChart({
 
   const breakdownChartData = useMemo(
     () =>
-      hasBreakdownData
+      hasBreakdownData && breakdownTokenType !== "stack"
         ? buildTokenTypeByModel(entries, breakdownTokenType, breakdownMode, activeProviderFilter)
+        : [],
+    [entries, hasBreakdownData, breakdownTokenType, breakdownMode, activeProviderFilter],
+  );
+
+  const tokenStackChartData = useMemo(
+    () =>
+      hasBreakdownData && breakdownTokenType === "stack"
+        ? buildTokenTypeStacks(entries, breakdownMode, activeProviderFilter)
         : [],
     [entries, hasBreakdownData, breakdownTokenType, breakdownMode, activeProviderFilter],
   );
@@ -186,8 +217,8 @@ export function TokenChart({
 
   const isBreakdownView =
     (viewMode === "model" || viewMode === "provider" || isProviderModelView) && hasBreakdownData;
+  const isTokenStackView = isBreakdownView && breakdownTokenType === "stack";
   const selectedTokenType = breakdownTokenType;
-  const typeSeries = TYPE_SERIES;
   const isTokenTypeSelectorVisible = isBreakdownView;
   const chartMarkdown = useMemo(() => {
     let series: ChartDataSeries[];
@@ -201,11 +232,13 @@ export function TokenChart({
           : isProviderModelView
             ? "By Provider → Model"
             : "By Model";
-      series = getVisibleChartSeries(breakdownSeries, hiddenSeries);
-      sourceRows = breakdownChartData;
+      series = isTokenStackView
+        ? getTokenStackSeries(breakdownSeries, hiddenSeries)
+        : getVisibleChartSeries(breakdownSeries, hiddenSeries);
+      sourceRows = isTokenStackView ? tokenStackChartData : breakdownChartData;
     } else {
       viewLabel = "By Type";
-      series = getVisibleTypeSeries(typeSeries, hiddenSeries).map((s) => ({
+      series = getVisibleTypeSeries(TYPE_SERIES, hiddenSeries).map((s) => ({
         key: s.key,
         label: s.name,
         color: s.color,
@@ -231,7 +264,12 @@ export function TokenChart({
           : []),
         ...(isBreakdownView
           ? ([
-              ["Token type", TOKEN_TYPE_TABS.find((tab) => tab.key === selectedTokenType)?.label],
+              [
+                "Token type",
+                selectedTokenType === "stack"
+                  ? "Stack"
+                  : TOKEN_TYPE_TABS.find((tab) => tab.key === selectedTokenType)?.label,
+              ],
             ] as [string, unknown][])
           : []),
         ["Show percent", showPercent],
@@ -273,7 +311,8 @@ export function TokenChart({
     selectedProvider,
     showPercent,
     timeGranularity,
-    typeSeries,
+    tokenStackChartData,
+    isTokenStackView,
     viewMode,
   ]);
   const markdownRegistration = useMemo(
@@ -286,7 +325,7 @@ export function TokenChart({
   );
   useRegisterChartMarkdown(markdownRegistration);
 
-  const handleTokenTypeChange = (nextTokenType: ModelTokenType) => {
+  const handleTokenTypeChange = (nextTokenType: BreakdownTokenType) => {
     setBreakdownTokenType(nextTokenType);
   };
 
@@ -410,10 +449,12 @@ export function TokenChart({
         entries={entries}
         syncId={syncId}
         isBreakdownView={isBreakdownView}
-        typeSeries={typeSeries}
+        isTokenStackView={isTokenStackView}
+        typeSeries={TYPE_SERIES}
         showPercent={showPercent}
         hiddenSeries={hiddenSeries}
         breakdownChartData={breakdownChartData}
+        tokenStackChartData={tokenStackChartData}
         breakdownSeries={breakdownSeries}
         timeGranularity={timeGranularity}
         toggleSeries={toggleSeries}
@@ -430,10 +471,12 @@ function TokenBarChart({
   entries,
   syncId,
   isBreakdownView,
+  isTokenStackView,
   typeSeries,
   showPercent,
   hiddenSeries,
   breakdownChartData,
+  tokenStackChartData,
   breakdownSeries,
   timeGranularity,
   toggleSeries,
@@ -445,10 +488,12 @@ function TokenBarChart({
   entries: NormalizedEntry[];
   syncId?: string;
   isBreakdownView: boolean;
+  isTokenStackView: boolean;
   typeSeries: readonly TokenTypeSeries[];
   showPercent: boolean;
   hiddenSeries: Set<string>;
-  breakdownChartData: TokenBreakdownChartData;
+  breakdownChartData: TokenBreakdownChartRow[];
+  tokenStackChartData: TokenBreakdownChartRow[];
   breakdownSeries: ChartDataSeries[];
   timeGranularity?: TimeGranularity;
   toggleSeries: (key: string) => void;
@@ -458,21 +503,38 @@ function TokenBarChart({
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }) {
   void syncId;
-  const sourceData = (isBreakdownView ? breakdownChartData : entries) as TokenChartRow[];
-  const visibleSeries = useMemo(() => {
+  const sourceData = (
+    isTokenStackView ? tokenStackChartData : isBreakdownView ? breakdownChartData : entries
+  ) as TokenChartRow[];
+  const visibleSeries = useMemo<TokenChartSeries[]>(() => {
+    const visibleBreakdownSeries = getVisibleChartSeries(breakdownSeries, hiddenSeries);
+    if (isTokenStackView) {
+      return getTokenStackSeries(breakdownSeries, hiddenSeries).map((series) => {
+        const [breakdownKey, tokenType] = series.key.split("\0");
+        return {
+          key: series.key,
+          label: series.label,
+          color: getChartJsColorForSeries(tokenType ?? "", TYPE_SERIES),
+          stack: breakdownKey,
+          stackKeys: typeSeries.map((type) => getTokenStackKey(breakdownKey, type.key)),
+        };
+      });
+    }
     if (isBreakdownView) {
-      return getVisibleChartSeries(breakdownSeries, hiddenSeries).map((series) => ({
+      return visibleBreakdownSeries.map((series) => ({
         key: series.key,
         label: series.label,
         color: getChartJsColorForSeries(series.key, breakdownSeries),
+        stack: "tokens",
       }));
     }
     return getVisibleTypeSeries(typeSeries, hiddenSeries).map((series) => ({
       key: series.key,
       label: series.name,
       color: getChartJsColorForSeries(series.key, TYPE_SERIES),
+      stack: "tokens",
     }));
-  }, [breakdownSeries, hiddenSeries, isBreakdownView, typeSeries]);
+  }, [breakdownSeries, hiddenSeries, isBreakdownView, isTokenStackView, typeSeries]);
   const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
   const projection = useMemo(
     () =>
@@ -512,13 +574,13 @@ function TokenBarChart({
         data: sourceData.map((row) => {
           const record = row as Record<string, unknown>;
           return showPercent
-            ? normalizeStackValue(record, series.key, visibleKeys)
+            ? normalizeStackValue(record, series.key, series.stackKeys ?? visibleKeys)
             : (asNumber(record[series.key]) ?? 0);
         }),
         backgroundColor: withOpacity(color, 0.85),
         borderColor: color,
         borderWidth: 0,
-        stack: "tokens",
+        stack: series.stack,
       };
     });
 
@@ -534,7 +596,7 @@ function TokenBarChart({
             backgroundColor: withOpacity(color, 0.28),
             borderColor: withOpacity(color, 0.45),
             borderWidth: 0,
-            stack: "tokens",
+            stack: series.stack,
           };
         })
       : [];

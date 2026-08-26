@@ -100,11 +100,57 @@ export type ModelTokenType =
   | "cacheCreationTokens"
   | "cacheReadTokens";
 
+export type TokenBreakdownChartRow = Record<string, string | number>;
+
 export function buildTokenTypeByModel(
   entries: NormalizedEntry[],
   tokenType: ModelTokenType,
   mode: BreakdownMode = "model",
   providerFilter?: string,
-): Record<string, string | number>[] {
+): TokenBreakdownChartRow[] {
   return buildMetricByBreakdown(entries, tokenType, mode, providerFilter);
+}
+
+export function getTokenStackKey(
+  breakdownKey: string,
+  tokenType: Exclude<ModelTokenType, "totalTokens">,
+): string {
+  return `${breakdownKey}\0${tokenType}`;
+}
+
+export function buildTokenTypeStacks(
+  entries: NormalizedEntry[],
+  mode: BreakdownMode = "model",
+  providerFilter?: string,
+): TokenBreakdownChartRow[] {
+  return entries.map((entry) => {
+    const row: Record<string, string | number> = { label: entry.label };
+    const grouped = groupBreakdowns(entry.modelBreakdowns, mode, providerFilter);
+
+    if (grouped.size === 0) {
+      if (providerFilter === undefined) {
+        for (const tokenType of [
+          "inputTokens",
+          "outputTokens",
+          "cacheCreationTokens",
+          "cacheReadTokens",
+        ] as const) {
+          row[getTokenStackKey(OTHER_BREAKDOWN_KEY, tokenType)] = entry[tokenType];
+        }
+      }
+      return row;
+    }
+
+    for (const [key, metrics] of grouped.entries()) {
+      for (const tokenType of [
+        "inputTokens",
+        "outputTokens",
+        "cacheCreationTokens",
+        "cacheReadTokens",
+      ] as const) {
+        row[getTokenStackKey(key, tokenType)] = getBreakdownMetricValue(metrics, tokenType);
+      }
+    }
+    return row;
+  });
 }
