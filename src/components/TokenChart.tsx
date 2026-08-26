@@ -83,11 +83,6 @@ type TokenChartRow = NormalizedEntry | TokenBreakdownChartData[number];
 type TokenChartDataset = ChartDataset<"bar", number[]>;
 type TokenChartJsData = ChartData<"bar", number[], string>;
 
-function getTypeSeries(tokenType: ModelTokenType): TokenTypeSeries[] {
-  if (tokenType === "totalTokens") return [...TYPE_SERIES];
-  return TYPE_SERIES.filter((series) => series.key === tokenType);
-}
-
 function getVisibleTypeSeries(
   typeSeries: readonly TokenTypeSeries[],
   hiddenSeries: Set<string>,
@@ -144,7 +139,6 @@ export function TokenChart({
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("type");
   const [breakdownTokenType, setBreakdownTokenType] = useState<ModelTokenType>("inputTokens");
-  const [typeTokenType, setTypeTokenType] = useState<ModelTokenType>("totalTokens");
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
   const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
@@ -192,9 +186,9 @@ export function TokenChart({
 
   const isBreakdownView =
     (viewMode === "model" || viewMode === "provider" || isProviderModelView) && hasBreakdownData;
-  const selectedTokenType = viewMode === "type" ? typeTokenType : breakdownTokenType;
-  const typeSeries = useMemo(() => getTypeSeries(typeTokenType), [typeTokenType]);
-  const isTokenTypeSelectorVisible = viewMode === "type" || isBreakdownView;
+  const selectedTokenType = breakdownTokenType;
+  const typeSeries = TYPE_SERIES;
+  const isTokenTypeSelectorVisible = isBreakdownView;
   const chartMarkdown = useMemo(() => {
     let series: ChartDataSeries[];
     let sourceRows: readonly TokenChartRow[];
@@ -235,7 +229,11 @@ export function TokenChart({
         ...(isProviderModelView
           ? ([["Provider", selectedProvider ?? "None"]] as [string, unknown][])
           : []),
-        ["Token type", TOKEN_TYPE_TABS.find((tab) => tab.key === selectedTokenType)?.label],
+        ...(isBreakdownView
+          ? ([
+              ["Token type", TOKEN_TYPE_TABS.find((tab) => tab.key === selectedTokenType)?.label],
+            ] as [string, unknown][])
+          : []),
         ["Show percent", showPercent],
         ["Hidden series", Array.from(hiddenSeries)],
         ...(projectionMetadata
@@ -289,9 +287,7 @@ export function TokenChart({
   useRegisterChartMarkdown(markdownRegistration);
 
   const handleTokenTypeChange = (nextTokenType: ModelTokenType) => {
-    if (viewMode === "type") setTypeTokenType(nextTokenType);
-    else setBreakdownTokenType(nextTokenType);
-    setHiddenSeries(new Set());
+    setBreakdownTokenType(nextTokenType);
   };
 
   return (
@@ -449,7 +445,7 @@ function TokenBarChart({
   entries: NormalizedEntry[];
   syncId?: string;
   isBreakdownView: boolean;
-  typeSeries: TokenTypeSeries[];
+  typeSeries: readonly TokenTypeSeries[];
   showPercent: boolean;
   hiddenSeries: Set<string>;
   breakdownChartData: TokenBreakdownChartData;
