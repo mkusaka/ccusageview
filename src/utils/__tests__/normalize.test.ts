@@ -89,7 +89,11 @@ describe("normalizeEntries", () => {
   it("blocks normalized entries have correct structure (label is TZ-dependent)", () => {
     const entries = normalizeEntries(BLOCKS_REPORT);
     // Labels use toLocaleString which varies by timezone, so check structure not exact labels
-    expect(entries.map(({ label: _, ...rest }) => rest)).toMatchSnapshot();
+    expect(
+      entries.map((entry) =>
+        Object.fromEntries(Object.entries(entry).filter(([key]) => key !== "label")),
+      ),
+    ).toMatchSnapshot();
     // Verify labels contain expected date parts
     for (const entry of entries) {
       expect(entry.label).toMatch(/Jul 1/);
