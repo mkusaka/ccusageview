@@ -17,7 +17,13 @@ import {
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
-import { getChartJsColor, withOpacity } from "./chartjs-utils";
+import {
+  getChartJsColor,
+  getOrCreateExternalTooltipElement,
+  hideExternalTooltip,
+  positionExternalTooltip,
+  withOpacity,
+} from "./chartjs-utils";
 import { useProviderSelection } from "./useProviderSelection";
 
 interface Props {
@@ -167,19 +173,28 @@ export function ModelBreakdown({ entries }: Props) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: "rgba(255, 255, 255, 0.96)",
-          borderColor: "rgba(148, 163, 184, 0.4)",
-          borderWidth: 1,
-          titleColor: "rgb(75, 85, 99)",
-          bodyColor: "rgb(17, 24, 39)",
-          callbacks: {
-            title(items) {
-              const index = items[0]?.dataIndex ?? 0;
-              return pieData[index]?.fullName ?? "";
-            },
-            label(item) {
-              return metricConfig.format(Number(item.raw ?? 0));
-            },
+          enabled: false,
+          external({ chart, tooltip }) {
+            const tooltipEl = getOrCreateExternalTooltipElement(chart, "model-breakdown");
+            if (tooltip.opacity === 0) {
+              hideExternalTooltip(tooltipEl);
+              return;
+            }
+            const item = tooltip.dataPoints[0];
+            const data = pieData[item?.dataIndex ?? -1];
+            if (!data) {
+              hideExternalTooltip(tooltipEl);
+              return;
+            }
+            tooltipEl.replaceChildren();
+            const title = document.createElement("div");
+            title.textContent = data.fullName;
+            title.style.fontWeight = "600";
+            tooltipEl.appendChild(title);
+            const value = document.createElement("div");
+            value.textContent = metricConfig.format(data.value);
+            tooltipEl.appendChild(value);
+            positionExternalTooltip(chart, tooltip, tooltipEl);
           },
         },
       },

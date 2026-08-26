@@ -24,7 +24,13 @@ import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
-import { getChartJsColor, withOpacity } from "./chartjs-utils";
+import {
+  getChartJsColor,
+  getOrCreateExternalTooltipElement,
+  hideExternalTooltip,
+  positionExternalTooltip,
+  withOpacity,
+} from "./chartjs-utils";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -746,28 +752,35 @@ function DistributionChart({
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: "rgba(255, 255, 255, 0.96)",
-          borderColor: "rgba(148, 163, 184, 0.4)",
-          borderWidth: 1,
-          titleColor: "rgb(17, 24, 39)",
-          bodyColor: "rgb(75, 85, 99)",
-          callbacks: {
-            title(items) {
-              const point = items[0]?.raw as DistributionPoint | undefined;
-              return `Percentile: ${point?.x ?? ""}%`;
-            },
-            label(item) {
-              const point = item.raw as DistributionPoint;
-              return `${metricConfig.label}: ${metricConfig.format(point.y)}`;
-            },
-            afterLabel(item) {
-              const point = item.raw as DistributionPoint;
-              if (!point.sourceLabel) return "";
+          enabled: false,
+          external({ chart, tooltip }) {
+            const tooltipEl = getOrCreateExternalTooltipElement(chart, "statistics-distribution");
+            if (tooltip.opacity === 0) {
+              hideExternalTooltip(tooltipEl);
+              return;
+            }
+            const point = tooltip.dataPoints[0]?.raw as DistributionPoint | undefined;
+            if (!point) {
+              hideExternalTooltip(tooltipEl);
+              return;
+            }
+            tooltipEl.replaceChildren();
+            const title = document.createElement("div");
+            title.textContent = `Percentile: ${point.x}%`;
+            title.style.fontWeight = "600";
+            tooltipEl.appendChild(title);
+            const value = document.createElement("div");
+            value.textContent = `${metricConfig.label}: ${metricConfig.format(point.y)}`;
+            tooltipEl.appendChild(value);
+            if (point.sourceLabel) {
+              const source = document.createElement("div");
               const sourceLabelName = /^\d{4}-\d{2}(-\d{2})?$/.test(point.sourceLabel)
                 ? "Period"
                 : "Source";
-              return `${sourceLabelName}: ${point.sourceLabel}`;
-            },
+              source.textContent = `${sourceLabelName}: ${point.sourceLabel}`;
+              tooltipEl.appendChild(source);
+            }
+            positionExternalTooltip(chart, tooltip, tooltipEl);
           },
         },
       },

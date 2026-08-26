@@ -159,6 +159,9 @@ export function ActivityHeatmap({ entries }: Props) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [hoveredDay, setHoveredDay] = useState<DayData | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const tooltipHideTimeoutRef = useRef(0);
+  const tooltipShowFrameRef = useRef(0);
   const [metric, setMetric] = useState<Metric>("cost");
 
   const dayMap = useMemo(() => buildDayMap(entries), [entries]);
@@ -175,6 +178,14 @@ export function ActivityHeatmap({ entries }: Props) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(
+    () => () => {
+      clearTimeout(tooltipHideTimeoutRef.current);
+      cancelAnimationFrame(tooltipShowFrameRef.current);
+    },
+    [],
+  );
 
   // Layout: 53 weeks, cell size scales up on wide screens, min 16px for scroll
   const numWeeks = 53;
@@ -326,14 +337,31 @@ export function ActivityHeatmap({ entries }: Props) {
                   rx={2}
                   fill={getColor(day[metric])}
                   onMouseEnter={(e) => {
+                    clearTimeout(tooltipHideTimeoutRef.current);
+                    cancelAnimationFrame(tooltipShowFrameRef.current);
+                    tooltipHideTimeoutRef.current = 0;
                     setHoveredDay(day);
                     const rect = (e.target as SVGRectElement).getBoundingClientRect();
                     setTooltipPos({
                       x: rect.left + rect.width / 2,
                       y: rect.top,
                     });
+                    tooltipShowFrameRef.current = requestAnimationFrame(() => {
+                      tooltipShowFrameRef.current = 0;
+                      setTooltipVisible(true);
+                    });
                   }}
-                  onMouseLeave={() => setHoveredDay(null)}
+                  onMouseLeave={() => {
+                    cancelAnimationFrame(tooltipShowFrameRef.current);
+                    tooltipShowFrameRef.current = 0;
+                    tooltipHideTimeoutRef.current = window.setTimeout(() => {
+                      setTooltipVisible(false);
+                      tooltipHideTimeoutRef.current = window.setTimeout(() => {
+                        tooltipHideTimeoutRef.current = 0;
+                        setHoveredDay(null);
+                      }, 180);
+                    }, 150);
+                  }}
                 />
               )),
             )}
@@ -349,7 +377,11 @@ export function ActivityHeatmap({ entries }: Props) {
               border: "1px solid var(--color-border)",
               left: tooltipPos.x,
               top: tooltipPos.y - 36,
-              transform: "translateX(-50%)",
+              transform: tooltipVisible
+                ? "translateX(-50%) translateY(0) scale(1)"
+                : "translateX(-50%) translateY(4px) scale(0.98)",
+              opacity: tooltipVisible ? 1 : 0,
+              transition: "opacity 180ms ease-out, transform 180ms ease-out",
             }}
           >
             <span className="text-text-secondary">{hoveredDay.date}</span>

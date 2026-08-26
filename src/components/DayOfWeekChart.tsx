@@ -30,6 +30,7 @@ import {
   getChartJsColor,
   getChartJsColorForSeries,
   getOrCreateExternalTooltipElement,
+  hideExternalTooltip,
   normalizeStackValue,
   positionExternalTooltip,
   withOpacity,
@@ -515,7 +516,7 @@ function renderDayOfWeekTooltip(
 ) {
   const tooltipEl = getOrCreateExternalTooltipElement(chart, "day-of-week");
   if (tooltip.opacity === 0) {
-    tooltipEl.style.opacity = "0";
+    hideExternalTooltip(tooltipEl);
     return;
   }
   tooltipEl.replaceChildren();
@@ -523,7 +524,7 @@ function renderDayOfWeekTooltip(
     const label = tooltip.title[0] ?? "";
     const bucket = data.find((item) => item.day === label);
     if (!bucket || bucket.count === 0) {
-      tooltipEl.style.opacity = "0";
+      hideExternalTooltip(tooltipEl);
       return;
     }
     appendTooltipLine(tooltipEl, bucket.day, true);
@@ -548,7 +549,7 @@ function renderDayOfWeekTooltip(
     return Number.isFinite(value) && value !== 0;
   });
   if (items.length === 0) {
-    tooltipEl.style.opacity = "0";
+    hideExternalTooltip(tooltipEl);
     return;
   }
   appendTooltipLine(tooltipEl, tooltip.title.join(" "), true);

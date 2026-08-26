@@ -34,6 +34,7 @@ import {
   getChartJsColorForSeries,
   getOrCreateExternalTooltipElement,
   getParsedTooltipValue,
+  hideExternalTooltip,
   positionExternalTooltip,
   shouldSyncChartHover,
   syncChartHoverState,
@@ -116,13 +117,13 @@ function renderExternalTooltip({
   const tooltipEl = getOrCreateExternalTooltipElement(chart, "cache-efficiency");
 
   if (tooltip.opacity === 0) {
-    tooltipEl.style.opacity = "0";
+    hideExternalTooltip(tooltipEl);
     return;
   }
 
   const items = tooltip.dataPoints.filter(shouldShowTooltipItem);
   if (items.length === 0) {
-    tooltipEl.style.opacity = "0";
+    hideExternalTooltip(tooltipEl);
     return;
   }
 

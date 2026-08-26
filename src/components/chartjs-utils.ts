@@ -42,6 +42,9 @@ export function normalizeStackValue(
   const total = visibleKeys.reduce((sum, itemKey) => sum + (asNumber(row[itemKey]) ?? 0), 0);
   return total > 0 ? raw / total : 0;
 }
+const EXTERNAL_TOOLTIP_VISIBLE_TRANSFORM = "translateX(-50%) translateY(0) scale(1)";
+const EXTERNAL_TOOLTIP_HIDDEN_TRANSFORM = "translateX(-50%) translateY(4px) scale(0.98)";
+const EXTERNAL_TOOLTIP_TRANSITION = "opacity 180ms ease-out, transform 180ms ease-out";
 
 export function getOrCreateExternalTooltipElement(
   chart: ChartJsInstance,
@@ -68,11 +71,19 @@ export function getOrCreateExternalTooltipElement(
     tooltipEl.style.fontSize = "12px";
     tooltipEl.style.lineHeight = "1.35";
     tooltipEl.style.padding = "8px 10px";
-    tooltipEl.style.transition = "opacity 80ms ease";
+    tooltipEl.style.transition = EXTERNAL_TOOLTIP_TRANSITION;
+    tooltipEl.style.opacity = "0";
+    tooltipEl.style.transform = EXTERNAL_TOOLTIP_HIDDEN_TRANSFORM;
     parent.appendChild(tooltipEl);
   }
 
   return tooltipEl;
+}
+
+export function hideExternalTooltip(tooltipEl: HTMLDivElement) {
+  tooltipEl.style.transitionDelay = "150ms";
+  tooltipEl.style.opacity = "0";
+  tooltipEl.style.transform = EXTERNAL_TOOLTIP_HIDDEN_TRANSFORM;
 }
 
 export function positionExternalTooltip<TType extends "bar" | "line" | "doughnut">(
@@ -95,10 +106,11 @@ export function positionExternalTooltip<TType extends "bar" | "line" | "doughnut
     top = Math.max(8, parentRect.height - tooltipHeight - 8);
   }
 
+  tooltipEl.style.transitionDelay = "0ms";
   tooltipEl.style.opacity = "1";
   tooltipEl.style.left = `${left}px`;
   tooltipEl.style.top = `${top}px`;
-  tooltipEl.style.transform = "translateX(-50%)";
+  tooltipEl.style.transform = EXTERNAL_TOOLTIP_VISIBLE_TRANSFORM;
 }
 
 export function getParsedTooltipValue<TType extends "bar" | "line" | "doughnut">(

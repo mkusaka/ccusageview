@@ -35,6 +35,7 @@ import {
   getChartJsColorForSeries,
   getOrCreateExternalTooltipElement,
   getParsedTooltipValue,
+  hideExternalTooltip,
   normalizeStackValue,
   positionExternalTooltip,
   shouldSyncChartHover,
@@ -631,7 +632,7 @@ function renderTokenTooltip(
 ) {
   const tooltipEl = getOrCreateExternalTooltipElement(chart, "tokens");
   if (tooltip.opacity === 0) {
-    tooltipEl.style.opacity = "0";
+    hideExternalTooltip(tooltipEl);
     return;
   }
   const items = tooltip.dataPoints.filter((item) => {
@@ -639,7 +640,7 @@ function renderTokenTooltip(
     return Number.isFinite(value) && value !== 0;
   });
   if (items.length === 0) {
-    tooltipEl.style.opacity = "0";
+    hideExternalTooltip(tooltipEl);
     return;
   }
   const row = sourceData[items[0]?.dataIndex ?? 0] as Record<string, unknown> | undefined;

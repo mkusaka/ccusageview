@@ -30,6 +30,7 @@ import {
   getChartJsColor,
   getChartJsColorForSeries,
   getOrCreateExternalTooltipElement,
+  hideExternalTooltip,
   normalizeStackValue,
   positionExternalTooltip,
   withOpacity,
@@ -515,7 +516,7 @@ function renderHourOfDayTooltip(
 ) {
   const tooltipEl = getOrCreateExternalTooltipElement(chart, "hour-of-day");
   if (tooltip.opacity === 0) {
-    tooltipEl.style.opacity = "0";
+    hideExternalTooltip(tooltipEl);
     return;
   }
   tooltipEl.replaceChildren();
@@ -523,7 +524,7 @@ function renderHourOfDayTooltip(
     const label = tooltip.title[0] ?? "";
     const bucket = data.find((item) => String(item.hour) === label);
     if (!bucket || bucket.count === 0) {
-      tooltipEl.style.opacity = "0";
+      hideExternalTooltip(tooltipEl);
       return;
     }
     appendTooltipLine(tooltipEl, `${bucket.hour}:00`, true);
@@ -548,7 +549,7 @@ function renderHourOfDayTooltip(
     return Number.isFinite(value) && value !== 0;
   });
   if (items.length === 0) {
-    tooltipEl.style.opacity = "0";
+    hideExternalTooltip(tooltipEl);
     return;
   }
   appendTooltipLine(tooltipEl, tooltip.title.join(" "), true);
