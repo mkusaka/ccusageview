@@ -147,7 +147,7 @@ function renderExternalTooltip({
 
     const body = document.createElement("div");
     body.style.display = "grid";
-    body.style.gridTemplateColumns = items.length > 10 ? "repeat(2, minmax(300px, 1fr))" : "1fr";
+    body.style.gridTemplateColumns = items.length > 10 ? "repeat(2, max-content)" : "max-content";
     body.style.columnGap = "12px";
     body.style.rowGap = "3px";
 
@@ -156,7 +156,6 @@ function renderExternalTooltip({
       row.style.display = "flex";
       row.style.alignItems = "center";
       row.style.gap = "6px";
-      row.style.minWidth = "0";
 
       const marker = document.createElement("span");
       marker.style.width = "8px";
@@ -166,7 +165,6 @@ function renderExternalTooltip({
 
       const text = document.createElement("span");
       text.textContent = formatTooltipItem(item);
-      text.style.minWidth = "0";
       text.style.whiteSpace = "nowrap";
 
       row.append(marker, text);
