@@ -75,6 +75,10 @@ export function getOrCreateExternalTooltipElement(
     tooltipEl.style.opacity = "0";
     tooltipEl.style.transform = EXTERNAL_TOOLTIP_HIDDEN_TRANSFORM;
     parent.appendChild(tooltipEl);
+    // Make the canvas container a positioned ancestor so absolute left/top are relative to it.
+    if (getComputedStyle(parent).position === "static") {
+      parent.style.position = "relative";
+    }
   }
 
   return tooltipEl;
