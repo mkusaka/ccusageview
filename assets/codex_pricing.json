@@ -262,7 +262,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/gpt-5.1-2025-11-13": {
     "cache_read_input_token_cost": 1.25e-7,
@@ -291,6 +292,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_minimal_reasoning_effort": true
   },
   "azure/gpt-5.1-chat": {
@@ -316,7 +318,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": true,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/gpt-5.1-chat-2025-11-13": {
     "cache_read_input_token_cost": 1.25e-7,
@@ -344,7 +347,8 @@
     "supports_system_messages": true,
     "supports_tool_choice": false,
     "supports_vision": true,
-    "supports_none_reasoning_effort": true
+    "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none"
   },
   "azure/gpt-5.1-codex": {
     "deprecation_date": "2027-05-15",
@@ -741,6 +745,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -777,6 +782,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -810,6 +816,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true
   },
   "azure/gpt-5.4-mini-2026-03-17": {
@@ -842,6 +849,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true
   },
   "azure/gpt-5.4-nano": {
@@ -874,6 +882,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true
   },
   "azure/gpt-5.4-nano-2026-03-17": {
@@ -906,6 +915,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true
   },
   "azure/gpt-5.4-pro": {
@@ -2014,6 +2024,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": false,
     "supports_minimal_reasoning_effort": true
   },
@@ -2049,6 +2060,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": false,
     "supports_minimal_reasoning_effort": true
   },
@@ -2085,6 +2097,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": false,
     "supports_minimal_reasoning_effort": true
   },
@@ -2225,6 +2238,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -2260,6 +2274,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -2504,6 +2519,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -2543,6 +2559,7 @@
     "supports_tool_choice": true,
     "supports_vision": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": true
   },
@@ -2585,6 +2602,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -2627,6 +2645,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -2666,6 +2685,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
@@ -2705,6 +2725,7 @@
     "supports_vision": true,
     "supports_web_search": true,
     "supports_none_reasoning_effort": true,
+    "default_reasoning_effort": "none",
     "supports_xhigh_reasoning_effort": true,
     "supports_minimal_reasoning_effort": false
   },
