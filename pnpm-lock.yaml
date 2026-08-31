@@ -5,7 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  es-toolkit: 1.51.0
+  es-toolkit: 1.52.0
   sharp: 0.35.3
   miniflare>undici: 8.10.0
   vite>postcss: 8.5.26
