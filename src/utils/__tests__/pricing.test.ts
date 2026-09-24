@@ -78,9 +78,13 @@ describe("getTokenPricing", () => {
     expect(pricing).toEqual({ input: 0.8, output: 4, cacheWrite: 1, cacheRead: 0.08 });
   });
 
-  it("returns pricing for haiku 3 (new naming)", () => {
-    const pricing = getTokenPricing("claude-haiku-3-20240307");
-    expect(pricing).toEqual({ input: 0.25, output: 1.25, cacheWrite: 0.3, cacheRead: 0.03 });
+  it("returns pricing for haiku 3.5 (new naming)", () => {
+    const pricing = getTokenPricing("claude-haiku-3-5-20241022");
+    expect(pricing).toEqual({ input: 0.8, output: 4, cacheWrite: 1, cacheRead: 0.08 });
+  });
+
+  it("returns null for retired haiku 3 (removed from upstream pricing)", () => {
+    expect(getTokenPricing("claude-haiku-3-20240307")).toBeNull();
   });
 
   it("returns pricing for old-format opus 3", () => {
