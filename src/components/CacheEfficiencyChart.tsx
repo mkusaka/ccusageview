@@ -10,6 +10,7 @@ import type {
 } from "chart.js";
 import { Chart as ReactChart } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { ReportType } from "../types";
 import type { BreakdownMode } from "../utils/breakdown";
 import {
   buildCacheEfficiencyChartData,
@@ -22,7 +23,7 @@ import { collectModels, buildModelSeries, MODEL_COLORS } from "../utils/chart";
 import type { ChartDataSeries } from "../utils/chartData";
 import { buildMarkdownSection } from "../utils/chartData";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
-import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_MODEL } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
@@ -44,6 +45,7 @@ import {
 
 interface Props {
   entries: NormalizedEntry[];
+  reportType?: ReportType;
   syncId?: string;
   hoveredDataIndex?: number | null;
   hoveredSyncSource?: string | null;
@@ -299,6 +301,7 @@ function buildChartJsOptions(
 
 export function CacheEfficiencyChart({
   entries,
+  reportType,
   syncId,
   hoveredDataIndex = null,
   hoveredSyncSource = null,
@@ -325,9 +328,7 @@ export function CacheEfficiencyChart({
   const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
   const missingDataCommand =
     viewMode !== "total" && !hasModeData
-      ? breakdownMode === "agent"
-        ? BREAKDOWN_HINT_AGENT
-        : BREAKDOWN_HINT_MODEL
+      ? breakdownHintCommand(reportType, breakdownMode === "agent" ? "agent" : "model")
       : null;
   const breakdownKeys = useMemo(
     () => (hasModeData ? collectModels(entries, breakdownMode) : []),

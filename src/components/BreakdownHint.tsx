@@ -1,8 +1,21 @@
-// Commands to generate the data a breakdown view needs.
-export const BREAKDOWN_HINT_MODEL = "ccusage daily --json";
-export const BREAKDOWN_HINT_AGENT = "ccusage daily --json --by-agent";
+import type { ReportType } from "../types";
+
+const AGENT_REPORTS = new Set<ReportType>(["daily", "weekly", "monthly", "session"]);
+
+// Command that produces the data a breakdown view needs, for the loaded report type.
 // Hourly reports only come from ccost (ccusage has no hourly command).
-export const BREAKDOWN_HINT_HOURLY = "ccost hourly --json";
+export function breakdownHintCommand(
+  reportType: ReportType | undefined,
+  kind: "model" | "agent",
+): string {
+  if (kind === "agent") {
+    const report = reportType && AGENT_REPORTS.has(reportType) ? reportType : "daily";
+    return `ccusage ${report} --json --by-agent`;
+  }
+  if (reportType === "hourly") return "ccost hourly --json";
+  const report = reportType && reportType !== "blocks" ? reportType : "daily";
+  return `ccusage ${report} --json`;
+}
 
 export function BreakdownHint({ command }: { command: string }) {
   return (

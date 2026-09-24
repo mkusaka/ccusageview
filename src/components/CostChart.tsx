@@ -9,6 +9,7 @@ import type {
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { ReportType } from "../types";
 import type { TimeGranularity } from "../utils/projection";
 import { formatProjectionMetadata, getProjectionMetrics } from "../utils/projection";
 import { formatCost, formatCostAxis } from "../utils/format";
@@ -38,10 +39,11 @@ import {
   withOpacity,
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
-import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_MODEL } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
 
 interface Props {
   entries: NormalizedEntry[];
+  reportType?: ReportType;
   syncId?: string;
   timeGranularity?: TimeGranularity;
   hoveredDataIndex?: number | null;
@@ -114,6 +116,7 @@ function buildProjectionTableRows(
 
 export function CostChart({
   entries,
+  reportType,
   syncId,
   timeGranularity,
   hoveredDataIndex = null,
@@ -193,9 +196,10 @@ export function CostChart({
     hasModeData;
   const missingDataCommand =
     viewMode !== "total" && viewMode !== "tokenType" && !hasModeData
-      ? viewMode === "agent" || isAgentModelView
-        ? BREAKDOWN_HINT_AGENT
-        : BREAKDOWN_HINT_MODEL
+      ? breakdownHintCommand(
+          reportType,
+          viewMode === "agent" || isAgentModelView ? "agent" : "model",
+        )
       : null;
   const isTokenTypeView = viewMode === "tokenType" && hasTokenTypeCostData;
   const chartMarkdown = useMemo(() => {

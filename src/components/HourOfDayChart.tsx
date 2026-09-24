@@ -9,6 +9,7 @@ import type {
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { ReportType } from "../types";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatCost, formatCostAxis, formatTokens } from "../utils/format";
 import { collectModels, buildModelSeries, shortenModelName, MODEL_COLORS } from "../utils/chart";
@@ -25,7 +26,7 @@ import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
-import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_HOURLY } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
 import {
   asNumber,
   getChartJsColor,
@@ -39,6 +40,7 @@ import {
 
 interface Props {
   entries: NormalizedEntry[];
+  reportType?: ReportType;
 }
 
 type ViewMode = "total" | "model" | "provider" | "agent";
@@ -128,7 +130,7 @@ function getVisibleChartSeries(
   return visible;
 }
 
-export function HourOfDayChart({ entries }: Props) {
+export function HourOfDayChart({ entries, reportType }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [{ metric, aggregation, viewMode, showPercent, hiddenSeries }, dispatch] = useReducer(
     hourOfDayReducer,
@@ -145,9 +147,7 @@ export function HourOfDayChart({ entries }: Props) {
   const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
   const missingDataCommand =
     viewMode !== "total" && !hasModeData
-      ? breakdownMode === "agent"
-        ? BREAKDOWN_HINT_AGENT
-        : BREAKDOWN_HINT_HOURLY
+      ? breakdownHintCommand(reportType, breakdownMode === "agent" ? "agent" : "model")
       : null;
   const breakdownKeys = useMemo(
     () => (hasModeData ? collectModels(entries, breakdownMode) : []),

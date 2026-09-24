@@ -3,6 +3,7 @@ import "chart.js/auto";
 import type { Chart as ChartJsInstance, ChartData, ChartOptions, Plugin } from "chart.js";
 import { Line } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { ReportType } from "../types";
 import type { BreakdownMode } from "../utils/breakdown";
 import {
   computeAllStats,
@@ -21,7 +22,7 @@ import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatCostAxis, formatTokens, formatSkewness } from "../utils/format";
 import { formatCacheReadRate } from "../utils/cacheEfficiency";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
-import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_MODEL } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
@@ -35,6 +36,7 @@ import {
 
 interface Props {
   entries: NormalizedEntry[];
+  reportType?: ReportType;
 }
 
 interface MetricConfig {
@@ -152,7 +154,7 @@ const STAT_HIGHLIGHT_TARGET: Partial<Record<string, HighlightedStat>> = {
   P99: 99,
 };
 
-export function StatisticsSummary({ entries }: Props) {
+export function StatisticsSummary({ entries, reportType }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<StatMetricKey>("cost");
   const [breakdownMode, setBreakdownMode] = useState<StatisticsBreakdownMode>("total");
@@ -178,9 +180,7 @@ export function StatisticsSummary({ entries }: Props) {
   const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
   const missingDataCommand =
     breakdownMode !== "total" && !hasModeData
-      ? breakdownMode === "agent"
-        ? BREAKDOWN_HINT_AGENT
-        : BREAKDOWN_HINT_MODEL
+      ? breakdownHintCommand(reportType, breakdownMode === "agent" ? "agent" : "model")
       : null;
   const breakdownKeys = useMemo(() => {
     if (breakdownMode === "total" || !hasModeData) return [];

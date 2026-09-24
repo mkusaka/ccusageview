@@ -9,6 +9,7 @@ import type {
 } from "chart.js";
 import { Bar } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { ReportType } from "../types";
 import type { TimeGranularity } from "../utils/projection";
 import { formatProjectionMetadata, getProjectionMetrics } from "../utils/projection";
 import type { BreakdownMode } from "../utils/breakdown";
@@ -45,10 +46,11 @@ import {
   withOpacity,
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
-import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_MODEL } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
 
 interface Props {
   entries: NormalizedEntry[];
+  reportType?: ReportType;
   syncId?: string;
   timeGranularity?: TimeGranularity;
   hoveredDataIndex?: number | null;
@@ -154,6 +156,7 @@ function buildProjectionTableRows(
 
 export function TokenChart({
   entries,
+  reportType,
   syncId,
   timeGranularity,
   hoveredDataIndex = null,
@@ -257,9 +260,10 @@ export function TokenChart({
     hasModeData;
   const missingDataCommand =
     viewMode !== "type" && !hasModeData
-      ? viewMode === "agent" || isAgentModelView
-        ? BREAKDOWN_HINT_AGENT
-        : BREAKDOWN_HINT_MODEL
+      ? breakdownHintCommand(
+          reportType,
+          viewMode === "agent" || isAgentModelView ? "agent" : "model",
+        )
       : null;
   const isTokenStackView = isBreakdownView && breakdownTokenType === "stack";
   const selectedTokenType = breakdownTokenType;

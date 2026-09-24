@@ -3,6 +3,7 @@ import "chart.js/auto";
 import type { ChartData, ChartOptions } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { ReportType } from "../types";
 import { aggregateBreakdowns, type AggregatedBreakdown } from "../utils/aggregate";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatCacheReadRate, getCacheReadRate } from "../utils/cacheEfficiency";
@@ -25,10 +26,11 @@ import {
   withOpacity,
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
-import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_MODEL } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
 
 interface Props {
   entries: NormalizedEntry[];
+  reportType?: ReportType;
 }
 
 const METRICS = {
@@ -109,7 +111,7 @@ interface PieDataItem {
   value: number;
 }
 
-export function ModelBreakdown({ entries }: Props) {
+export function ModelBreakdown({ entries, reportType }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("model");
   const [sortState, setSortState] = useState(() => createInitialModelBreakdownSortState());
@@ -308,9 +310,10 @@ export function ModelBreakdown({ entries }: Props) {
 
   const missingDataCommand =
     sortedRows.length === 0
-      ? viewMode === "agent" || isAgentModelView
-        ? BREAKDOWN_HINT_AGENT
-        : BREAKDOWN_HINT_MODEL
+      ? breakdownHintCommand(
+          reportType,
+          viewMode === "agent" || isAgentModelView ? "agent" : "model",
+        )
       : null;
 
   if (sortedRows.length === 0 && !missingDataCommand) return null;

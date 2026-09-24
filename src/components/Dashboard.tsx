@@ -121,10 +121,6 @@ export function Dashboard({ data }: Props) {
     [isFullRange, totals, filteredEntries],
   );
 
-  const hasModelBreakdowns = filteredEntries.some(
-    (e) => e.modelBreakdowns && e.modelBreakdowns.length > 0,
-  );
-
   const showHeatmap = reportType === "daily" || reportType === "weekly" || reportType === "hourly";
   const showDayOfWeek =
     (reportType === "daily" && granularity === "daily") ||
@@ -247,7 +243,9 @@ export function Dashboard({ data }: Props) {
         <div ref={dashboardRef} className="space-y-4">
           <SummaryCards totals={filteredTotals} entryCount={filteredEntries.length} />
 
-          {filteredEntries.length >= 2 && <StatisticsSummary entries={filteredEntries} />}
+          {filteredEntries.length >= 2 && (
+            <StatisticsSummary entries={filteredEntries} reportType={reportType} />
+          )}
 
           {filteredEntries.length > 0 && (
             <>
@@ -255,12 +253,16 @@ export function Dashboard({ data }: Props) {
               {showDayOfWeek && (
                 <DayOfWeekChart
                   entries={reportType === "hourly" ? dailyEntries : filteredEntries}
+                  reportType={reportType}
                 />
               )}
-              {showHourOfDay && <HourOfDayChart entries={filteredEntries} />}
+              {showHourOfDay && (
+                <HourOfDayChart entries={filteredEntries} reportType={reportType} />
+              )}
               <div className="space-y-4" onMouseLeave={handleSyncedChartGroupMouseLeave}>
                 <CostChart
                   entries={filteredEntries}
+                  reportType={reportType}
                   syncId={COST_TOKEN_CHART_SYNC_ID}
                   timeGranularity={timeGranularity}
                   hoveredDataIndex={syncedChartHoverState.index}
@@ -269,6 +271,7 @@ export function Dashboard({ data }: Props) {
                 />
                 <TokenChart
                   entries={filteredEntries}
+                  reportType={reportType}
                   syncId={COST_TOKEN_CHART_SYNC_ID}
                   timeGranularity={timeGranularity}
                   hoveredDataIndex={syncedChartHoverState.index}
@@ -277,13 +280,14 @@ export function Dashboard({ data }: Props) {
                 />
                 <CacheEfficiencyChart
                   entries={filteredEntries}
+                  reportType={reportType}
                   syncId={COST_TOKEN_CHART_SYNC_ID}
                   hoveredDataIndex={syncedChartHoverState.index}
                   hoveredSyncSource={syncedChartHoverState.source}
                   onHoverDataIndexChange={handleSyncedChartHoverIndexChange}
                 />
               </div>
-              {hasModelBreakdowns && <ModelBreakdown entries={filteredEntries} />}
+              <ModelBreakdown entries={filteredEntries} reportType={reportType} />
             </>
           )}
         </div>
