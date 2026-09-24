@@ -44,7 +44,7 @@ import {
   syncChartHoverState,
   withOpacity,
 } from "./chartjs-utils";
-import { useProviderSelection } from "./useProviderSelection";
+import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -79,7 +79,7 @@ const TOKEN_TYPE_TABS: { key: ModelTokenType | "stack"; label: string }[] = [
   { key: "stack", label: "Stack" },
 ];
 
-type ViewMode = "type" | "model" | "provider" | "providerModel" | "agent";
+type ViewMode = "type" | "model" | "provider" | "providerModel" | "agent" | "agentModel";
 type TokenTypeSeries = (typeof TYPE_SERIES)[number];
 type StackTokenType = Exclude<ModelTokenType, "totalTokens">;
 type BreakdownTokenType = ModelTokenType | "stack";
@@ -167,8 +167,13 @@ export function TokenChart({
   const breakdownMode: BreakdownMode =
     viewMode === "provider" || viewMode === "agent" ? viewMode : "model";
   const isProviderModelView = viewMode === "providerModel";
+  const isAgentModelView = viewMode === "agentModel";
   const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
     useProviderSelection(entries, isProviderModelView);
+  const { agentKeys, selectedAgent, activeAgentFilter, selectAgent } = useAgentSelection(
+    entries,
+    isAgentModelView,
+  );
 
   const toggleSeries = (key: string) => {
     setHiddenSeries((prev) => {
@@ -181,27 +186,50 @@ export function TokenChart({
 
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
   const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
-  const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
+  const hasModeData = viewMode === "agent" || isAgentModelView ? hasAgentData : hasBreakdownData;
 
   const breakdownKeys = useMemo(
-    () => (hasModeData ? collectModels(entries, breakdownMode, activeProviderFilter) : []),
-    [entries, hasModeData, breakdownMode, activeProviderFilter],
+    () =>
+      hasModeData
+        ? collectModels(entries, breakdownMode, activeProviderFilter, activeAgentFilter)
+        : [],
+    [entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter],
   );
 
   const breakdownChartData = useMemo(
     () =>
       hasModeData && breakdownTokenType !== "stack"
-        ? buildTokenTypeByModel(entries, breakdownTokenType, breakdownMode, activeProviderFilter)
+        ? buildTokenTypeByModel(
+            entries,
+            breakdownTokenType,
+            breakdownMode,
+            activeProviderFilter,
+            activeAgentFilter,
+          )
         : [],
-    [entries, hasModeData, breakdownTokenType, breakdownMode, activeProviderFilter],
+    [
+      entries,
+      hasModeData,
+      breakdownTokenType,
+      breakdownMode,
+      activeProviderFilter,
+      activeAgentFilter,
+    ],
   );
 
   const tokenStackChartData = useMemo(
     () =>
       hasModeData && breakdownTokenType === "stack"
-        ? buildTokenTypeStacks(entries, breakdownMode, activeProviderFilter)
+        ? buildTokenTypeStacks(entries, breakdownMode, activeProviderFilter, activeAgentFilter)
         : [],
-    [entries, hasModeData, breakdownTokenType, breakdownMode, activeProviderFilter],
+    [
+      entries,
+      hasModeData,
+      breakdownTokenType,
+      breakdownMode,
+      activeProviderFilter,
+      activeAgentFilter,
+    ],
   );
 
   const breakdownSeries = useMemo(
@@ -213,16 +241,18 @@ export function TokenChart({
             MODEL_COLORS,
             breakdownMode,
             activeProviderFilter,
+            activeAgentFilter,
           )
         : [],
-    [breakdownKeys, entries, hasModeData, breakdownMode, activeProviderFilter],
+    [breakdownKeys, entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter],
   );
 
   const isBreakdownView =
     (viewMode === "model" ||
       viewMode === "provider" ||
       isProviderModelView ||
-      viewMode === "agent") &&
+      viewMode === "agent" ||
+      isAgentModelView) &&
     hasModeData;
   const isTokenStackView = isBreakdownView && breakdownTokenType === "stack";
   const selectedTokenType = breakdownTokenType;
@@ -240,7 +270,9 @@ export function TokenChart({
             ? "By Provider → Model"
             : viewMode === "agent"
               ? "By Agent"
-              : "By Model";
+              : isAgentModelView
+                ? "By Agent → Model"
+                : "By Model";
       series = isTokenStackView
         ? getTokenStackSeries(breakdownSeries, hiddenSeries)
         : getVisibleChartSeries(breakdownSeries, hiddenSeries);
@@ -271,6 +303,7 @@ export function TokenChart({
         ...(isProviderModelView
           ? ([["Provider", selectedProvider ?? "None"]] as [string, unknown][])
           : []),
+        ...(isAgentModelView ? ([["Agent", selectedAgent ?? "None"]] as [string, unknown][]) : []),
         ...(isBreakdownView
           ? ([
               [
@@ -314,8 +347,10 @@ export function TokenChart({
     breakdownSeries,
     entries,
     hiddenSeries,
+    isAgentModelView,
     isBreakdownView,
     isProviderModelView,
+    selectedAgent,
     selectedTokenType,
     selectedProvider,
     showPercent,
@@ -416,6 +451,21 @@ export function TokenChart({
                   By Agent
                 </button>
               )}
+              {hasAgentData && (
+                <button
+                  onClick={() => {
+                    setViewMode("agentModel");
+                    setHiddenSeries(new Set());
+                  }}
+                  className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
+                    viewMode === "agentModel"
+                      ? "bg-bg-card text-text-primary shadow-sm"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  By Agent → Model
+                </button>
+              )}
             </div>
           )}
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
@@ -447,6 +497,25 @@ export function TokenChart({
             {providerKeys.map((provider) => (
               <option key={provider} value={provider}>
                 {provider}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {isAgentModelView && selectedAgent && (
+        <label className="flex items-center gap-2 mb-3 w-fit text-xs text-text-secondary">
+          <span>Agent</span>
+          <select
+            value={selectedAgent}
+            onChange={(event) => {
+              selectAgent(event.target.value);
+              setHiddenSeries(new Set());
+            }}
+            className="px-2 py-0.5 text-xs rounded border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent"
+          >
+            {agentKeys.map((agent) => (
+              <option key={agent} value={agent}>
+                {agent}
               </option>
             ))}
           </select>

@@ -139,6 +139,30 @@ describe("groupEntries", () => {
     expect(result[0].modelBreakdowns![0].modelName).toBe("claude-sonnet-4-20250514");
   });
 
+  it("merges nested modelBreakdowns inside agentBreakdowns", () => {
+    const agents = (modelBreakdowns: ModelBreakdown[]) => [
+      { ...MB_SONNET, modelName: "claude", modelBreakdowns },
+    ];
+    const entries = [
+      makeEntry("2025-07", { agentBreakdowns: agents([MB_SONNET]) }),
+      makeEntry("2025-07", {
+        agentBreakdowns: agents([{ ...MB_SONNET, inputTokens: 300, cost: 0.5 }, MB_GPT]),
+      }),
+    ];
+    const result = groupEntries(entries, (e) => e.label);
+
+    const agent = result[0].agentBreakdowns![0];
+    expect(agent.modelName).toBe("claude");
+    expect(agent.inputTokens).toBe(1000);
+    expect(agent.modelBreakdowns).toHaveLength(2);
+    expect(agent.modelBreakdowns![0]).toMatchObject({
+      modelName: "claude-sonnet-4-20250514",
+      inputTokens: 800,
+      cost: 1.5,
+    });
+    expect(agent.modelBreakdowns![1].modelName).toBe("gpt-5-codex");
+  });
+
   it("sorts results by key", () => {
     const entries = [makeEntry("c"), makeEntry("a"), makeEntry("b")];
     const result = groupEntries(entries, (e) => e.label);

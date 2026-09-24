@@ -24,7 +24,7 @@ import {
   positionExternalTooltip,
   withOpacity,
 } from "./chartjs-utils";
-import { useProviderSelection } from "./useProviderSelection";
+import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -100,7 +100,7 @@ function getTableColumns(mode: BreakdownMode): TableColumn[] {
   ];
 }
 
-type ViewMode = BreakdownMode | "providerModel";
+type ViewMode = BreakdownMode | "providerModel" | "agentModel";
 
 interface PieDataItem {
   name: string;
@@ -114,14 +114,19 @@ export function ModelBreakdown({ entries }: Props) {
   const [sortState, setSortState] = useState(() => createInitialModelBreakdownSortState());
 
   const isProviderModelView = viewMode === "providerModel";
-  const mode: BreakdownMode = viewMode === "providerModel" ? "model" : viewMode;
+  const isAgentModelView = viewMode === "agentModel";
+  const mode: BreakdownMode = viewMode === "providerModel" || isAgentModelView ? "model" : viewMode;
   const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
   const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
     useProviderSelection(entries, isProviderModelView);
+  const { agentKeys, selectedAgent, activeAgentFilter, selectAgent } = useAgentSelection(
+    entries,
+    isAgentModelView,
+  );
 
   const rows = useMemo(
-    () => aggregateBreakdowns(entries, mode, activeProviderFilter),
-    [entries, mode, activeProviderFilter],
+    () => aggregateBreakdowns(entries, mode, activeProviderFilter, activeAgentFilter),
+    [entries, mode, activeProviderFilter, activeAgentFilter],
   );
   const columns = useMemo(() => getTableColumns(mode), [mode]);
   const { metric, sortCol, sortDir } = sortState;
@@ -223,10 +228,15 @@ export function ModelBreakdown({ entries }: Props) {
                 ? "By Provider → Model"
                 : viewMode === "agent"
                   ? "By Agent"
-                  : "By Model",
+                  : isAgentModelView
+                    ? "By Agent → Model"
+                    : "By Model",
           ],
           ...(isProviderModelView
             ? ([["Provider", selectedProvider ?? "None"]] as [string, unknown][])
+            : []),
+          ...(isAgentModelView
+            ? ([["Agent", selectedAgent ?? "None"]] as [string, unknown][])
             : []),
           ["Pie metric", metricConfig.label],
           ["Sort", `${sortCol} ${sortDir}`],
@@ -270,11 +280,13 @@ export function ModelBreakdown({ entries }: Props) {
         ],
       }),
     [
+      isAgentModelView,
       isProviderModelView,
       markdownRows,
       metricConfig.label,
       mode,
       pieData,
+      selectedAgent,
       selectedProvider,
       sortCol,
       sortDir,
@@ -351,6 +363,18 @@ export function ModelBreakdown({ entries }: Props) {
                 By Agent
               </button>
             )}
+            {hasAgentData && (
+              <button
+                onClick={() => setViewMode("agentModel")}
+                className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
+                  viewMode === "agentModel"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Agent → Model
+              </button>
+            )}
           </div>
           {isProviderModelView && selectedProvider && (
             <label className="flex items-center gap-2 w-fit text-xs text-text-secondary shrink-0">
@@ -363,6 +387,22 @@ export function ModelBreakdown({ entries }: Props) {
                 {providerKeys.map((provider) => (
                   <option key={provider} value={provider}>
                     {provider}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {isAgentModelView && selectedAgent && (
+            <label className="flex items-center gap-2 w-fit text-xs text-text-secondary shrink-0">
+              <span>Agent</span>
+              <select
+                value={selectedAgent}
+                onChange={(event) => selectAgent(event.target.value)}
+                className="px-2 py-0.5 text-xs rounded border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent"
+              >
+                {agentKeys.map((agent) => (
+                  <option key={agent} value={agent}>
+                    {agent}
                   </option>
                 ))}
               </select>

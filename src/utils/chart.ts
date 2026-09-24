@@ -24,8 +24,9 @@ export function collectModels(
   entries: NormalizedEntry[],
   mode: BreakdownMode = "model",
   providerFilter?: string,
+  agentFilter?: string,
 ): string[] {
-  return collectBreakdownKeys(entries, mode, providerFilter);
+  return collectBreakdownKeys(entries, mode, providerFilter, agentFilter);
 }
 
 export interface SeriesItem {
@@ -40,6 +41,7 @@ export function buildModelSeries(
   colors: string[] = MODEL_COLORS,
   mode: BreakdownMode = "model",
   providerFilter?: string,
+  agentFilter?: string,
 ): SeriesItem[] {
   const result = allModels.map((m, i) => ({
     key: m,
@@ -48,6 +50,7 @@ export function buildModelSeries(
   }));
   if (
     providerFilter === undefined &&
+    agentFilter === undefined &&
     entries.some((e) => !getEntryBreakdowns(e, mode) || getEntryBreakdowns(e, mode)!.length === 0)
   ) {
     result.push({
@@ -66,13 +69,14 @@ function buildMetricByBreakdown(
   metric: ChartBreakdownMetricKey,
   mode: BreakdownMode,
   providerFilter?: string,
+  agentFilter?: string,
 ): Record<string, string | number>[] {
   return entries.map((entry) => {
     const row: Record<string, string | number> = { label: entry.label };
-    const grouped = groupBreakdowns(entry, mode, providerFilter);
+    const grouped = groupBreakdowns(entry, mode, providerFilter, agentFilter);
 
     if (grouped.size === 0) {
-      if (providerFilter === undefined) {
+      if (providerFilter === undefined && agentFilter === undefined) {
         row[OTHER_BREAKDOWN_KEY] = metric === "cost" ? entry.cost : entry[metric];
       }
       return row;
@@ -90,8 +94,9 @@ export function buildCostByModel(
   entries: NormalizedEntry[],
   mode: BreakdownMode = "model",
   providerFilter?: string,
+  agentFilter?: string,
 ): Record<string, string | number>[] {
-  return buildMetricByBreakdown(entries, "cost", mode, providerFilter);
+  return buildMetricByBreakdown(entries, "cost", mode, providerFilter, agentFilter);
 }
 
 export type ModelTokenType =
@@ -108,8 +113,9 @@ export function buildTokenTypeByModel(
   tokenType: ModelTokenType,
   mode: BreakdownMode = "model",
   providerFilter?: string,
+  agentFilter?: string,
 ): TokenBreakdownChartRow[] {
-  return buildMetricByBreakdown(entries, tokenType, mode, providerFilter);
+  return buildMetricByBreakdown(entries, tokenType, mode, providerFilter, agentFilter);
 }
 
 export function getTokenStackKey(
@@ -123,13 +129,14 @@ export function buildTokenTypeStacks(
   entries: NormalizedEntry[],
   mode: BreakdownMode = "model",
   providerFilter?: string,
+  agentFilter?: string,
 ): TokenBreakdownChartRow[] {
   return entries.map((entry) => {
     const row: Record<string, string | number> = { label: entry.label };
-    const grouped = groupBreakdowns(entry, mode, providerFilter);
+    const grouped = groupBreakdowns(entry, mode, providerFilter, agentFilter);
 
     if (grouped.size === 0) {
-      if (providerFilter === undefined) {
+      if (providerFilter === undefined && agentFilter === undefined) {
         for (const tokenType of [
           "inputTokens",
           "outputTokens",

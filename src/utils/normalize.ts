@@ -13,10 +13,17 @@ export interface NormalizedEntry {
   models: string[];
   modelBreakdowns?: ModelBreakdown[];
   // Per-agent breakdowns in ModelBreakdown shape (modelName = agent name)
-  agentBreakdowns?: ModelBreakdown[];
+  agentBreakdowns?: AgentModelBreakdown[];
 }
 
-function toAgentBreakdowns(agents: AgentBreakdown[] | undefined): ModelBreakdown[] | undefined {
+// Agent-level breakdown row that keeps the agent's own model breakdowns
+export interface AgentModelBreakdown extends ModelBreakdown {
+  modelBreakdowns?: ModelBreakdown[];
+}
+
+function toAgentBreakdowns(
+  agents: AgentBreakdown[] | undefined,
+): AgentModelBreakdown[] | undefined {
   if (!agents || agents.length === 0) return undefined;
   return agents.map((a) => ({
     modelName: a.agent,
@@ -25,6 +32,7 @@ function toAgentBreakdowns(agents: AgentBreakdown[] | undefined): ModelBreakdown
     cacheCreationTokens: a.cacheCreationTokens,
     cacheReadTokens: a.cacheReadTokens,
     cost: a.totalCost,
+    modelBreakdowns: a.modelBreakdowns,
   }));
 }
 

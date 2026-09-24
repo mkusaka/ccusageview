@@ -97,20 +97,27 @@ function getBreakdownKey(modelName: string, mode: BreakdownMode): string {
 
 // Breakdown rows for the given mode: models/providers come from modelBreakdowns,
 // agents from agentBreakdowns (agent name stored in modelName).
+// agentFilter selects one agent's nested modelBreakdowns (By Agent → Model).
 export function getEntryBreakdowns(
   entry: NormalizedEntry,
   mode: BreakdownMode,
+  agentFilter?: string,
 ): ModelBreakdown[] | undefined {
-  return mode === "agent" ? entry.agentBreakdowns : entry.modelBreakdowns;
+  if (mode === "agent") return entry.agentBreakdowns;
+  if (agentFilter !== undefined) {
+    return entry.agentBreakdowns?.find((a) => a.modelName === agentFilter)?.modelBreakdowns;
+  }
+  return entry.modelBreakdowns;
 }
 
 export function groupBreakdowns(
   entry: NormalizedEntry,
   mode: BreakdownMode,
   providerFilter?: string,
+  agentFilter?: string,
 ): Map<string, BreakdownMetrics> {
   const grouped = new Map<string, BreakdownMetrics>();
-  const breakdowns = getEntryBreakdowns(entry, mode);
+  const breakdowns = getEntryBreakdowns(entry, mode, agentFilter);
 
   if (!breakdowns || breakdowns.length === 0) {
     return grouped;
@@ -145,11 +152,12 @@ export function collectBreakdownKeys(
   entries: NormalizedEntry[],
   mode: BreakdownMode,
   providerFilter?: string,
+  agentFilter?: string,
 ): string[] {
   const keys = new Set<string>();
 
   for (const entry of entries) {
-    const breakdowns = getEntryBreakdowns(entry, mode);
+    const breakdowns = getEntryBreakdowns(entry, mode, agentFilter);
     if (!breakdowns || breakdowns.length === 0) continue;
 
     for (const breakdown of breakdowns) {

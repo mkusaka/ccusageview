@@ -37,7 +37,7 @@ import {
   syncChartHoverState,
   withOpacity,
 } from "./chartjs-utils";
-import { useProviderSelection } from "./useProviderSelection";
+import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -48,7 +48,14 @@ interface Props {
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }
 
-type ViewMode = "total" | "model" | "provider" | "providerModel" | "tokenType" | "agent";
+type ViewMode =
+  | "total"
+  | "model"
+  | "provider"
+  | "providerModel"
+  | "tokenType"
+  | "agent"
+  | "agentModel";
 type CostBreakdownChartData = ReturnType<typeof buildCostByModel>;
 type TokenTypeCostData = ReturnType<typeof buildCostByTokenType>;
 type CostChartRow = NormalizedEntry | CostBreakdownChartData[number] | TokenTypeCostData[number];
@@ -119,8 +126,13 @@ export function CostChart({
   const breakdownMode: BreakdownMode =
     viewMode === "provider" || viewMode === "agent" ? viewMode : "model";
   const isProviderModelView = viewMode === "providerModel";
+  const isAgentModelView = viewMode === "agentModel";
   const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
     useProviderSelection(entries, isProviderModelView);
+  const { agentKeys, selectedAgent, activeAgentFilter, selectAgent } = useAgentSelection(
+    entries,
+    isAgentModelView,
+  );
 
   const toggleSeries = (key: string) => {
     setHiddenSeries((prev) => {
@@ -133,16 +145,22 @@ export function CostChart({
 
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
   const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
-  const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
+  const hasModeData = viewMode === "agent" || isAgentModelView ? hasAgentData : hasBreakdownData;
 
   const breakdownKeys = useMemo(
-    () => (hasModeData ? collectModels(entries, breakdownMode, activeProviderFilter) : []),
-    [entries, hasModeData, breakdownMode, activeProviderFilter],
+    () =>
+      hasModeData
+        ? collectModels(entries, breakdownMode, activeProviderFilter, activeAgentFilter)
+        : [],
+    [entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter],
   );
 
   const breakdownChartData = useMemo(
-    () => (hasModeData ? buildCostByModel(entries, breakdownMode, activeProviderFilter) : []),
-    [entries, hasModeData, breakdownMode, activeProviderFilter],
+    () =>
+      hasModeData
+        ? buildCostByModel(entries, breakdownMode, activeProviderFilter, activeAgentFilter)
+        : [],
+    [entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter],
   );
 
   const breakdownSeries = useMemo(
@@ -154,9 +172,10 @@ export function CostChart({
             MODEL_COLORS,
             breakdownMode,
             activeProviderFilter,
+            activeAgentFilter,
           )
         : [],
-    [breakdownKeys, entries, hasModeData, breakdownMode, activeProviderFilter],
+    [breakdownKeys, entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter],
   );
 
   const tokenTypeCostData = useMemo(() => buildCostByTokenType(entries), [entries]);
@@ -168,7 +187,8 @@ export function CostChart({
     (viewMode === "model" ||
       viewMode === "provider" ||
       isProviderModelView ||
-      viewMode === "agent") &&
+      viewMode === "agent" ||
+      isAgentModelView) &&
     hasModeData;
   const isTokenTypeView = viewMode === "tokenType" && hasTokenTypeCostData;
   const chartMarkdown = useMemo(() => {
@@ -192,7 +212,9 @@ export function CostChart({
             ? "By Provider → Model"
             : viewMode === "agent"
               ? "By Agent"
-              : "By Model";
+              : isAgentModelView
+                ? "By Agent → Model"
+                : "By Model";
       series = getVisibleChartSeries(breakdownSeries, hiddenSeries);
       sourceRows = breakdownChartData;
     } else {
@@ -217,6 +239,7 @@ export function CostChart({
         ...(isProviderModelView
           ? ([["Provider", selectedProvider ?? "None"]] as [string, unknown][])
           : []),
+        ...(isAgentModelView ? ([["Agent", selectedAgent ?? "None"]] as [string, unknown][]) : []),
         ["Show percent", (isBreakdownView || isTokenTypeView) && showPercent],
         ["Hidden series", Array.from(hiddenSeries)],
         ...(projectionMetadata
@@ -250,9 +273,11 @@ export function CostChart({
     breakdownSeries,
     entries,
     hiddenSeries,
+    isAgentModelView,
     isBreakdownView,
     isProviderModelView,
     isTokenTypeView,
+    selectedAgent,
     selectedProvider,
     showPercent,
     timeGranularity,
@@ -353,6 +378,21 @@ export function CostChart({
                 By Agent
               </button>
             )}
+            {hasAgentData && (
+              <button
+                onClick={() => {
+                  setViewMode("agentModel");
+                  setHiddenSeries(new Set());
+                }}
+                className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
+                  viewMode === "agentModel"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Agent → Model
+              </button>
+            )}
             {hasTokenTypeCostData && (
               <button
                 onClick={() => {
@@ -398,6 +438,25 @@ export function CostChart({
             {providerKeys.map((provider) => (
               <option key={provider} value={provider}>
                 {provider}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {isAgentModelView && selectedAgent && (
+        <label className="flex items-center gap-2 mb-3 w-fit text-xs text-text-secondary">
+          <span>Agent</span>
+          <select
+            value={selectedAgent}
+            onChange={(event) => {
+              selectAgent(event.target.value);
+              setHiddenSeries(new Set());
+            }}
+            className="px-2 py-0.5 text-xs rounded border border-border bg-bg-card text-text-primary focus:outline-none focus:ring-1 focus:ring-accent/30 focus:border-accent"
+          >
+            {agentKeys.map((agent) => (
+              <option key={agent} value={agent}>
+                {agent}
               </option>
             ))}
           </select>

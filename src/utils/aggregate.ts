@@ -1,5 +1,5 @@
 import type { ModelBreakdown } from "../types";
-import type { NormalizedEntry, NormalizedTotals } from "./normalize";
+import type { AgentModelBreakdown, NormalizedEntry, NormalizedTotals } from "./normalize";
 import {
   formatBreakdownLabel,
   groupBreakdowns,
@@ -54,8 +54,8 @@ export function groupEntries(
     {
       numerics: Record<NumericKey, number>;
       models: Set<string>;
-      modelMap: Map<string, ModelBreakdown>;
-      agentMap: Map<string, ModelBreakdown>;
+      modelMap: Map<string, AgentModelBreakdown>;
+      agentMap: Map<string, AgentModelBreakdown>;
       hasBreakdowns: boolean;
       hasAgentBreakdowns: boolean;
     }
@@ -106,8 +106,8 @@ export function groupEntries(
 
 /** breakdowns を modelName でマップにマージ。要素があれば true を返す */
 function mergeBreakdowns(
-  target: Map<string, ModelBreakdown>,
-  breakdowns: ModelBreakdown[] | undefined,
+  target: Map<string, AgentModelBreakdown>,
+  breakdowns: AgentModelBreakdown[] | undefined,
   seen: boolean,
 ): boolean {
   if (!breakdowns) return seen;
@@ -115,11 +115,36 @@ function mergeBreakdowns(
     const existing = target.get(mb.modelName);
     if (existing) {
       for (const k of MB_NUMERIC_KEYS) existing[k] += mb[k];
+      // agentBreakdowns rows carry nested modelBreakdowns — merge them too
+      if (mb.modelBreakdowns || existing.modelBreakdowns) {
+        existing.modelBreakdowns = mergeBreakdownsByName(
+          existing.modelBreakdowns,
+          mb.modelBreakdowns,
+        );
+      }
     } else {
       target.set(mb.modelName, { ...mb });
     }
   }
   return true;
+}
+
+/** 2つの ModelBreakdown リストを modelName で合算して結合 */
+function mergeBreakdownsByName(
+  a: ModelBreakdown[] | undefined,
+  b: ModelBreakdown[] | undefined,
+): ModelBreakdown[] | undefined {
+  if (!a && !b) return undefined;
+  const map = new Map<string, ModelBreakdown>();
+  for (const mb of [...(a ?? []), ...(b ?? [])]) {
+    const existing = map.get(mb.modelName);
+    if (existing) {
+      for (const k of MB_NUMERIC_KEYS) existing[k] += mb[k];
+    } else {
+      map.set(mb.modelName, { ...mb });
+    }
+  }
+  return Array.from(map.values());
 }
 
 /** entries 全体を合算して NormalizedTotals を返す */
@@ -159,11 +184,17 @@ export function aggregateBreakdowns(
   entries: NormalizedEntry[],
   mode: BreakdownMode,
   providerFilter?: string,
+  agentFilter?: string,
 ): AggregatedBreakdown[] {
   const map = new Map<string, BreakdownMetrics>();
 
   for (const entry of entries) {
-    for (const [key, metrics] of groupBreakdowns(entry, mode, providerFilter).entries()) {
+    for (const [key, metrics] of groupBreakdowns(
+      entry,
+      mode,
+      providerFilter,
+      agentFilter,
+    ).entries()) {
       const existing = map.get(key);
       if (existing) {
         for (const metric of BREAKDOWN_NUMERIC_KEYS) {

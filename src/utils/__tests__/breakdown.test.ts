@@ -6,7 +6,7 @@ import {
   groupBreakdowns,
 } from "../breakdown";
 import type { ModelBreakdown } from "../../types";
-import type { NormalizedEntry } from "../normalize";
+import type { AgentModelBreakdown, NormalizedEntry } from "../normalize";
 
 const SONNET: ModelBreakdown = {
   modelName: "claude-sonnet-4-20250514",
@@ -38,7 +38,7 @@ const GPT: ModelBreakdown = {
 function makeEntry(
   label: string,
   modelBreakdowns?: ModelBreakdown[],
-  agentBreakdowns?: ModelBreakdown[],
+  agentBreakdowns?: AgentModelBreakdown[],
 ): NormalizedEntry {
   return {
     label,
@@ -131,6 +131,31 @@ describe("groupBreakdowns", () => {
       cost: 0.7,
     });
   });
+
+  it("groups the selected agent's nested model breakdowns via agentFilter", () => {
+    const agents = [
+      { ...SONNET, modelName: "claude", modelBreakdowns: [SONNET, HAIKU] },
+      { ...GPT, modelName: "codex", modelBreakdowns: [GPT] },
+    ];
+    const grouped = groupBreakdowns(
+      makeEntry("a", [SONNET, HAIKU, GPT], agents),
+      "model",
+      undefined,
+      "claude",
+    );
+
+    expect(Array.from(grouped.keys())).toEqual([
+      "claude-sonnet-4-20250514",
+      "claude-haiku-3-20240307",
+    ]);
+  });
+
+  it("returns empty when the selected agent is absent", () => {
+    const agents = [{ ...SONNET, modelName: "claude", modelBreakdowns: [SONNET] }];
+    const grouped = groupBreakdowns(makeEntry("a", [SONNET], agents), "model", undefined, "codex");
+
+    expect(grouped.size).toBe(0);
+  });
 });
 
 describe("collectBreakdownKeys", () => {
@@ -153,6 +178,20 @@ describe("collectBreakdownKeys", () => {
       makeEntry("b", [GPT], [{ ...GPT, modelName: "codex" }]),
     ];
     expect(collectBreakdownKeys(entries, "agent")).toEqual(["claude", "codex"]);
+  });
+
+  it("collects only models of the selected agent via agentFilter", () => {
+    const entries = [
+      makeEntry(
+        "a",
+        [SONNET, GPT],
+        [
+          { ...SONNET, modelName: "claude", modelBreakdowns: [SONNET] },
+          { ...GPT, modelName: "codex", modelBreakdowns: [GPT] },
+        ],
+      ),
+    ];
+    expect(collectBreakdownKeys(entries, "model", undefined, "codex")).toEqual(["gpt-5-codex"]);
   });
 });
 
