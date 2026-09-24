@@ -5,6 +5,7 @@ import type { SourceInput } from "./utils/inputs";
 import { InputView } from "./components/InputView";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ShareButton } from "./components/ShareButton";
+import { TooltipProvider } from "./components/ui/tooltip";
 
 // Chart.js and every chart component live behind this boundary, which keeps them
 // out of the initial bundle — nothing is rendered until usage data is pasted.
@@ -82,91 +83,93 @@ function App() {
   const nonEmptyInputs = inputs.flatMap((inp) => (inp.content.trim() ? [inp] : []));
 
   return (
-    <div className="min-h-screen bg-bg-primary text-text-primary">
-      {/* Header */}
-      <header className="border-b border-border bg-bg-card/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">
-          <h1 className="text-sm font-semibold tracking-tight">
-            ccusage<span className="text-text-secondary font-normal">view</span>
-          </h1>
-          <div className="flex items-center gap-1">
-            {parseResult.data && <ShareButton />}
-            <button
-              onClick={() => setDarkMode((d) => !d)}
-              className="size-8 flex items-center justify-center rounded-md hover:bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors"
-              title="Toggle dark mode"
-            >
-              {darkMode ? (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5" />
-                  <path
-                    d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              ) : (
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M14 9.5A6.5 6.5 0 016.5 2 5.5 5.5 0 1014 9.5z"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-            </button>
+    <TooltipProvider delayDuration={150}>
+      <div className="min-h-screen bg-bg-primary text-text-primary">
+        {/* Header */}
+        <header className="border-b border-border bg-bg-card/80 backdrop-blur-sm sticky top-0 z-10">
+          <div className="max-w-6xl mx-auto px-4 h-12 flex items-center justify-between">
+            <h1 className="text-sm font-semibold tracking-tight">
+              ccusage<span className="text-text-secondary font-normal">view</span>
+            </h1>
+            <div className="flex items-center gap-1">
+              {parseResult.data && <ShareButton />}
+              <button
+                onClick={() => setDarkMode((d) => !d)}
+                className="size-8 flex items-center justify-center rounded-md hover:bg-bg-secondary text-text-secondary hover:text-text-primary transition-colors"
+                title="Toggle dark mode"
+              >
+                {darkMode ? (
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+                    <path
+                      d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path
+                      d="M14 9.5A6.5 6.5 0 016.5 2 5.5 5.5 0 1014 9.5z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Content */}
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
-        <InputView
-          inputs={inputs}
-          onChange={handleInputsChange}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          error={parseResult.error}
-        />
-        {nonEmptyInputs.length >= 2 && (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-text-secondary">Sources:</span>
-            {inputs.map((inp, i) => {
-              if (!inp.content.trim()) return null;
-              return (
-                <button
-                  key={inp.id}
-                  onClick={() => toggleSource(i)}
-                  className={`px-2.5 py-1 rounded-full border transition-colors select-none ${
-                    inp.enabled
-                      ? "bg-accent/15 border-accent/40 text-accent"
-                      : "bg-bg-secondary border-border text-text-secondary"
-                  }`}
-                >
-                  {inp.label || `Source ${i + 1}`}
-                </button>
-              );
-            })}
-          </div>
-        )}
-        {parseResult.data && (
-          <ErrorBoundary message="Something went wrong while loading the dashboard.">
-            <Suspense
-              fallback={
-                <div className="h-96 flex items-center justify-center text-sm text-text-secondary">
-                  Loading dashboard…
-                </div>
-              }
-            >
-              <Dashboard data={parseResult.data} />
-            </Suspense>
-          </ErrorBoundary>
-        )}
-      </main>
-    </div>
+        {/* Content */}
+        <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+          <InputView
+            inputs={inputs}
+            onChange={handleInputsChange}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            error={parseResult.error}
+          />
+          {nonEmptyInputs.length >= 2 && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-text-secondary">Sources:</span>
+              {inputs.map((inp, i) => {
+                if (!inp.content.trim()) return null;
+                return (
+                  <button
+                    key={inp.id}
+                    onClick={() => toggleSource(i)}
+                    className={`px-2.5 py-1 rounded-full border transition-colors select-none ${
+                      inp.enabled
+                        ? "bg-accent/15 border-accent/40 text-accent"
+                        : "bg-bg-secondary border-border text-text-secondary"
+                    }`}
+                  >
+                    {inp.label || `Source ${i + 1}`}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {parseResult.data && (
+            <ErrorBoundary message="Something went wrong while loading the dashboard.">
+              <Suspense
+                fallback={
+                  <div className="h-96 flex items-center justify-center text-sm text-text-secondary">
+                    Loading dashboard…
+                  </div>
+                }
+              >
+                <Dashboard data={parseResult.data} />
+              </Suspense>
+            </ErrorBoundary>
+          )}
+        </main>
+      </div>
+    </TooltipProvider>
   );
 }
 

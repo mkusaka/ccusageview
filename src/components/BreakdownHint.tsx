@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { ReportType } from "../types";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 const AGENT_REPORTS = new Set<ReportType>(["daily", "weekly", "monthly", "session"]);
 
@@ -19,8 +20,8 @@ export function breakdownHintCommand(
 }
 
 // A tab button that looks disabled and shows a tooltip with the command to
-// generate the missing data. Uses aria-disabled instead of disabled —
-// disabled buttons don't fire hover events, so their title never shows.
+// generate the missing data. Uses aria-disabled instead of disabled so it
+// stays interactive enough for the tooltip trigger.
 export function HintedTab({
   hint,
   children,
@@ -30,15 +31,21 @@ export function HintedTab({
   hint: string | null;
   children: ReactNode;
 }) {
-  return (
+  const button = (
     <button
       {...buttonProps}
       aria-disabled={hint != null || undefined}
-      title={hint ? `No data — generate it with ${hint}` : undefined}
       onClick={hint == null ? onClick : undefined}
     >
       {children}
     </button>
+  );
+  if (hint == null) return button;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent>No data — generate it with {hint}</TooltipContent>
+    </Tooltip>
   );
 }
 
