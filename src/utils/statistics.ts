@@ -64,7 +64,7 @@ export function extractMetricForVisibleModels(
 ): number[] {
   const values: number[] = [];
   for (const e of entries) {
-    const grouped = groupBreakdowns(e.modelBreakdowns, mode);
+    const grouped = groupBreakdowns(e, mode);
     if (grouped.size === 0) {
       if (includeOther) {
         const value = getEntryMetricValue(e, key);
@@ -89,7 +89,7 @@ export function extractMetricForVisibleModelsWithLabels(
 ): LabeledValue[] {
   const result: LabeledValue[] = [];
   for (const e of entries) {
-    const grouped = groupBreakdowns(e.modelBreakdowns, mode);
+    const grouped = groupBreakdowns(e, mode);
     if (grouped.size === 0) {
       if (includeOther) {
         const value = getEntryMetricValue(e, key);

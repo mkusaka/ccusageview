@@ -79,7 +79,7 @@ const TOKEN_TYPE_TABS: { key: ModelTokenType | "stack"; label: string }[] = [
   { key: "stack", label: "Stack" },
 ];
 
-type ViewMode = "type" | "model" | "provider" | "providerModel";
+type ViewMode = "type" | "model" | "provider" | "providerModel" | "agent";
 type TokenTypeSeries = (typeof TYPE_SERIES)[number];
 type StackTokenType = Exclude<ModelTokenType, "totalTokens">;
 type BreakdownTokenType = ModelTokenType | "stack";
@@ -164,7 +164,8 @@ export function TokenChart({
   const [breakdownTokenType, setBreakdownTokenType] = useState<BreakdownTokenType>("inputTokens");
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
-  const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
+  const breakdownMode: BreakdownMode =
+    viewMode === "provider" || viewMode === "agent" ? viewMode : "model";
   const isProviderModelView = viewMode === "providerModel";
   const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
     useProviderSelection(entries, isProviderModelView);
@@ -179,31 +180,33 @@ export function TokenChart({
   };
 
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
+  const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
+  const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
 
   const breakdownKeys = useMemo(
-    () => (hasBreakdownData ? collectModels(entries, breakdownMode, activeProviderFilter) : []),
-    [entries, hasBreakdownData, breakdownMode, activeProviderFilter],
+    () => (hasModeData ? collectModels(entries, breakdownMode, activeProviderFilter) : []),
+    [entries, hasModeData, breakdownMode, activeProviderFilter],
   );
 
   const breakdownChartData = useMemo(
     () =>
-      hasBreakdownData && breakdownTokenType !== "stack"
+      hasModeData && breakdownTokenType !== "stack"
         ? buildTokenTypeByModel(entries, breakdownTokenType, breakdownMode, activeProviderFilter)
         : [],
-    [entries, hasBreakdownData, breakdownTokenType, breakdownMode, activeProviderFilter],
+    [entries, hasModeData, breakdownTokenType, breakdownMode, activeProviderFilter],
   );
 
   const tokenStackChartData = useMemo(
     () =>
-      hasBreakdownData && breakdownTokenType === "stack"
+      hasModeData && breakdownTokenType === "stack"
         ? buildTokenTypeStacks(entries, breakdownMode, activeProviderFilter)
         : [],
-    [entries, hasBreakdownData, breakdownTokenType, breakdownMode, activeProviderFilter],
+    [entries, hasModeData, breakdownTokenType, breakdownMode, activeProviderFilter],
   );
 
   const breakdownSeries = useMemo(
     () =>
-      hasBreakdownData
+      hasModeData
         ? buildModelSeries(
             breakdownKeys,
             entries,
@@ -212,11 +215,15 @@ export function TokenChart({
             activeProviderFilter,
           )
         : [],
-    [breakdownKeys, entries, hasBreakdownData, breakdownMode, activeProviderFilter],
+    [breakdownKeys, entries, hasModeData, breakdownMode, activeProviderFilter],
   );
 
   const isBreakdownView =
-    (viewMode === "model" || viewMode === "provider" || isProviderModelView) && hasBreakdownData;
+    (viewMode === "model" ||
+      viewMode === "provider" ||
+      isProviderModelView ||
+      viewMode === "agent") &&
+    hasModeData;
   const isTokenStackView = isBreakdownView && breakdownTokenType === "stack";
   const selectedTokenType = breakdownTokenType;
   const isTokenTypeSelectorVisible = isBreakdownView;
@@ -231,7 +238,9 @@ export function TokenChart({
           ? "By Provider"
           : isProviderModelView
             ? "By Provider → Model"
-            : "By Model";
+            : viewMode === "agent"
+              ? "By Agent"
+              : "By Model";
       series = isTokenStackView
         ? getTokenStackSeries(breakdownSeries, hiddenSeries)
         : getVisibleChartSeries(breakdownSeries, hiddenSeries);
@@ -392,6 +401,21 @@ export function TokenChart({
               >
                 By Provider → Model
               </button>
+              {hasAgentData && (
+                <button
+                  onClick={() => {
+                    setViewMode("agent");
+                    setHiddenSeries(new Set());
+                  }}
+                  className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                    viewMode === "agent"
+                      ? "bg-bg-card text-text-primary shadow-sm"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  By Agent
+                </button>
+              )}
             </div>
           )}
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">

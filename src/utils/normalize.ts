@@ -1,4 +1,4 @@
-import type { ModelBreakdown, ReportData, ReportType, TimeEntry } from "../types";
+import type { AgentBreakdown, ModelBreakdown, ReportData, ReportType, TimeEntry } from "../types";
 import { groupEntries, sumEntries } from "./aggregate";
 
 // Unified entry format for chart components
@@ -12,6 +12,20 @@ export interface NormalizedEntry {
   cost: number;
   models: string[];
   modelBreakdowns?: ModelBreakdown[];
+  // Per-agent breakdowns in ModelBreakdown shape (modelName = agent name)
+  agentBreakdowns?: ModelBreakdown[];
+}
+
+function toAgentBreakdowns(agents: AgentBreakdown[] | undefined): ModelBreakdown[] | undefined {
+  if (!agents || agents.length === 0) return undefined;
+  return agents.map((a) => ({
+    modelName: a.agent,
+    inputTokens: a.inputTokens,
+    outputTokens: a.outputTokens,
+    cacheCreationTokens: a.cacheCreationTokens,
+    cacheReadTokens: a.cacheReadTokens,
+    cost: a.totalCost,
+  }));
 }
 
 export interface NormalizedTotals {
@@ -24,6 +38,7 @@ export interface NormalizedTotals {
 }
 
 function normalizeTimeEntry(e: TimeEntry): NormalizedEntry {
+  const agentBreakdowns = toAgentBreakdowns(e.agents);
   if ("period" in e) {
     return {
       label: e.period,
@@ -35,6 +50,7 @@ function normalizeTimeEntry(e: TimeEntry): NormalizedEntry {
       cost: e.totalCost,
       models: e.modelsUsed,
       modelBreakdowns: e.modelBreakdowns,
+      ...(agentBreakdowns ? { agentBreakdowns } : {}),
     };
   }
 
@@ -47,6 +63,7 @@ function normalizeTimeEntry(e: TimeEntry): NormalizedEntry {
     cacheReadTokens: e.cacheReadTokens,
     totalTokens: e.totalTokens,
     cost: e.costUSD,
+    ...(agentBreakdowns ? { agentBreakdowns } : {}),
     models: modelEntries.map(([modelName]) => modelName),
     modelBreakdowns: modelEntries.map(([modelName, metrics]) => ({
       modelName,
@@ -80,6 +97,7 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
         .map((e) => {
           const project = e.projectPath !== "Unknown Project" ? e.projectPath : "";
           const shortId = e.sessionId.slice(-20);
+          const agentBreakdowns = toAgentBreakdowns(e.agents);
           return {
             label: project || shortId,
             inputTokens: e.inputTokens,
@@ -90,6 +108,7 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
             cost: e.totalCost,
             models: e.modelsUsed,
             modelBreakdowns: e.modelBreakdowns,
+            ...(agentBreakdowns ? { agentBreakdowns } : {}),
           };
         });
 

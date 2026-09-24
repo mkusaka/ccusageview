@@ -35,7 +35,11 @@ const GPT: ModelBreakdown = {
   cost: 0.7,
 };
 
-function makeEntry(label: string, modelBreakdowns?: ModelBreakdown[]): NormalizedEntry {
+function makeEntry(
+  label: string,
+  modelBreakdowns?: ModelBreakdown[],
+  agentBreakdowns?: ModelBreakdown[],
+): NormalizedEntry {
   return {
     label,
     inputTokens: 0,
@@ -46,6 +50,7 @@ function makeEntry(label: string, modelBreakdowns?: ModelBreakdown[]): Normalize
     cost: 0,
     models: modelBreakdowns ? modelBreakdowns.map((entry) => entry.modelName) : [],
     modelBreakdowns,
+    agentBreakdowns,
   };
 }
 
@@ -67,7 +72,7 @@ describe("getProviderName", () => {
 
 describe("groupBreakdowns", () => {
   it("keeps model names separate in model mode", () => {
-    const grouped = groupBreakdowns([SONNET, HAIKU, GPT], "model");
+    const grouped = groupBreakdowns(makeEntry("a", [SONNET, HAIKU, GPT]), "model");
 
     expect(Array.from(grouped.keys())).toEqual([
       "claude-sonnet-4-20250514",
@@ -77,7 +82,7 @@ describe("groupBreakdowns", () => {
   });
 
   it("merges models that share a provider in provider mode", () => {
-    const grouped = groupBreakdowns([SONNET, HAIKU, GPT], "provider");
+    const grouped = groupBreakdowns(makeEntry("a", [SONNET, HAIKU, GPT]), "provider");
 
     expect(grouped.get("Anthropic")).toEqual({
       inputTokens: 600,
@@ -96,12 +101,35 @@ describe("groupBreakdowns", () => {
   });
 
   it("filters model breakdowns by provider", () => {
-    const grouped = groupBreakdowns([SONNET, HAIKU, GPT], "model", "Anthropic");
+    const grouped = groupBreakdowns(makeEntry("a", [SONNET, HAIKU, GPT]), "model", "Anthropic");
 
     expect(Array.from(grouped.keys())).toEqual([
       "claude-sonnet-4-20250514",
       "claude-haiku-3-20240307",
     ]);
+  });
+
+  it("groups agent breakdowns by agent name in agent mode", () => {
+    const agents = [
+      { ...SONNET, modelName: "claude" },
+      { ...GPT, modelName: "codex" },
+    ];
+    const grouped = groupBreakdowns(makeEntry("a", [SONNET, GPT], agents), "agent");
+
+    expect(grouped.get("claude")).toEqual({
+      inputTokens: 500,
+      outputTokens: 100,
+      cacheCreationTokens: 50,
+      cacheReadTokens: 200,
+      cost: 1,
+    });
+    expect(grouped.get("codex")).toEqual({
+      inputTokens: 300,
+      outputTokens: 50,
+      cacheCreationTokens: 0,
+      cacheReadTokens: 120,
+      cost: 0.7,
+    });
   });
 });
 
@@ -117,6 +145,14 @@ describe("collectBreakdownKeys", () => {
       "claude-haiku-3-20240307",
       "claude-sonnet-4-20250514",
     ]);
+  });
+
+  it("collects agent names in agent mode", () => {
+    const entries = [
+      makeEntry("a", [SONNET], [{ ...SONNET, modelName: "claude" }]),
+      makeEntry("b", [GPT], [{ ...GPT, modelName: "codex" }]),
+    ];
+    expect(collectBreakdownKeys(entries, "agent")).toEqual(["claude", "codex"]);
   });
 });
 

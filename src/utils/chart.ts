@@ -3,6 +3,7 @@ import {
   collectBreakdownKeys,
   formatBreakdownLabel,
   getBreakdownMetricValue,
+  getEntryBreakdowns,
   groupBreakdowns,
   OTHER_BREAKDOWN_KEY,
   type BreakdownMode,
@@ -47,7 +48,7 @@ export function buildModelSeries(
   }));
   if (
     providerFilter === undefined &&
-    entries.some((e) => !e.modelBreakdowns || e.modelBreakdowns.length === 0)
+    entries.some((e) => !getEntryBreakdowns(e, mode) || getEntryBreakdowns(e, mode)!.length === 0)
   ) {
     result.push({
       key: OTHER_BREAKDOWN_KEY,
@@ -68,7 +69,7 @@ function buildMetricByBreakdown(
 ): Record<string, string | number>[] {
   return entries.map((entry) => {
     const row: Record<string, string | number> = { label: entry.label };
-    const grouped = groupBreakdowns(entry.modelBreakdowns, mode, providerFilter);
+    const grouped = groupBreakdowns(entry, mode, providerFilter);
 
     if (grouped.size === 0) {
       if (providerFilter === undefined) {
@@ -125,7 +126,7 @@ export function buildTokenTypeStacks(
 ): TokenBreakdownChartRow[] {
   return entries.map((entry) => {
     const row: Record<string, string | number> = { label: entry.label };
-    const grouped = groupBreakdowns(entry.modelBreakdowns, mode, providerFilter);
+    const grouped = groupBreakdowns(entry, mode, providerFilter);
 
     if (grouped.size === 0) {
       if (providerFilter === undefined) {

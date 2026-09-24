@@ -77,7 +77,7 @@ export function buildCacheEfficiencyChartDataForBreakdowns(
   mode: BreakdownMode,
 ): CacheEfficiencyChartDatum[] {
   return entries.map((entry) => {
-    const grouped = groupBreakdowns(entry.modelBreakdowns, mode);
+    const grouped = groupBreakdowns(entry, mode);
 
     if (grouped.size === 0) {
       return {
@@ -127,7 +127,7 @@ export function buildCacheEfficiencyChartDataByBreakdown(
   return entries.map((entry) => {
     const row: CacheEfficiencyBreakdownChartDatum = { label: entry.label };
 
-    const grouped = groupBreakdowns(entry.modelBreakdowns, mode);
+    const grouped = groupBreakdowns(entry, mode);
     if (grouped.size === 0) {
       if (includeOther && visibleBreakdownSet.has("Other")) {
         const metrics = calculateCacheEfficiency(entry);
