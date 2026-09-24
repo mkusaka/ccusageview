@@ -40,7 +40,7 @@ interface Props {
   entries: NormalizedEntry[];
 }
 
-type ViewMode = "total" | "model" | "provider";
+type ViewMode = "total" | "model" | "provider" | "agent";
 type DayOfWeekData = ReturnType<typeof buildDayOfWeekData>;
 type DayOfWeekBreakdownData = ReturnType<typeof buildDayOfWeekByBreakdown>;
 type DayOfWeekChartRow = DayOfWeekData[number] | DayOfWeekBreakdownData[number];
@@ -133,34 +133,37 @@ export function DayOfWeekChart({ entries }: Props) {
     dayOfWeekReducer,
     INITIAL_DAY_OF_WEEK_STATE,
   );
-  const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
+  const breakdownMode: BreakdownMode = viewMode === "total" ? "model" : viewMode;
 
   const toggleSeries = (key: string) => {
     dispatch({ type: "toggleSeries", key });
   };
 
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
+  const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
+  const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
   const breakdownKeys = useMemo(
-    () => (hasBreakdownData ? collectModels(entries, breakdownMode) : []),
-    [entries, hasBreakdownData, breakdownMode],
+    () => (hasModeData ? collectModels(entries, breakdownMode) : []),
+    [entries, hasModeData, breakdownMode],
   );
 
   const data = useMemo(() => buildDayOfWeekData(entries, metric), [entries, metric]);
   const breakdownData = useMemo(
     () =>
-      hasBreakdownData
+      hasModeData
         ? buildDayOfWeekByBreakdown(entries, metric, breakdownKeys, breakdownMode, aggregation)
         : [],
-    [entries, metric, breakdownKeys, breakdownMode, aggregation, hasBreakdownData],
+    [entries, metric, breakdownKeys, breakdownMode, aggregation, hasModeData],
   );
   const breakdownSeries = useMemo(
     () =>
-      hasBreakdownData ? buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode) : [],
-    [breakdownKeys, entries, breakdownMode, hasBreakdownData],
+      hasModeData ? buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode) : [],
+    [breakdownKeys, entries, breakdownMode, hasModeData],
   );
 
   const hasData = data.some((bucket) => bucket.count > 0);
-  const isBreakdownView = (viewMode === "model" || viewMode === "provider") && hasBreakdownData;
+  const isBreakdownView =
+    (viewMode === "model" || viewMode === "provider" || viewMode === "agent") && hasModeData;
   const metricConfig = METRICS[metric];
   const chartMarkdown = useMemo(() => {
     if (isBreakdownView) {
@@ -170,7 +173,14 @@ export function DayOfWeekChart({ entries }: Props) {
         metadata: [
           ["Metric", metricConfig.label],
           ["Aggregation", AGGREGATION_LABELS[aggregation]],
-          ["View", viewMode === "provider" ? "By Provider" : "By Model"],
+          [
+            "View",
+            viewMode === "provider"
+              ? "By Provider"
+              : viewMode === "agent"
+                ? "By Agent"
+                : "By Model",
+          ],
           ["Show percent", showPercent],
           ["Hidden series", Array.from(hiddenSeries)],
         ],
@@ -260,7 +270,7 @@ export function DayOfWeekChart({ entries }: Props) {
           <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
-          {hasBreakdownData && (
+          {(hasBreakdownData || hasAgentData) && (
             <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
               <button
                 onClick={() => {
@@ -298,6 +308,20 @@ export function DayOfWeekChart({ entries }: Props) {
               >
                 By Provider
               </button>
+              {hasAgentData && (
+                <button
+                  onClick={() => {
+                    dispatch({ type: "setViewMode", viewMode: "agent" });
+                  }}
+                  className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                    viewMode === "agent"
+                      ? "bg-bg-card text-text-primary shadow-sm"
+                      : "text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  By Agent
+                </button>
+              )}
               {isBreakdownView && (
                 <button
                   onClick={() => dispatch({ type: "togglePercent" })}

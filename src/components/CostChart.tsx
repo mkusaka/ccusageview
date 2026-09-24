@@ -48,7 +48,7 @@ interface Props {
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
 }
 
-type ViewMode = "total" | "model" | "provider" | "providerModel" | "tokenType";
+type ViewMode = "total" | "model" | "provider" | "providerModel" | "tokenType" | "agent";
 type CostBreakdownChartData = ReturnType<typeof buildCostByModel>;
 type TokenTypeCostData = ReturnType<typeof buildCostByTokenType>;
 type CostChartRow = NormalizedEntry | CostBreakdownChartData[number] | TokenTypeCostData[number];
@@ -116,7 +116,8 @@ export function CostChart({
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
-  const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
+  const breakdownMode: BreakdownMode =
+    viewMode === "provider" || viewMode === "agent" ? viewMode : "model";
   const isProviderModelView = viewMode === "providerModel";
   const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
     useProviderSelection(entries, isProviderModelView);
@@ -131,20 +132,22 @@ export function CostChart({
   };
 
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
+  const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
+  const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
 
   const breakdownKeys = useMemo(
-    () => (hasBreakdownData ? collectModels(entries, breakdownMode, activeProviderFilter) : []),
-    [entries, hasBreakdownData, breakdownMode, activeProviderFilter],
+    () => (hasModeData ? collectModels(entries, breakdownMode, activeProviderFilter) : []),
+    [entries, hasModeData, breakdownMode, activeProviderFilter],
   );
 
   const breakdownChartData = useMemo(
-    () => (hasBreakdownData ? buildCostByModel(entries, breakdownMode, activeProviderFilter) : []),
-    [entries, hasBreakdownData, breakdownMode, activeProviderFilter],
+    () => (hasModeData ? buildCostByModel(entries, breakdownMode, activeProviderFilter) : []),
+    [entries, hasModeData, breakdownMode, activeProviderFilter],
   );
 
   const breakdownSeries = useMemo(
     () =>
-      hasBreakdownData
+      hasModeData
         ? buildModelSeries(
             breakdownKeys,
             entries,
@@ -153,7 +156,7 @@ export function CostChart({
             activeProviderFilter,
           )
         : [],
-    [breakdownKeys, entries, hasBreakdownData, breakdownMode, activeProviderFilter],
+    [breakdownKeys, entries, hasModeData, breakdownMode, activeProviderFilter],
   );
 
   const tokenTypeCostData = useMemo(() => buildCostByTokenType(entries), [entries]);
@@ -162,7 +165,11 @@ export function CostChart({
   );
 
   const isBreakdownView =
-    (viewMode === "model" || viewMode === "provider" || isProviderModelView) && hasBreakdownData;
+    (viewMode === "model" ||
+      viewMode === "provider" ||
+      isProviderModelView ||
+      viewMode === "agent") &&
+    hasModeData;
   const isTokenTypeView = viewMode === "tokenType" && hasTokenTypeCostData;
   const chartMarkdown = useMemo(() => {
     let series: ChartDataSeries[];
@@ -183,7 +190,9 @@ export function CostChart({
           ? "By Provider"
           : isProviderModelView
             ? "By Provider → Model"
-            : "By Model";
+            : viewMode === "agent"
+              ? "By Agent"
+              : "By Model";
       series = getVisibleChartSeries(breakdownSeries, hiddenSeries);
       sourceRows = breakdownChartData;
     } else {
@@ -327,6 +336,21 @@ export function CostChart({
                 }`}
               >
                 By Provider → Model
+              </button>
+            )}
+            {hasAgentData && (
+              <button
+                onClick={() => {
+                  setViewMode("agent");
+                  setHiddenSeries(new Set());
+                }}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === "agent"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Agent
               </button>
             )}
             {hasTokenTypeCostData && (

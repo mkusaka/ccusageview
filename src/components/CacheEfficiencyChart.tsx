@@ -55,7 +55,7 @@ const RATE_SERIES = {
   color: "var(--color-chart-teal)",
 } as const;
 
-type ViewMode = "total" | "model" | "provider";
+type ViewMode = "total" | "model" | "provider" | "agent";
 type CacheEfficiencyChartRow = CacheEfficiencyChartDatum | CacheEfficiencyBreakdownChartDatum;
 type CacheEfficiencyBreakdownChartDatum = {
   label: string;
@@ -317,20 +317,22 @@ export function CacheEfficiencyChart({
   hoveredDataIndexRef.current = hoveredDataIndex;
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [hiddenBreakdowns, setHiddenBreakdowns] = useState<Set<string>>(new Set());
-  const breakdownMode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
+  const breakdownMode: BreakdownMode = viewMode === "total" ? "model" : viewMode;
 
   const hasBreakdownData = useMemo(() => hasAnyBreakdownData(entries), [entries]);
+  const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
+  const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
   const breakdownKeys = useMemo(
-    () => (hasBreakdownData ? collectModels(entries, breakdownMode) : []),
-    [entries, hasBreakdownData, breakdownMode],
+    () => (hasModeData ? collectModels(entries, breakdownMode) : []),
+    [entries, hasModeData, breakdownMode],
   );
   const breakdownSeries = useMemo(
     () =>
-      hasBreakdownData ? buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode) : [],
-    [breakdownKeys, entries, hasBreakdownData, breakdownMode],
+      hasModeData ? buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode) : [],
+    [breakdownKeys, entries, hasModeData, breakdownMode],
   );
   const includeOther = !hiddenBreakdowns.has("Other");
-  const isBreakdownView = viewMode !== "total" && hasBreakdownData;
+  const isBreakdownView = viewMode !== "total" && hasModeData;
   const visibleBreakdownSeries = useMemo(
     () => getVisibleBreakdownSeries(breakdownSeries, hiddenBreakdowns),
     [breakdownSeries, hiddenBreakdowns],
@@ -426,7 +428,13 @@ export function CacheEfficiencyChart({
       metadata: [
         [
           "View",
-          viewMode === "total" ? "Total" : viewMode === "model" ? "By Model" : "By Provider",
+          viewMode === "total"
+            ? "Total"
+            : viewMode === "model"
+              ? "By Model"
+              : viewMode === "provider"
+                ? "By Provider"
+                : "By Agent",
         ],
         ["Hidden breakdowns", Array.from(hiddenBreakdowns)],
         [
@@ -455,7 +463,7 @@ export function CacheEfficiencyChart({
           <CopyImageButton targetRef={chartRef} />
           <CopyMarkdownButton markdown={getChartMarkdown} />
         </div>
-        {hasBreakdownData && (
+        {(hasBreakdownData || hasAgentData) && (
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
             {(["total", "model", "provider"] as const).map((mode) => (
               <button
@@ -470,6 +478,18 @@ export function CacheEfficiencyChart({
                 {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
               </button>
             ))}
+            {hasAgentData && (
+              <button
+                onClick={() => handleViewModeChange("agent")}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === "agent"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Agent
+              </button>
+            )}
           </div>
         )}
       </div>

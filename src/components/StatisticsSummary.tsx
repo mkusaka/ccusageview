@@ -173,15 +173,17 @@ export function StatisticsSummary({ entries }: Props) {
   };
 
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
+  const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
+  const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
   const breakdownKeys = useMemo(() => {
-    if (breakdownMode === "total" || !hasBreakdownData) return [];
+    if (breakdownMode === "total" || !hasModeData) return [];
     return collectModels(entries, breakdownMode);
-  }, [entries, breakdownMode, hasBreakdownData]);
+  }, [entries, breakdownMode, hasModeData]);
 
   const breakdownSeries = useMemo(() => {
-    if (breakdownMode === "total" || !hasBreakdownData) return [];
+    if (breakdownMode === "total" || !hasModeData) return [];
     return buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode);
-  }, [breakdownKeys, entries, breakdownMode, hasBreakdownData]);
+  }, [breakdownKeys, entries, breakdownMode, hasModeData]);
 
   const visibleBreakdowns = useMemo(
     () => new Set(breakdownKeys.filter((key) => !hiddenBreakdowns.has(key))),
@@ -331,7 +333,9 @@ export function StatisticsSummary({ entries }: Props) {
             ? "Total"
             : breakdownMode === "model"
               ? "By Model"
-              : "By Provider",
+              : breakdownMode === "provider"
+                ? "By Provider"
+                : "By Agent",
         ],
         ["Hidden breakdowns", Array.from(hiddenBreakdowns)],
         ["Entries", stats.count],
@@ -394,6 +398,7 @@ export function StatisticsSummary({ entries }: Props) {
         breakdownMode={breakdownMode}
         chartMarkdown={chartMarkdown}
         entryCount={stats.count}
+        hasAgentData={hasAgentData}
         hasBreakdownData={hasBreakdownData}
         metric={metric}
         panelRef={panelRef}
@@ -429,6 +434,7 @@ function StatisticsHeader({
   breakdownMode,
   chartMarkdown,
   entryCount,
+  hasAgentData,
   hasBreakdownData,
   metric,
   panelRef,
@@ -438,6 +444,7 @@ function StatisticsHeader({
   breakdownMode: StatisticsBreakdownMode;
   chartMarkdown: string;
   entryCount: number;
+  hasAgentData: boolean;
   hasBreakdownData: boolean;
   metric: StatMetricKey;
   panelRef: RefObject<HTMLDivElement | null>;
@@ -453,7 +460,7 @@ function StatisticsHeader({
         <CopyMarkdownButton markdown={chartMarkdown} />
       </div>
       <div className="flex items-center gap-2 overflow-x-auto">
-        {hasBreakdownData && (
+        {(hasBreakdownData || hasAgentData) && (
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
             {(["total", "model", "provider"] as const).map((mode) => (
               <button
@@ -468,6 +475,18 @@ function StatisticsHeader({
                 {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
               </button>
             ))}
+            {hasAgentData && (
+              <button
+                onClick={() => onBreakdownModeChange("agent")}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  breakdownMode === "agent"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Agent
+              </button>
+            )}
           </div>
         )}
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">

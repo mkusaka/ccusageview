@@ -50,7 +50,7 @@ function getTableColumns(mode: BreakdownMode): TableColumn[] {
   return [
     {
       key: "label",
-      label: mode === "model" ? "Model" : "Provider",
+      label: mode === "model" ? "Model" : mode === "agent" ? "Agent" : "Provider",
       align: "left",
       render: (row) => row.label,
       sortValue: (row) => row.label,
@@ -114,7 +114,8 @@ export function ModelBreakdown({ entries }: Props) {
   const [sortState, setSortState] = useState(() => createInitialModelBreakdownSortState());
 
   const isProviderModelView = viewMode === "providerModel";
-  const mode: BreakdownMode = viewMode === "provider" ? "provider" : "model";
+  const mode: BreakdownMode = viewMode === "providerModel" ? "model" : viewMode;
+  const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
   const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
     useProviderSelection(entries, isProviderModelView);
 
@@ -220,7 +221,9 @@ export function ModelBreakdown({ entries }: Props) {
               ? "By Provider"
               : isProviderModelView
                 ? "By Provider → Model"
-                : "By Model",
+                : viewMode === "agent"
+                  ? "By Agent"
+                  : "By Model",
           ],
           ...(isProviderModelView
             ? ([["Provider", selectedProvider ?? "None"]] as [string, unknown][])
@@ -232,7 +235,10 @@ export function ModelBreakdown({ entries }: Props) {
           {
             title: "Pie Data",
             columns: [
-              { key: "fullName", label: mode === "model" ? "Model" : "Provider" },
+              {
+                key: "fullName",
+                label: mode === "model" ? "Model" : mode === "agent" ? "Agent" : "Provider",
+              },
               { key: "value", label: metricConfig.label, align: "right" },
             ],
             rows: pickDataKeys(pieData, ["fullName", "value"]),
@@ -240,7 +246,10 @@ export function ModelBreakdown({ entries }: Props) {
           {
             title: "Breakdown Table",
             columns: [
-              { key: "label", label: mode === "model" ? "Model" : "Provider" },
+              {
+                key: "label",
+                label: mode === "model" ? "Model" : mode === "agent" ? "Agent" : "Provider",
+              },
               { key: "inputTokens", label: "Input", align: "right" },
               { key: "outputTokens", label: "Output", align: "right" },
               { key: "cacheCreationTokens", label: "Cache Write", align: "right" },
@@ -330,6 +339,18 @@ export function ModelBreakdown({ entries }: Props) {
             >
               By Provider → Model
             </button>
+            {hasAgentData && (
+              <button
+                onClick={() => setViewMode("agent")}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === "agent"
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                By Agent
+              </button>
+            )}
           </div>
           {isProviderModelView && selectedProvider && (
             <label className="flex items-center gap-2 w-fit text-xs text-text-secondary shrink-0">

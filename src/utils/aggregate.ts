@@ -55,7 +55,9 @@ export function groupEntries(
       numerics: Record<NumericKey, number>;
       models: Set<string>;
       modelMap: Map<string, ModelBreakdown>;
+      agentMap: Map<string, ModelBreakdown>;
       hasBreakdowns: boolean;
+      hasAgentBreakdowns: boolean;
     }
   >();
 
@@ -69,14 +71,25 @@ export function groupEntries(
         numerics: Object.fromEntries(NUMERIC_KEYS.map((k) => [k, 0])) as Record<NumericKey, number>,
         models: new Set(),
         modelMap: new Map(),
+        agentMap: new Map(),
         hasBreakdowns: false,
+        hasAgentBreakdowns: false,
       };
       map.set(key, bucket);
     }
 
     for (const k of NUMERIC_KEYS) bucket.numerics[k] += entry[k];
     for (const m of entry.models) bucket.models.add(m);
-    mergeBreakdowns(bucket, entry.modelBreakdowns);
+    bucket.hasBreakdowns = mergeBreakdowns(
+      bucket.modelMap,
+      entry.modelBreakdowns,
+      bucket.hasBreakdowns,
+    );
+    bucket.hasAgentBreakdowns = mergeBreakdowns(
+      bucket.agentMap,
+      entry.agentBreakdowns,
+      bucket.hasAgentBreakdowns,
+    );
   }
 
   return Array.from(map.entries())
@@ -86,25 +99,27 @@ export function groupEntries(
         label,
         models: Array.from(b.models),
         modelBreakdowns: b.hasBreakdowns ? Array.from(b.modelMap.values()) : undefined,
+        ...(b.hasAgentBreakdowns ? { agentBreakdowns: Array.from(b.agentMap.values()) } : {}),
       }),
     );
 }
 
-/** modelBreakdowns を modelName でバケットにマージ */
+/** breakdowns を modelName でマップにマージ。要素があれば true を返す */
 function mergeBreakdowns(
-  bucket: { modelMap: Map<string, ModelBreakdown>; hasBreakdowns: boolean },
+  target: Map<string, ModelBreakdown>,
   breakdowns: ModelBreakdown[] | undefined,
-): void {
-  if (!breakdowns) return;
-  bucket.hasBreakdowns = true;
+  seen: boolean,
+): boolean {
+  if (!breakdowns) return seen;
   for (const mb of breakdowns) {
-    const existing = bucket.modelMap.get(mb.modelName);
+    const existing = target.get(mb.modelName);
     if (existing) {
       for (const k of MB_NUMERIC_KEYS) existing[k] += mb[k];
     } else {
-      bucket.modelMap.set(mb.modelName, { ...mb });
+      target.set(mb.modelName, { ...mb });
     }
   }
+  return true;
 }
 
 /** entries 全体を合算して NormalizedTotals を返す */
@@ -148,11 +163,7 @@ export function aggregateBreakdowns(
   const map = new Map<string, BreakdownMetrics>();
 
   for (const entry of entries) {
-    for (const [key, metrics] of groupBreakdowns(
-      entry.modelBreakdowns,
-      mode,
-      providerFilter,
-    ).entries()) {
+    for (const [key, metrics] of groupBreakdowns(entry, mode, providerFilter).entries()) {
       const existing = map.get(key);
       if (existing) {
         for (const metric of BREAKDOWN_NUMERIC_KEYS) {

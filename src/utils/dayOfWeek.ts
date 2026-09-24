@@ -1,5 +1,6 @@
 import {
   getBreakdownMetricValue,
+  getEntryBreakdowns,
   groupBreakdowns,
   OTHER_BREAKDOWN_KEY,
   type BreakdownMode,
@@ -149,16 +150,14 @@ function buildBreakdownRows(
       for (const key of breakdownKeys) {
         row[key] = 0;
       }
-      if (
-        bucketEntries.some((entry) => !entry.modelBreakdowns || entry.modelBreakdowns.length === 0)
-      ) {
+      if (bucketEntries.some((entry) => (getEntryBreakdowns(entry, mode)?.length ?? 0) === 0)) {
         row[OTHER_BREAKDOWN_KEY] = 0;
       }
 
       const selectedEntry = selectRepresentativeEntry(bucketEntries, metric, aggregation);
       if (!selectedEntry) return row;
 
-      const groupedBreakdowns = groupBreakdowns(selectedEntry.modelBreakdowns, mode);
+      const groupedBreakdowns = groupBreakdowns(selectedEntry, mode);
       if (groupedBreakdowns.size === 0) {
         row[OTHER_BREAKDOWN_KEY] = getBreakdownMetricValue(selectedEntry, metric);
         return row;
@@ -174,7 +173,7 @@ function buildBreakdownRows(
     const totals = new Map<string, number>();
 
     for (const entry of bucketEntries) {
-      const groupedBreakdowns = groupBreakdowns(entry.modelBreakdowns, mode);
+      const groupedBreakdowns = groupBreakdowns(entry, mode);
       if (groupedBreakdowns.size === 0) {
         const previous = totals.get(OTHER_BREAKDOWN_KEY) ?? 0;
         totals.set(OTHER_BREAKDOWN_KEY, previous + getBreakdownMetricValue(entry, metric));

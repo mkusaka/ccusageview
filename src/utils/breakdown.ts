@@ -1,7 +1,7 @@
 import type { ModelBreakdown } from "../types";
 import type { NormalizedEntry } from "./normalize";
 
-export type BreakdownMode = "model" | "provider";
+export type BreakdownMode = "model" | "provider" | "agent";
 
 export interface BreakdownMetrics {
   inputTokens: number;
@@ -92,15 +92,25 @@ export function getBreakdownMetricValue(
 }
 
 function getBreakdownKey(modelName: string, mode: BreakdownMode): string {
-  return mode === "model" ? modelName : getProviderName(modelName);
+  return mode === "provider" ? getProviderName(modelName) : modelName;
+}
+
+// Breakdown rows for the given mode: models/providers come from modelBreakdowns,
+// agents from agentBreakdowns (agent name stored in modelName).
+export function getEntryBreakdowns(
+  entry: NormalizedEntry,
+  mode: BreakdownMode,
+): ModelBreakdown[] | undefined {
+  return mode === "agent" ? entry.agentBreakdowns : entry.modelBreakdowns;
 }
 
 export function groupBreakdowns(
-  breakdowns: ModelBreakdown[] | undefined,
+  entry: NormalizedEntry,
   mode: BreakdownMode,
   providerFilter?: string,
 ): Map<string, BreakdownMetrics> {
   const grouped = new Map<string, BreakdownMetrics>();
+  const breakdowns = getEntryBreakdowns(entry, mode);
 
   if (!breakdowns || breakdowns.length === 0) {
     return grouped;
@@ -139,9 +149,10 @@ export function collectBreakdownKeys(
   const keys = new Set<string>();
 
   for (const entry of entries) {
-    if (!entry.modelBreakdowns || entry.modelBreakdowns.length === 0) continue;
+    const breakdowns = getEntryBreakdowns(entry, mode);
+    if (!breakdowns || breakdowns.length === 0) continue;
 
-    for (const breakdown of entry.modelBreakdowns) {
+    for (const breakdown of breakdowns) {
       if (providerFilter !== undefined && getProviderName(breakdown.modelName) !== providerFilter) {
         continue;
       }

@@ -33,12 +33,21 @@ interface CodexModelBreakdown extends UsageMetrics {
   reasoningOutputTokens?: number;
 }
 
+// Per-agent row emitted by `ccusage --by-agent` inside each time entry
+export interface AgentBreakdown extends UsageMetrics {
+  agent: string;
+  totalCost: number;
+  modelsUsed: string[];
+  modelBreakdowns: ModelBreakdown[];
+}
+
 // Shared fields for daily/weekly/monthly entries in ccusage's Claude output
 interface ClaudeTimeEntry extends UsageMetrics {
   period: string;
   totalCost: number;
   modelsUsed: string[];
   modelBreakdowns: ModelBreakdown[];
+  agents?: AgentBreakdown[];
 }
 
 // Shared fields for daily/weekly/monthly entries in ccusage's Codex output
@@ -47,6 +56,7 @@ interface CodexTimeEntry extends UsageMetrics {
   costUSD: number;
   models: Record<string, CodexModelBreakdown>;
   reasoningOutputTokens?: number;
+  agents?: AgentBreakdown[];
 }
 
 export type TimeEntry = ClaudeTimeEntry | CodexTimeEntry;
@@ -86,6 +96,7 @@ interface SessionEntry {
   lastActivity: string;
   modelsUsed: string[];
   modelBreakdowns: ModelBreakdown[];
+  agents?: AgentBreakdown[];
   projectPath: string;
 }
 
