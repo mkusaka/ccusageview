@@ -25,6 +25,7 @@ import {
   withOpacity,
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
+import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_MODEL } from "./BreakdownHint";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -116,7 +117,6 @@ export function ModelBreakdown({ entries }: Props) {
   const isProviderModelView = viewMode === "providerModel";
   const isAgentModelView = viewMode === "agentModel";
   const mode: BreakdownMode = viewMode === "providerModel" || isAgentModelView ? "model" : viewMode;
-  const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
   const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
     useProviderSelection(entries, isProviderModelView);
   const { agentKeys, selectedAgent, activeAgentFilter, selectAgent } = useAgentSelection(
@@ -306,7 +306,14 @@ export function ModelBreakdown({ entries }: Props) {
   );
   useRegisterChartMarkdown(markdownRegistration);
 
-  if (sortedRows.length === 0) return null;
+  const missingDataCommand =
+    sortedRows.length === 0
+      ? viewMode === "agent" || isAgentModelView
+        ? BREAKDOWN_HINT_AGENT
+        : BREAKDOWN_HINT_MODEL
+      : null;
+
+  if (sortedRows.length === 0 && !missingDataCommand) return null;
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
@@ -351,30 +358,26 @@ export function ModelBreakdown({ entries }: Props) {
             >
               By Provider → Model
             </button>
-            {hasAgentData && (
-              <button
-                onClick={() => setViewMode("agent")}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  viewMode === "agent"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Agent
-              </button>
-            )}
-            {hasAgentData && (
-              <button
-                onClick={() => setViewMode("agentModel")}
-                className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
-                  viewMode === "agentModel"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Agent → Model
-              </button>
-            )}
+            <button
+              onClick={() => setViewMode("agent")}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === "agent"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Agent
+            </button>
+            <button
+              onClick={() => setViewMode("agentModel")}
+              className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
+                viewMode === "agentModel"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Agent → Model
+            </button>
           </div>
           {isProviderModelView && selectedProvider && (
             <label className="flex items-center gap-2 w-fit text-xs text-text-secondary shrink-0">
@@ -411,83 +414,87 @@ export function ModelBreakdown({ entries }: Props) {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="flex-shrink-0 w-full lg:w-80">
-          <p className="text-xs text-text-secondary px-2 mb-2">
-            Click a numeric table header to change the pie metric.
-          </p>
-          <div className="h-[300px]">
-            <Doughnut data={pieChartData} options={pieChartOptions} />
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 px-2">
-            {pieData.map((item, index) => (
-              <div key={item.fullName} className="flex items-center gap-1.5">
-                <span
-                  className="size-2.5 rounded-full flex-shrink-0"
-                  style={{
-                    backgroundColor: getChartJsColor(index),
-                    opacity: 0.85,
-                  }}
-                />
-                <span className="text-xs text-text-secondary whitespace-nowrap">{item.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {missingDataCommand && <BreakdownHint command={missingDataCommand} />}
 
-        <div className="flex-1 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border">
-                {columns.map((column) => (
-                  <th
-                    key={column.key}
-                    aria-sort={
-                      sortCol === column.key
-                        ? sortDir === "asc"
-                          ? "ascending"
-                          : "descending"
-                        : "none"
-                    }
-                    className={`py-2 pr-4 font-medium text-text-secondary whitespace-nowrap ${
-                      column.align === "right" ? "text-right" : "text-left"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleSort(column.key)}
-                      className="hover:text-text-primary select-none whitespace-nowrap"
-                    >
-                      {column.label}
-                      {sortCol === column.key && (
-                        <span className="ml-1">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
-                      )}
-                    </button>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map((row) => (
-                <tr key={row.key} className="border-b border-border/50 text-text-primary">
+      {!missingDataCommand && (
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="flex-shrink-0 w-full lg:w-80">
+            <p className="text-xs text-text-secondary px-2 mb-2">
+              Click a numeric table header to change the pie metric.
+            </p>
+            <div className="h-[300px]">
+              <Doughnut data={pieChartData} options={pieChartOptions} />
+            </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 px-2">
+              {pieData.map((item, index) => (
+                <div key={item.fullName} className="flex items-center gap-1.5">
+                  <span
+                    className="size-2.5 rounded-full flex-shrink-0"
+                    style={{
+                      backgroundColor: getChartJsColor(index),
+                      opacity: 0.85,
+                    }}
+                  />
+                  <span className="text-xs text-text-secondary whitespace-nowrap">{item.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
                   {columns.map((column) => (
-                    <td
+                    <th
                       key={column.key}
-                      className={`py-2 pr-4 whitespace-nowrap ${
+                      aria-sort={
+                        sortCol === column.key
+                          ? sortDir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                      }
+                      className={`py-2 pr-4 font-medium text-text-secondary whitespace-nowrap ${
                         column.align === "right" ? "text-right" : "text-left"
-                      } ${column.key === "label" ? "font-mono text-xs" : ""} ${
-                        column.key === "cost" ? "font-medium" : ""
                       }`}
                     >
-                      {column.render(row)}
-                    </td>
+                      <button
+                        type="button"
+                        onClick={() => handleSort(column.key)}
+                        className="hover:text-text-primary select-none whitespace-nowrap"
+                      >
+                        {column.label}
+                        {sortCol === column.key && (
+                          <span className="ml-1">{sortDir === "asc" ? "\u2191" : "\u2193"}</span>
+                        )}
+                      </button>
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {sortedRows.map((row) => (
+                  <tr key={row.key} className="border-b border-border/50 text-text-primary">
+                    {columns.map((column) => (
+                      <td
+                        key={column.key}
+                        className={`py-2 pr-4 whitespace-nowrap ${
+                          column.align === "right" ? "text-right" : "text-left"
+                        } ${column.key === "label" ? "font-mono text-xs" : ""} ${
+                          column.key === "cost" ? "font-medium" : ""
+                        }`}
+                      >
+                        {column.render(row)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

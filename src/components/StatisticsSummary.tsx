@@ -21,6 +21,7 @@ import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatCostAxis, formatTokens, formatSkewness } from "../utils/format";
 import { formatCacheReadRate } from "../utils/cacheEfficiency";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
+import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_MODEL } from "./BreakdownHint";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
@@ -175,6 +176,12 @@ export function StatisticsSummary({ entries }: Props) {
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
   const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
   const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
+  const missingDataCommand =
+    breakdownMode !== "total" && !hasModeData
+      ? breakdownMode === "agent"
+        ? BREAKDOWN_HINT_AGENT
+        : BREAKDOWN_HINT_MODEL
+      : null;
   const breakdownKeys = useMemo(() => {
     if (breakdownMode === "total" || !hasModeData) return [];
     return collectModels(entries, breakdownMode);
@@ -398,13 +405,13 @@ export function StatisticsSummary({ entries }: Props) {
         breakdownMode={breakdownMode}
         chartMarkdown={chartMarkdown}
         entryCount={stats.count}
-        hasAgentData={hasAgentData}
-        hasBreakdownData={hasBreakdownData}
         metric={metric}
         panelRef={panelRef}
         onBreakdownModeChange={handleBreakdownModeChange}
         onMetricChange={setMetric}
       />
+
+      {missingDataCommand && <BreakdownHint command={missingDataCommand} />}
 
       <DistributionChart
         entries={entries}
@@ -434,8 +441,6 @@ function StatisticsHeader({
   breakdownMode,
   chartMarkdown,
   entryCount,
-  hasAgentData,
-  hasBreakdownData,
   metric,
   panelRef,
   onBreakdownModeChange,
@@ -444,8 +449,6 @@ function StatisticsHeader({
   breakdownMode: StatisticsBreakdownMode;
   chartMarkdown: string;
   entryCount: number;
-  hasAgentData: boolean;
-  hasBreakdownData: boolean;
   metric: StatMetricKey;
   panelRef: RefObject<HTMLDivElement | null>;
   onBreakdownModeChange: (mode: StatisticsBreakdownMode) => void;
@@ -460,35 +463,31 @@ function StatisticsHeader({
         <CopyMarkdownButton markdown={chartMarkdown} />
       </div>
       <div className="flex items-center gap-2 overflow-x-auto">
-        {(hasBreakdownData || hasAgentData) && (
-          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
-            {(["total", "model", "provider"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => onBreakdownModeChange(mode)}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  breakdownMode === mode
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
-              </button>
-            ))}
-            {hasAgentData && (
-              <button
-                onClick={() => onBreakdownModeChange("agent")}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  breakdownMode === "agent"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Agent
-              </button>
-            )}
-          </div>
-        )}
+        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+          {(["total", "model", "provider"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => onBreakdownModeChange(mode)}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                breakdownMode === mode
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
+            </button>
+          ))}
+          <button
+            onClick={() => onBreakdownModeChange("agent")}
+            className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              breakdownMode === "agent"
+                ? "bg-bg-card text-text-primary shadow-sm"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            By Agent
+          </button>
+        </div>
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
           {METRIC_KEYS.map((key) => (
             <button

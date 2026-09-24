@@ -45,6 +45,7 @@ import {
   withOpacity,
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
+import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_MODEL } from "./BreakdownHint";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -254,6 +255,12 @@ export function TokenChart({
       viewMode === "agent" ||
       isAgentModelView) &&
     hasModeData;
+  const missingDataCommand =
+    viewMode !== "type" && !hasModeData
+      ? viewMode === "agent" || isAgentModelView
+        ? BREAKDOWN_HINT_AGENT
+        : BREAKDOWN_HINT_MODEL
+      : null;
   const isTokenStackView = isBreakdownView && breakdownTokenType === "stack";
   const selectedTokenType = breakdownTokenType;
   const isTokenTypeSelectorVisible = isBreakdownView;
@@ -382,92 +389,86 @@ export function TokenChart({
           <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
         <div className="flex items-center gap-1">
-          {hasBreakdownData && (
-            <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
-              <button
-                onClick={() => {
-                  setViewMode("type");
-                  setHiddenSeries(new Set());
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  viewMode === "type"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Type
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode("model");
-                  setHiddenSeries(new Set());
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  viewMode === "model"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Model
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode("provider");
-                  setHiddenSeries(new Set());
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  viewMode === "provider"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Provider
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode("providerModel");
-                  setHiddenSeries(new Set());
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  viewMode === "providerModel"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Provider → Model
-              </button>
-              {hasAgentData && (
-                <button
-                  onClick={() => {
-                    setViewMode("agent");
-                    setHiddenSeries(new Set());
-                  }}
-                  className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                    viewMode === "agent"
-                      ? "bg-bg-card text-text-primary shadow-sm"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  By Agent
-                </button>
-              )}
-              {hasAgentData && (
-                <button
-                  onClick={() => {
-                    setViewMode("agentModel");
-                    setHiddenSeries(new Set());
-                  }}
-                  className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
-                    viewMode === "agentModel"
-                      ? "bg-bg-card text-text-primary shadow-sm"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  By Agent → Model
-                </button>
-              )}
-            </div>
-          )}
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+            <button
+              onClick={() => {
+                setViewMode("type");
+                setHiddenSeries(new Set());
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === "type"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Type
+            </button>
+            <button
+              onClick={() => {
+                setViewMode("model");
+                setHiddenSeries(new Set());
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === "model"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Model
+            </button>
+            <button
+              onClick={() => {
+                setViewMode("provider");
+                setHiddenSeries(new Set());
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === "provider"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Provider
+            </button>
+            <button
+              onClick={() => {
+                setViewMode("providerModel");
+                setHiddenSeries(new Set());
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === "providerModel"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Provider → Model
+            </button>
+            <button
+              onClick={() => {
+                setViewMode("agent");
+                setHiddenSeries(new Set());
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === "agent"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Agent
+            </button>
+            <button
+              onClick={() => {
+                setViewMode("agentModel");
+                setHiddenSeries(new Set());
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
+                viewMode === "agentModel"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Agent → Model
+            </button>
+          </div>
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
             <button
               onClick={() => setShowPercent((p) => !p)}
@@ -521,6 +522,7 @@ export function TokenChart({
           </select>
         </label>
       )}
+      {missingDataCommand && <BreakdownHint command={missingDataCommand} />}
       {isTokenTypeSelectorVisible && (
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 mb-3 w-fit">
           {TOKEN_TYPE_TABS.map((tab) => (

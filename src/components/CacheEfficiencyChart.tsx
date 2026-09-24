@@ -22,6 +22,7 @@ import { collectModels, buildModelSeries, MODEL_COLORS } from "../utils/chart";
 import type { ChartDataSeries } from "../utils/chartData";
 import { buildMarkdownSection } from "../utils/chartData";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
+import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_MODEL } from "./BreakdownHint";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
@@ -322,6 +323,12 @@ export function CacheEfficiencyChart({
   const hasBreakdownData = useMemo(() => hasAnyBreakdownData(entries), [entries]);
   const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
   const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
+  const missingDataCommand =
+    viewMode !== "total" && !hasModeData
+      ? breakdownMode === "agent"
+        ? BREAKDOWN_HINT_AGENT
+        : BREAKDOWN_HINT_MODEL
+      : null;
   const breakdownKeys = useMemo(
     () => (hasModeData ? collectModels(entries, breakdownMode) : []),
     [entries, hasModeData, breakdownMode],
@@ -463,36 +470,34 @@ export function CacheEfficiencyChart({
           <CopyImageButton targetRef={chartRef} />
           <CopyMarkdownButton markdown={getChartMarkdown} />
         </div>
-        {(hasBreakdownData || hasAgentData) && (
-          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
-            {(["total", "model", "provider"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => handleViewModeChange(mode)}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  viewMode === mode
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
-              </button>
-            ))}
-            {hasAgentData && (
-              <button
-                onClick={() => handleViewModeChange("agent")}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  viewMode === "agent"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Agent
-              </button>
-            )}
-          </div>
-        )}
+        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+          {(["total", "model", "provider"] as const).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => handleViewModeChange(mode)}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === mode
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
+            </button>
+          ))}
+          <button
+            onClick={() => handleViewModeChange("agent")}
+            className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              viewMode === "agent"
+                ? "bg-bg-card text-text-primary shadow-sm"
+                : "text-text-secondary hover:text-text-primary"
+            }`}
+          >
+            By Agent
+          </button>
+        </div>
       </div>
+
+      {missingDataCommand && <BreakdownHint command={missingDataCommand} />}
 
       <Suspense fallback={<div className="h-80" />}>
         <div className="relative h-80 overflow-visible">

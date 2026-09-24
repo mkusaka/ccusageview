@@ -25,6 +25,7 @@ import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
+import { BreakdownHint, BREAKDOWN_HINT_AGENT, BREAKDOWN_HINT_HOURLY } from "./BreakdownHint";
 import {
   asNumber,
   getChartJsColor,
@@ -142,6 +143,12 @@ export function HourOfDayChart({ entries }: Props) {
   const hasBreakdownData = useMemo(() => collectModels(entries).length > 0, [entries]);
   const hasAgentData = useMemo(() => entries.some((e) => e.agentBreakdowns?.length), [entries]);
   const hasModeData = breakdownMode === "agent" ? hasAgentData : hasBreakdownData;
+  const missingDataCommand =
+    viewMode !== "total" && !hasModeData
+      ? breakdownMode === "agent"
+        ? BREAKDOWN_HINT_AGENT
+        : BREAKDOWN_HINT_HOURLY
+      : null;
   const breakdownKeys = useMemo(
     () => (hasModeData ? collectModels(entries, breakdownMode) : []),
     [entries, hasModeData, breakdownMode],
@@ -270,73 +277,69 @@ export function HourOfDayChart({ entries }: Props) {
           <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
-          {(hasBreakdownData || hasAgentData) && (
-            <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+            <button
+              onClick={() => {
+                dispatch({ type: "setViewMode", viewMode: "total" });
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === "total"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              Total
+            </button>
+            <button
+              onClick={() => {
+                dispatch({ type: "setViewMode", viewMode: "model" });
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === "model"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Model
+            </button>
+            <button
+              onClick={() => {
+                dispatch({ type: "setViewMode", viewMode: "provider" });
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === "provider"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Provider
+            </button>
+            <button
+              onClick={() => {
+                dispatch({ type: "setViewMode", viewMode: "agent" });
+              }}
+              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                viewMode === "agent"
+                  ? "bg-bg-card text-text-primary shadow-sm"
+                  : "text-text-secondary hover:text-text-primary"
+              }`}
+            >
+              By Agent
+            </button>
+            {isBreakdownView && (
               <button
-                onClick={() => {
-                  dispatch({ type: "setViewMode", viewMode: "total" });
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  viewMode === "total"
+                onClick={() => dispatch({ type: "togglePercent" })}
+                className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
+                  showPercent
                     ? "bg-bg-card text-text-primary shadow-sm"
                     : "text-text-secondary hover:text-text-primary"
                 }`}
+                title="Show as percentage"
               >
-                Total
+                %
               </button>
-              <button
-                onClick={() => {
-                  dispatch({ type: "setViewMode", viewMode: "model" });
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  viewMode === "model"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Model
-              </button>
-              <button
-                onClick={() => {
-                  dispatch({ type: "setViewMode", viewMode: "provider" });
-                }}
-                className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                  viewMode === "provider"
-                    ? "bg-bg-card text-text-primary shadow-sm"
-                    : "text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                By Provider
-              </button>
-              {hasAgentData && (
-                <button
-                  onClick={() => {
-                    dispatch({ type: "setViewMode", viewMode: "agent" });
-                  }}
-                  className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                    viewMode === "agent"
-                      ? "bg-bg-card text-text-primary shadow-sm"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  By Agent
-                </button>
-              )}
-              {isBreakdownView && (
-                <button
-                  onClick={() => dispatch({ type: "togglePercent" })}
-                  className={`px-1.5 py-0.5 text-xs rounded transition-colors ${
-                    showPercent
-                      ? "bg-bg-card text-text-primary shadow-sm"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                  title="Show as percentage"
-                >
-                  %
-                </button>
-              )}
-            </div>
-          )}
+            )}
+          </div>
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
             {METRIC_KEYS.map((key) => (
               <button
@@ -354,6 +357,8 @@ export function HourOfDayChart({ entries }: Props) {
           </div>
         </div>
       </div>
+
+      {missingDataCommand && <BreakdownHint command={missingDataCommand} />}
 
       <HourOfDayBarChart
         aggregation={aggregation}
