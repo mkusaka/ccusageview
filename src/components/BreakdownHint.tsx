@@ -18,23 +18,27 @@ export function breakdownHintCommand(
   return `ccusage ${report} --json`;
 }
 
-// A tab button that disables itself and shows a tooltip with the command to
-// generate the missing data. The title goes on the wrapper span — browsers
-// don't show tooltips on disabled buttons.
+// A tab button that looks disabled and shows a tooltip with the command to
+// generate the missing data. Uses aria-disabled instead of disabled —
+// disabled buttons don't fire hover events, so their title never shows.
 export function HintedTab({
   hint,
   children,
+  onClick,
   ...buttonProps
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   hint: string | null;
   children: ReactNode;
 }) {
   return (
-    <span title={hint ? `No data — generate it with ${hint}` : undefined} className="inline-flex">
-      <button {...buttonProps} disabled={hint != null}>
-        {children}
-      </button>
-    </span>
+    <button
+      {...buttonProps}
+      aria-disabled={hint != null || undefined}
+      title={hint ? `No data — generate it with ${hint}` : undefined}
+      onClick={hint == null ? onClick : undefined}
+    >
+      {children}
+    </button>
   );
 }
 
