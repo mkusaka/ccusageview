@@ -46,7 +46,7 @@ import {
   withOpacity,
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
-import { BreakdownHint, breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand, HintedTab } from "./BreakdownHint";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -407,10 +407,8 @@ export function TokenChart({
             >
               By Type
             </button>
-            <button
-              {...disabledHintProps(
-                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
-              )}
+            <HintedTab
+              hint={hasBreakdownData ? null : breakdownHintCommand(reportType, "model")}
               onClick={() => {
                 setViewMode("model");
                 setHiddenSeries(new Set());
@@ -422,11 +420,9 @@ export function TokenChart({
               }`}
             >
               By Model
-            </button>
-            <button
-              {...disabledHintProps(
-                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
-              )}
+            </HintedTab>
+            <HintedTab
+              hint={hasBreakdownData ? null : breakdownHintCommand(reportType, "model")}
               onClick={() => {
                 setViewMode("provider");
                 setHiddenSeries(new Set());
@@ -438,11 +434,9 @@ export function TokenChart({
               }`}
             >
               By Provider
-            </button>
-            <button
-              {...disabledHintProps(
-                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
-              )}
+            </HintedTab>
+            <HintedTab
+              hint={hasBreakdownData ? null : breakdownHintCommand(reportType, "model")}
               onClick={() => {
                 setViewMode("providerModel");
                 setHiddenSeries(new Set());
@@ -454,11 +448,9 @@ export function TokenChart({
               }`}
             >
               By Provider → Model
-            </button>
-            <button
-              {...disabledHintProps(
-                hasAgentData ? null : breakdownHintCommand(reportType, "agent"),
-              )}
+            </HintedTab>
+            <HintedTab
+              hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
               onClick={() => {
                 setViewMode("agent");
                 setHiddenSeries(new Set());
@@ -470,11 +462,9 @@ export function TokenChart({
               }`}
             >
               By Agent
-            </button>
-            <button
-              {...disabledHintProps(
-                hasAgentData ? null : breakdownHintCommand(reportType, "agent"),
-              )}
+            </HintedTab>
+            <HintedTab
+              hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
               onClick={() => {
                 setViewMode("agentModel");
                 setHiddenSeries(new Set());
@@ -486,7 +476,7 @@ export function TokenChart({
               }`}
             >
               By Agent → Model
-            </button>
+            </HintedTab>
           </div>
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
             <button

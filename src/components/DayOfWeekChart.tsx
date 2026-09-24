@@ -23,7 +23,7 @@ import {
   type DayOfWeekMetric,
 } from "../utils/dayOfWeek";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
-import { BreakdownHint, breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand, HintedTab } from "./BreakdownHint";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
@@ -290,10 +290,8 @@ export function DayOfWeekChart({ entries, reportType }: Props) {
             >
               Total
             </button>
-            <button
-              {...disabledHintProps(
-                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
-              )}
+            <HintedTab
+              hint={hasBreakdownData ? null : breakdownHintCommand(reportType, "model")}
               onClick={() => {
                 dispatch({ type: "setViewMode", viewMode: "model" });
               }}
@@ -304,11 +302,9 @@ export function DayOfWeekChart({ entries, reportType }: Props) {
               }`}
             >
               By Model
-            </button>
-            <button
-              {...disabledHintProps(
-                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
-              )}
+            </HintedTab>
+            <HintedTab
+              hint={hasBreakdownData ? null : breakdownHintCommand(reportType, "model")}
               onClick={() => {
                 dispatch({ type: "setViewMode", viewMode: "provider" });
               }}
@@ -319,11 +315,9 @@ export function DayOfWeekChart({ entries, reportType }: Props) {
               }`}
             >
               By Provider
-            </button>
-            <button
-              {...disabledHintProps(
-                hasAgentData ? null : breakdownHintCommand(reportType, "agent"),
-              )}
+            </HintedTab>
+            <HintedTab
+              hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
               onClick={() => {
                 dispatch({ type: "setViewMode", viewMode: "agent" });
               }}
@@ -334,7 +328,7 @@ export function DayOfWeekChart({ entries, reportType }: Props) {
               }`}
             >
               By Agent
-            </button>
+            </HintedTab>
             {isBreakdownView && (
               <button
                 onClick={() => dispatch({ type: "togglePercent" })}

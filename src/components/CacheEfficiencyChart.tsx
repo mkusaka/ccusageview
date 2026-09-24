@@ -23,7 +23,7 @@ import { collectModels, buildModelSeries, MODEL_COLORS } from "../utils/chart";
 import type { ChartDataSeries } from "../utils/chartData";
 import { buildMarkdownSection } from "../utils/chartData";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
-import { BreakdownHint, breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand, HintedTab } from "./BreakdownHint";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
@@ -473,13 +473,13 @@ export function CacheEfficiencyChart({
         </div>
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
           {(["total", "model", "provider"] as const).map((mode) => (
-            <button
+            <HintedTab
               key={mode}
-              {...disabledHintProps(
+              hint={
                 mode !== "total" && !hasBreakdownData
                   ? breakdownHintCommand(reportType, "model")
-                  : null,
-              )}
+                  : null
+              }
               onClick={() => handleViewModeChange(mode)}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 viewMode === mode
@@ -488,10 +488,10 @@ export function CacheEfficiencyChart({
               }`}
             >
               {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
-            </button>
+            </HintedTab>
           ))}
-          <button
-            {...disabledHintProps(hasAgentData ? null : breakdownHintCommand(reportType, "agent"))}
+          <HintedTab
+            hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
             onClick={() => handleViewModeChange("agent")}
             className={`px-2 py-0.5 text-xs rounded transition-colors ${
               viewMode === "agent"
@@ -500,7 +500,7 @@ export function CacheEfficiencyChart({
             }`}
           >
             By Agent
-          </button>
+          </HintedTab>
         </div>
       </div>
 

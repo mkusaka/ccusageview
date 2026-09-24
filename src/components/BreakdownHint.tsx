@@ -1,3 +1,4 @@
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import type { ReportType } from "../types";
 
 const AGENT_REPORTS = new Set<ReportType>(["daily", "weekly", "monthly", "session"]);
@@ -17,13 +18,24 @@ export function breakdownHintCommand(
   return `ccusage ${report} --json`;
 }
 
-// Disabled-state props for a breakdown tab whose data is missing.
-// The tooltip explains how to generate it.
-export function disabledHintProps(command: string | null): {
-  disabled?: boolean;
-  title?: string;
-} {
-  return command ? { disabled: true, title: `No data — generate it with ${command}` } : {};
+// A tab button that disables itself and shows a tooltip with the command to
+// generate the missing data. The title goes on the wrapper span — browsers
+// don't show tooltips on disabled buttons.
+export function HintedTab({
+  hint,
+  children,
+  ...buttonProps
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  hint: string | null;
+  children: ReactNode;
+}) {
+  return (
+    <span title={hint ? `No data — generate it with ${hint}` : undefined} className="inline-flex">
+      <button {...buttonProps} disabled={hint != null}>
+        {children}
+      </button>
+    </span>
+  );
 }
 
 export function BreakdownHint({ command }: { command: string }) {

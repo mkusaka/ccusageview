@@ -26,7 +26,7 @@ import {
   withOpacity,
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
-import { BreakdownHint, breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand, HintedTab } from "./BreakdownHint";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -333,10 +333,8 @@ export function ModelBreakdown({ entries, reportType }: Props) {
         </div>
         <div className="flex items-center gap-2 overflow-x-auto">
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
-            <button
-              {...disabledHintProps(
-                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
-              )}
+            <HintedTab
+              hint={hasBreakdownData ? null : breakdownHintCommand(reportType, "model")}
               onClick={() => setViewMode("model")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 viewMode === "model"
@@ -345,11 +343,9 @@ export function ModelBreakdown({ entries, reportType }: Props) {
               }`}
             >
               By Model
-            </button>
-            <button
-              {...disabledHintProps(
-                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
-              )}
+            </HintedTab>
+            <HintedTab
+              hint={hasBreakdownData ? null : breakdownHintCommand(reportType, "model")}
               onClick={() => setViewMode("provider")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 viewMode === "provider"
@@ -358,11 +354,9 @@ export function ModelBreakdown({ entries, reportType }: Props) {
               }`}
             >
               By Provider
-            </button>
-            <button
-              {...disabledHintProps(
-                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
-              )}
+            </HintedTab>
+            <HintedTab
+              hint={hasBreakdownData ? null : breakdownHintCommand(reportType, "model")}
               onClick={() => setViewMode("providerModel")}
               className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
                 viewMode === "providerModel"
@@ -371,11 +365,9 @@ export function ModelBreakdown({ entries, reportType }: Props) {
               }`}
             >
               By Provider → Model
-            </button>
-            <button
-              {...disabledHintProps(
-                hasAgentData ? null : breakdownHintCommand(reportType, "agent"),
-              )}
+            </HintedTab>
+            <HintedTab
+              hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
               onClick={() => setViewMode("agent")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 viewMode === "agent"
@@ -384,11 +376,9 @@ export function ModelBreakdown({ entries, reportType }: Props) {
               }`}
             >
               By Agent
-            </button>
-            <button
-              {...disabledHintProps(
-                hasAgentData ? null : breakdownHintCommand(reportType, "agent"),
-              )}
+            </HintedTab>
+            <HintedTab
+              hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
               onClick={() => setViewMode("agentModel")}
               className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
                 viewMode === "agentModel"
@@ -397,7 +387,7 @@ export function ModelBreakdown({ entries, reportType }: Props) {
               }`}
             >
               By Agent → Model
-            </button>
+            </HintedTab>
           </div>
           {isProviderModelView && selectedProvider && (
             <label className="flex items-center gap-2 w-fit text-xs text-text-secondary shrink-0">

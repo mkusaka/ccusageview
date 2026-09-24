@@ -22,7 +22,7 @@ import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatCostAxis, formatTokens, formatSkewness } from "../utils/format";
 import { formatCacheReadRate } from "../utils/cacheEfficiency";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
-import { BreakdownHint, breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand, HintedTab } from "./BreakdownHint";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
@@ -471,9 +471,9 @@ function StatisticsHeader({
       <div className="flex items-center gap-2 overflow-x-auto">
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
           {(["total", "model", "provider"] as const).map((mode) => (
-            <button
+            <HintedTab
               key={mode}
-              {...disabledHintProps(mode !== "total" ? modelMissingCommand : null)}
+              hint={mode !== "total" ? modelMissingCommand : null}
               onClick={() => onBreakdownModeChange(mode)}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 breakdownMode === mode
@@ -482,10 +482,10 @@ function StatisticsHeader({
               }`}
             >
               {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
-            </button>
+            </HintedTab>
           ))}
-          <button
-            {...disabledHintProps(agentMissingCommand)}
+          <HintedTab
+            hint={agentMissingCommand}
             onClick={() => onBreakdownModeChange("agent")}
             className={`px-2 py-0.5 text-xs rounded transition-colors ${
               breakdownMode === "agent"
@@ -494,7 +494,7 @@ function StatisticsHeader({
             }`}
           >
             By Agent
-          </button>
+          </HintedTab>
         </div>
         <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
           {METRIC_KEYS.map((key) => (
