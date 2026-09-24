@@ -17,6 +17,15 @@ export function breakdownHintCommand(
   return `ccusage ${report} --json`;
 }
 
+// Disabled-state props for a breakdown tab whose data is missing.
+// The tooltip explains how to generate it.
+export function disabledHintProps(command: string | null): {
+  disabled?: boolean;
+  title?: string;
+} {
+  return command ? { disabled: true, title: `No data — generate it with ${command}` } : {};
+}
+
 export function BreakdownHint({ command }: { command: string }) {
   return (
     <p className="mb-3 text-xs text-text-secondary">

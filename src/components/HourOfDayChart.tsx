@@ -26,7 +26,7 @@ import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
-import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
 import {
   asNumber,
   getChartJsColor,
@@ -291,6 +291,9 @@ export function HourOfDayChart({ entries, reportType }: Props) {
               Total
             </button>
             <button
+              {...disabledHintProps(
+                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
+              )}
               onClick={() => {
                 dispatch({ type: "setViewMode", viewMode: "model" });
               }}
@@ -303,6 +306,9 @@ export function HourOfDayChart({ entries, reportType }: Props) {
               By Model
             </button>
             <button
+              {...disabledHintProps(
+                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
+              )}
               onClick={() => {
                 dispatch({ type: "setViewMode", viewMode: "provider" });
               }}
@@ -315,6 +321,9 @@ export function HourOfDayChart({ entries, reportType }: Props) {
               By Provider
             </button>
             <button
+              {...disabledHintProps(
+                hasAgentData ? null : breakdownHintCommand(reportType, "agent"),
+              )}
               onClick={() => {
                 dispatch({ type: "setViewMode", viewMode: "agent" });
               }}

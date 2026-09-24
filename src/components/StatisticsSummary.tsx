@@ -22,7 +22,7 @@ import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatCostAxis, formatTokens, formatSkewness } from "../utils/format";
 import { formatCacheReadRate } from "../utils/cacheEfficiency";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
-import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
@@ -407,6 +407,8 @@ export function StatisticsSummary({ entries, reportType }: Props) {
         entryCount={stats.count}
         metric={metric}
         panelRef={panelRef}
+        agentMissingCommand={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
+        modelMissingCommand={hasBreakdownData ? null : breakdownHintCommand(reportType, "model")}
         onBreakdownModeChange={handleBreakdownModeChange}
         onMetricChange={setMetric}
       />
@@ -443,6 +445,8 @@ function StatisticsHeader({
   entryCount,
   metric,
   panelRef,
+  agentMissingCommand,
+  modelMissingCommand,
   onBreakdownModeChange,
   onMetricChange,
 }: {
@@ -451,6 +455,8 @@ function StatisticsHeader({
   entryCount: number;
   metric: StatMetricKey;
   panelRef: RefObject<HTMLDivElement | null>;
+  agentMissingCommand: string | null;
+  modelMissingCommand: string | null;
   onBreakdownModeChange: (mode: StatisticsBreakdownMode) => void;
   onMetricChange: (metric: StatMetricKey) => void;
 }) {
@@ -467,6 +473,7 @@ function StatisticsHeader({
           {(["total", "model", "provider"] as const).map((mode) => (
             <button
               key={mode}
+              {...disabledHintProps(mode !== "total" ? modelMissingCommand : null)}
               onClick={() => onBreakdownModeChange(mode)}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 breakdownMode === mode
@@ -478,6 +485,7 @@ function StatisticsHeader({
             </button>
           ))}
           <button
+            {...disabledHintProps(agentMissingCommand)}
             onClick={() => onBreakdownModeChange("agent")}
             className={`px-2 py-0.5 text-xs rounded transition-colors ${
               breakdownMode === "agent"

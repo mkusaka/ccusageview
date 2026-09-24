@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 @theme {
   --color-bg-primary: oklch(0.985 0 0);
   --color-bg-secondary: oklch(0.96 0 0);

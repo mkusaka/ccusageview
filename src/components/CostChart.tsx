@@ -39,7 +39,7 @@ import {
   withOpacity,
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
-import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -330,6 +330,9 @@ export function CostChart({
               Total
             </button>
             <button
+              {...disabledHintProps(
+                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
+              )}
               onClick={() => {
                 setViewMode("model");
                 setHiddenSeries(new Set());
@@ -343,6 +346,9 @@ export function CostChart({
               By Model
             </button>
             <button
+              {...disabledHintProps(
+                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
+              )}
               onClick={() => {
                 setViewMode("provider");
                 setHiddenSeries(new Set());
@@ -356,6 +362,9 @@ export function CostChart({
               By Provider
             </button>
             <button
+              {...disabledHintProps(
+                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
+              )}
               onClick={() => {
                 setViewMode("providerModel");
                 setHiddenSeries(new Set());
@@ -369,6 +378,9 @@ export function CostChart({
               By Provider → Model
             </button>
             <button
+              {...disabledHintProps(
+                hasAgentData ? null : breakdownHintCommand(reportType, "agent"),
+              )}
               onClick={() => {
                 setViewMode("agent");
                 setHiddenSeries(new Set());
@@ -382,6 +394,9 @@ export function CostChart({
               By Agent
             </button>
             <button
+              {...disabledHintProps(
+                hasAgentData ? null : breakdownHintCommand(reportType, "agent"),
+              )}
               onClick={() => {
                 setViewMode("agentModel");
                 setHiddenSeries(new Set());

@@ -21,6 +21,7 @@ import { DayOfWeekChart } from "./DayOfWeekChart";
 import { HourOfDayChart } from "./HourOfDayChart";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
+import { breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
 import { RangeSlider } from "./RangeSlider";
 
 interface Props {
@@ -208,12 +209,12 @@ export function Dashboard({ data }: Props) {
         {/* Granularity toggle for daily and hourly reports */}
         {canToggleGranularity && (
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 ml-auto">
-            {(isHourly
-              ? (["hourly", "daily", "weekly", "monthly"] as const)
-              : (["daily", "weekly", "monthly"] as const)
-            ).map((g) => (
+            {(["hourly", "daily", "weekly", "monthly"] as const).map((g) => (
               <button
                 key={g}
+                {...disabledHintProps(
+                  g === "hourly" && !isHourly ? breakdownHintCommand("hourly", "model") : null,
+                )}
                 onClick={() => setGranularity(g)}
                 className={`px-2.5 py-0.5 text-xs rounded transition-colors ${
                   granularity === g

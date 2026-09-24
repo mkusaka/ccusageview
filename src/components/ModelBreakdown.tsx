@@ -26,7 +26,7 @@ import {
   withOpacity,
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
-import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -119,6 +119,8 @@ export function ModelBreakdown({ entries, reportType }: Props) {
   const isProviderModelView = viewMode === "providerModel";
   const isAgentModelView = viewMode === "agentModel";
   const mode: BreakdownMode = viewMode === "providerModel" || isAgentModelView ? "model" : viewMode;
+  const hasBreakdownData = entries.some((e) => e.modelBreakdowns?.length);
+  const hasAgentData = entries.some((e) => e.agentBreakdowns?.length);
   const { providerKeys, selectedProvider, activeProviderFilter, selectProvider } =
     useProviderSelection(entries, isProviderModelView);
   const { agentKeys, selectedAgent, activeAgentFilter, selectAgent } = useAgentSelection(
@@ -332,6 +334,9 @@ export function ModelBreakdown({ entries, reportType }: Props) {
         <div className="flex items-center gap-2 overflow-x-auto">
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
             <button
+              {...disabledHintProps(
+                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
+              )}
               onClick={() => setViewMode("model")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 viewMode === "model"
@@ -342,6 +347,9 @@ export function ModelBreakdown({ entries, reportType }: Props) {
               By Model
             </button>
             <button
+              {...disabledHintProps(
+                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
+              )}
               onClick={() => setViewMode("provider")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 viewMode === "provider"
@@ -352,6 +360,9 @@ export function ModelBreakdown({ entries, reportType }: Props) {
               By Provider
             </button>
             <button
+              {...disabledHintProps(
+                hasBreakdownData ? null : breakdownHintCommand(reportType, "model"),
+              )}
               onClick={() => setViewMode("providerModel")}
               className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
                 viewMode === "providerModel"
@@ -362,6 +373,9 @@ export function ModelBreakdown({ entries, reportType }: Props) {
               By Provider → Model
             </button>
             <button
+              {...disabledHintProps(
+                hasAgentData ? null : breakdownHintCommand(reportType, "agent"),
+              )}
               onClick={() => setViewMode("agent")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 viewMode === "agent"
@@ -372,6 +386,9 @@ export function ModelBreakdown({ entries, reportType }: Props) {
               By Agent
             </button>
             <button
+              {...disabledHintProps(
+                hasAgentData ? null : breakdownHintCommand(reportType, "agent"),
+              )}
               onClick={() => setViewMode("agentModel")}
               className={`px-2 py-0.5 text-xs rounded transition-colors whitespace-nowrap ${
                 viewMode === "agentModel"

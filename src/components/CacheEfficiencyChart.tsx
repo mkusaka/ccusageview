@@ -23,7 +23,7 @@ import { collectModels, buildModelSeries, MODEL_COLORS } from "../utils/chart";
 import type { ChartDataSeries } from "../utils/chartData";
 import { buildMarkdownSection } from "../utils/chartData";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
-import { BreakdownHint, breakdownHintCommand } from "./BreakdownHint";
+import { BreakdownHint, breakdownHintCommand, disabledHintProps } from "./BreakdownHint";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
@@ -475,6 +475,11 @@ export function CacheEfficiencyChart({
           {(["total", "model", "provider"] as const).map((mode) => (
             <button
               key={mode}
+              {...disabledHintProps(
+                mode !== "total" && !hasBreakdownData
+                  ? breakdownHintCommand(reportType, "model")
+                  : null,
+              )}
               onClick={() => handleViewModeChange(mode)}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 viewMode === mode
@@ -486,6 +491,7 @@ export function CacheEfficiencyChart({
             </button>
           ))}
           <button
+            {...disabledHintProps(hasAgentData ? null : breakdownHintCommand(reportType, "agent"))}
             onClick={() => handleViewModeChange("agent")}
             className={`px-2 py-0.5 text-xs rounded transition-colors ${
               viewMode === "agent"
