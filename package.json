@@ -34,7 +34,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
-    "@types/node": "24.13.4",
+    "@types/node": "24.13.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
@@ -49,8 +49,8 @@
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.0",
-    "vitest": "5.0.0",
-    "wrangler": "4.131.2"
+    "vitest": "5.0.1",
+    "wrangler": "4.135.0"
   },
   "engines": {
     "node": ">=22"
