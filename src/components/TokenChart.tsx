@@ -278,11 +278,11 @@ export function TokenChart({
         viewMode === "provider"
           ? "By Provider"
           : isProviderModelView
-            ? "By Provider → Model"
+            ? "By Model (Provider)"
             : viewMode === "agent"
               ? "By Agent"
               : isAgentModelView
-                ? "By Agent → Model"
+                ? "By Model (Agent)"
                 : "By Model";
       series = isTokenStackView
         ? getTokenStackSeries(breakdownSeries, hiddenSeries)
@@ -447,7 +447,7 @@ export function TokenChart({
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              By Provider → Model
+              By Model (Provider)
             </HintedTab>
             <HintedTab
               hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
@@ -475,7 +475,7 @@ export function TokenChart({
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              By Agent → Model
+              By Model (Agent)
             </HintedTab>
           </div>
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">

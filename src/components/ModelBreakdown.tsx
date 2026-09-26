@@ -229,11 +229,11 @@ export function ModelBreakdown({ entries, reportType }: Props) {
             viewMode === "provider"
               ? "By Provider"
               : isProviderModelView
-                ? "By Provider → Model"
+                ? "By Model (Provider)"
                 : viewMode === "agent"
                   ? "By Agent"
                   : isAgentModelView
-                    ? "By Agent → Model"
+                    ? "By Model (Agent)"
                     : "By Model",
           ],
           ...(isProviderModelView
@@ -364,7 +364,7 @@ export function ModelBreakdown({ entries, reportType }: Props) {
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              By Provider → Model
+              By Model (Provider)
             </HintedTab>
             <HintedTab
               hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
@@ -386,7 +386,7 @@ export function ModelBreakdown({ entries, reportType }: Props) {
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              By Agent → Model
+              By Model (Agent)
             </HintedTab>
           </div>
           {isProviderModelView && selectedProvider && (

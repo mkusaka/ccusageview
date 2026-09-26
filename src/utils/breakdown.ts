@@ -97,7 +97,7 @@ function getBreakdownKey(modelName: string, mode: BreakdownMode): string {
 
 // Breakdown rows for the given mode: models/providers come from modelBreakdowns,
 // agents from agentBreakdowns (agent name stored in modelName).
-// agentFilter selects one agent's nested modelBreakdowns (By Agent → Model).
+// agentFilter selects one agent's nested modelBreakdowns (By Model (Agent)).
 export function getEntryBreakdowns(
   entry: NormalizedEntry,
   mode: BreakdownMode,

@@ -220,11 +220,11 @@ export function CostChart({
         viewMode === "provider"
           ? "By Provider"
           : isProviderModelView
-            ? "By Provider → Model"
+            ? "By Model (Provider)"
             : viewMode === "agent"
               ? "By Agent"
               : isAgentModelView
-                ? "By Agent → Model"
+                ? "By Model (Agent)"
                 : "By Model";
       series = getVisibleChartSeries(breakdownSeries, hiddenSeries);
       sourceRows = breakdownChartData;
@@ -369,7 +369,7 @@ export function CostChart({
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              By Provider → Model
+              By Model (Provider)
             </HintedTab>
             <HintedTab
               hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
@@ -397,7 +397,7 @@ export function CostChart({
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              By Agent → Model
+              By Model (Agent)
             </HintedTab>
             {hasTokenTypeCostData && (
               <button
