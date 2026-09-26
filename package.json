@@ -26,6 +26,7 @@
     "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
+    "@duckdb/duckdb-wasm": "1.33.1-dev57.0",
     "@radix-ui/react-tooltip": "^1.2.16",
     "chart.js": "^4.5.1",
     "hono": "^4.11.9",

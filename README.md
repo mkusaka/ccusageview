@@ -13,6 +13,7 @@ A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppi
 - **Shareable URLs** — data is compressed into the URL hash, or use short URLs via `/s/:id`
 - **Copy as image** — export individual charts or the entire dashboard to clipboard
 - **Dark mode** — respects system preference, toggleable
+- **Ask AI for a chart** — describe a chart in natural language; Chrome's on-device model generates a local DuckDB query and a line or bar chart
 
 ## Quick start
 
@@ -47,6 +48,12 @@ npx ccusageview --label "Claude Code" --label "OpenCode" claude.json opencode.js
 ### Paste JSON directly
 
 Open https://ccusageview.polyfill.workers.dev/ and paste your ccusage JSON into the input area.
+
+### Ask AI for a chart
+
+Load a report, click **Ask AI for a chart**, then start typing a request. The on-device model automatically suggests more specific chart requests based on the report type and available breakdown tables; select a suggestion to fill the prompt, then click **Generate chart**. The app imports normalized, source-aware usage rows into DuckDB-Wasm in your browser. `window.LanguageModel` generates a SQL query and a chart definition; the query runs locally, and you can inspect it under **Generated SQL**. Query or chart errors are returned to the model for up to two corrections.
+
+This requires a [Chrome environment with the Prompt API available](https://developer.chrome.com/docs/ai/prompt-api); the on-device model may need to download on first use. The AI panel shows an unavailable message in other environments. The model receives the schema, your request, and any query/validation errors; the usage rows stay in the browser rather than being sent to an AI service. AI-generated charts can still be misleading: check the SQL and aggregation grain before relying on their conclusions. Individual models and agents can only be charted when their breakdowns exist in the supplied report.
 
 ## CLI options
 

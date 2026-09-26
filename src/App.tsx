@@ -163,7 +163,7 @@ function App() {
                   </div>
                 }
               >
-                <Dashboard data={parseResult.data} />
+                <Dashboard data={parseResult.data} inputs={inputs} />
               </Suspense>
             </ErrorBoundary>
           )}

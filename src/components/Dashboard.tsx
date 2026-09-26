@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { ReportType } from "../types";
+import type { SourceInput } from "../utils/inputs";
 import type { DashboardData } from "../utils/normalize";
 import type { TimeGranularity } from "../utils/projection";
 import {
@@ -23,9 +24,11 @@ import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { breakdownHintCommand, HintedTab } from "./BreakdownHint";
 import { RangeSlider } from "./RangeSlider";
+import { AiChartLauncher } from "./AiChartLauncher";
 
 interface Props {
   data: DashboardData;
+  inputs: SourceInput[];
 }
 
 const TYPE_LABELS: Record<ReportType, string> = {
@@ -58,7 +61,7 @@ interface SyncedChartHoverState {
   source: string | null;
 }
 
-export function Dashboard({ data }: Props) {
+export function Dashboard({ data, inputs }: Props) {
   const dashboardRef = useRef<HTMLDivElement>(null);
   const [markdownSectionsById, setMarkdownSectionsById] = useState<
     Record<string, RegisteredMarkdownSection>
@@ -239,6 +242,7 @@ export function Dashboard({ data }: Props) {
       )}
 
       <ChartMarkdownContext.Provider value={registerMarkdownSection}>
+        <AiChartLauncher inputs={inputs} />
         <div ref={dashboardRef} className="space-y-4">
           <SummaryCards totals={filteredTotals} entryCount={filteredEntries.length} />
 

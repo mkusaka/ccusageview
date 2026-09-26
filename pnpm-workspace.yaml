@@ -7,6 +7,7 @@ trustPolicy: no-downgrade
 blockExoticSubdeps: true
 overrides:
   es-toolkit: 1.52.0
+  "apache-arrow>@types/node": 24.13.6
   sharp: 0.35.4
   "miniflare>undici": 8.10.2
   "vite>postcss": 8.5.28
