@@ -1,3 +1,4 @@
+import * as v from "valibot";
 import { AI_CHART_SCHEMA } from "./aiChartDatabase";
 
 export interface PromptSession {
@@ -52,6 +53,17 @@ const CHART_CONSTRAINT = {
   required: ["sql", "chart"],
   additionalProperties: false,
 };
+const CHART_SCHEMA = v.strictObject({
+  sql: v.pipe(v.string(), v.trim(), v.nonEmpty("SQL query is required.")),
+  chart: v.strictObject({
+    type: v.picklist(["line", "bar"]),
+    title: v.pipe(v.string(), v.trim(), v.nonEmpty("Chart title is required.")),
+    x: v.pipe(v.string(), v.trim(), v.nonEmpty("Chart x column is required.")),
+    y: v.pipe(v.string(), v.trim(), v.nonEmpty("Chart y column is required.")),
+    series: v.string(),
+    stacked: v.boolean(),
+  }),
+});
 
 const SUGGESTION_CONSTRAINT = {
   type: "object",
@@ -66,17 +78,15 @@ const SUGGESTION_CONSTRAINT = {
   additionalProperties: false,
 };
 
-export async function suggestAiChartPrompts(
-  session: PromptSession,
-  request: string,
-  availableTables: string[],
-  reportType: string,
-  signal?: AbortSignal,
-): Promise<string[]> {
-  const response = await session.prompt(
-    `Suggest up to 3 specific, useful chart requests refining this user's intent: ${request}\n\n${AI_CHART_SCHEMA}\n\nCurrent report type: ${reportType}. Only these tables contain data: ${availableTables.join(", ")}. Do not suggest analyses using empty breakdown tables. Suggestions must be natural-language requests, not SQL or explanations, and use the same language as the user's request. Make each suggestion distinct and directly chartable with the available tables.`,
-    { responseConstraint: SUGGESTION_CONSTRAINT, signal },
-  );
+const JAPANESE_CHARACTERS = /[\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/gu;
+
+function matchesSuggestionLanguage(text: string, language: "ja" | "en"): boolean {
+  const japanese = text.match(JAPANESE_CHARACTERS)?.length ?? 0;
+  const latin = text.match(/[A-Za-z]/g)?.length ?? 0;
+  return language === "ja" ? japanese > latin : latin > japanese;
+}
+
+function parseSuggestions(response: string, request: string): string[] {
   const result: unknown = JSON.parse(response);
   if (
     !result ||
@@ -93,6 +103,39 @@ export async function suggestAiChartPrompts(
   return [...new Set(suggestions)].slice(0, 3);
 }
 
+export async function suggestAiChartPrompts(
+  session: PromptSession,
+  request: string,
+  availableTables: string[],
+  reportType: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const language = request.search(JAPANESE_CHARACTERS) === -1 ? "en" : "ja";
+  const languageRule =
+    language === "ja"
+      ? "候補文はすべて自然な日本語で書いてください。英語の文にしないでください。"
+      : "Write every suggestion in natural English, not Japanese.";
+  const response = await session.prompt(
+    `${languageRule}\nSuggest up to 3 specific, useful chart requests refining this user's intent: ${request}\n\n${AI_CHART_SCHEMA}\n\nCurrent report type: ${reportType}. Only these tables contain data: ${availableTables.join(", ")}. Do not suggest analyses using empty breakdown tables. Suggestions must be natural-language requests, not SQL or explanations. Make each suggestion distinct and directly chartable with the available tables.`,
+    { responseConstraint: SUGGESTION_CONSTRAINT, signal },
+  );
+  const suggestions = parseSuggestions(response, request);
+  if (suggestions.every((item) => matchesSuggestionLanguage(item, language))) return suggestions;
+
+  signal?.throwIfAborted();
+  const rewritten = await session.prompt(
+    `${languageRule}\nRewrite these chart requests in the language of the original request without changing their meaning. Original request: ${request}\nChart requests: ${JSON.stringify(suggestions)}\nReturn only JSON with the rewritten suggestions.`,
+    { responseConstraint: SUGGESTION_CONSTRAINT, signal },
+  );
+  const matching = parseSuggestions(rewritten, request).filter((item) =>
+    matchesSuggestionLanguage(item, language),
+  );
+  if (!matching.length) {
+    throw new Error("The model could not provide chart suggestions in the input language.");
+  }
+  return matching;
+}
+
 export interface GeneratedChart {
   sql: string;
   type: "line" | "bar";
@@ -102,28 +145,12 @@ export interface GeneratedChart {
   datasets: { label: string; values: (number | null)[] }[];
 }
 
-function chartFromRows(spec: unknown, rows: Record<string, unknown>[]): GeneratedChart {
-  if (!spec || typeof spec !== "object" || !("chart" in spec) || !("sql" in spec)) {
-    throw new Error("The model did not return a chart and SQL query.");
-  }
-  const { sql, chart } = spec as Record<string, unknown>;
-  if (typeof sql !== "string" || !chart || typeof chart !== "object") {
-    throw new Error("Invalid chart definition.");
-  }
-  const { type, title, x, y, series, stacked } = chart as Record<string, unknown>;
-  if (
-    (type !== "line" && type !== "bar") ||
-    typeof title !== "string" ||
-    typeof x !== "string" ||
-    typeof y !== "string" ||
-    typeof series !== "string" ||
-    typeof stacked !== "boolean" ||
-    !title.trim() ||
-    !x ||
-    !y
-  ) {
-    throw new Error("Invalid chart type or field names.");
-  }
+function chartFromRows(
+  spec: v.InferOutput<typeof CHART_SCHEMA>,
+  rows: Record<string, unknown>[],
+): GeneratedChart {
+  const { sql, chart } = spec;
+  const { type, title, x, y, series, stacked } = chart;
   if (!rows.length) throw new Error("The query returned no rows.");
 
   const xValues = new Map<string, Map<string, number>>();
@@ -170,27 +197,36 @@ export async function generateAiChart(
   session: PromptSession,
   request: string,
   query: (sql: string) => Promise<Record<string, unknown>[]>,
+  options: { signal?: AbortSignal; onRetry?: (attempt: number, error: string) => void } = {},
 ): Promise<GeneratedChart> {
   let feedback = "";
-  for (let attempt = 0; attempt < 3; attempt++) {
+  let attempt = 1;
+  while (true) {
+    options.signal?.throwIfAborted();
+    // Prompt API failures cannot be repaired by changing SQL; surface them to the caller.
     const response = await session.prompt(
       `Create a chart answering this request: ${request}\n\n${AI_CHART_SCHEMA}\n\nChart specification: type is line or bar; x and y are the result column names; series is the result column name or an empty string for a single series; stacked is a boolean. Return only JSON. Use only SELECT queries, no external files or network.\n${feedback}`,
-      { responseConstraint: CHART_CONSTRAINT },
+      { responseConstraint: CHART_CONSTRAINT, signal: options.signal },
     );
-    let sql = "";
+    options.signal?.throwIfAborted();
     try {
-      const spec: unknown = JSON.parse(response);
-      if (!spec || typeof spec !== "object" || !("sql" in spec) || typeof spec.sql !== "string") {
-        throw new Error("Missing SQL query.");
-      }
-      sql = spec.sql;
-      return chartFromRows(spec, await query(sql));
+      const spec = v.parse(CHART_SCHEMA, JSON.parse(response));
+      const rows = await query(spec.sql);
+      options.signal?.throwIfAborted();
+      return chartFromRows(spec, rows);
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (attempt === 2)
-        throw new Error(`Could not generate a chart: ${message}`, { cause: error });
-      feedback = `Previous SQL: ${sql}\nPrevious output: ${response}\nError: ${message}\nFix the query or chart definition without changing the user's request.`;
+      options.signal?.throwIfAborted();
+      const message =
+        error instanceof v.ValiError
+          ? v.summarize(error.issues)
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      const previousOutput = response.length > 4000 ? `${response.slice(0, 4000)}…` : response;
+      feedback = `Previous output: ${previousOutput || "(empty)"}\nError: ${message}\nFix the JSON, SQL, or chart definition without changing the user's request.`;
+      options.onRetry?.(++attempt, message);
+      // Keep the Stop button responsive even if the model immediately repeats an invalid output.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
     }
   }
-  throw new Error("Could not generate a chart.");
 }

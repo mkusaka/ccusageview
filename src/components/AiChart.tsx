@@ -18,7 +18,7 @@ interface Props {
 
 type GenerationState =
   | { status: "idle" }
-  | { status: "loading" }
+  | { status: "loading"; attempt: number; lastError?: string }
   | { status: "ready"; chart: GeneratedChart }
   | { status: "error"; message: string };
 
@@ -38,6 +38,7 @@ export function AiChart({ inputs }: Props) {
     cancelSuggestions,
   } = useAiChartSuggestions(inputs, busy);
   const database = useRef<Promise<AiChartDatabase> | null>(null);
+  const generationAbort = useRef<AbortController | null>(null);
   const runId = useRef(0);
 
   const closeDatabase = useCallback(() => {
@@ -52,9 +53,20 @@ export function AiChart({ inputs }: Props) {
 
   const invalidate = useCallback(() => {
     runId.current++;
+    generationAbort.current?.abort();
+    generationAbort.current = null;
     closeDatabase();
     cancelSuggestions();
   }, [closeDatabase, cancelSuggestions]);
+
+  const stopGeneration = useCallback(() => {
+    generationAbort.current?.abort();
+    generationAbort.current = null;
+    runId.current++;
+    closeDatabase();
+    setDownload("");
+    setGeneration({ status: "idle" });
+  }, [closeDatabase, setDownload]);
 
   useEffect(() => {
     setGeneration({ status: "idle" });
@@ -67,12 +79,15 @@ export function AiChart({ inputs }: Props) {
     if (!model) return;
     cancelSuggestions();
     const currentRun = ++runId.current;
-    setGeneration({ status: "loading" });
+    const controller = new AbortController();
+    generationAbort.current = controller;
+    setGeneration({ status: "loading", attempt: 1 });
     setDownload("");
     // Start create() directly from the user gesture; a first-time model download requires it.
     try {
       const session = await model.create({
         ...MODEL_OPTIONS,
+        signal: controller.signal,
         monitor(monitor) {
           monitor.addEventListener("downloadprogress", (event) => {
             if (currentRun === runId.current) {
@@ -84,9 +99,17 @@ export function AiChart({ inputs }: Props) {
         },
       });
       try {
+        controller.signal.throwIfAborted();
         if (!database.current) database.current = createAiChartDatabase(inputs);
         const db = await database.current;
-        const nextChart = await generateAiChart(session, prompt.trim(), db.query);
+        const nextChart = await generateAiChart(session, prompt.trim(), db.query, {
+          signal: controller.signal,
+          onRetry(attempt, lastError) {
+            if (currentRun === runId.current) {
+              setGeneration({ status: "loading", attempt, lastError });
+            }
+          },
+        });
         if (currentRun === runId.current) setGeneration({ status: "ready", chart: nextChart });
       } finally {
         session.destroy();
@@ -101,6 +124,7 @@ export function AiChart({ inputs }: Props) {
         closeDatabase();
       }
     } finally {
+      if (generationAbort.current === controller) generationAbort.current = null;
       if (currentRun === runId.current) setDownload("");
     }
   }
@@ -174,6 +198,15 @@ export function AiChart({ inputs }: Props) {
           >
             {busy ? "Generating…" : "Generate chart"}
           </button>
+          {busy && (
+            <button
+              type="button"
+              onClick={stopGeneration}
+              className="rounded-md border border-border px-3 py-2 text-sm hover:bg-bg-secondary"
+            >
+              Stop generation
+            </button>
+          )}
         </form>
       )}
       {suggestions.status === "loading" && suggestions.prompt === prompt.trim() && (
@@ -216,6 +249,11 @@ export function AiChart({ inputs }: Props) {
       {download && (
         <p role="status" className="text-xs text-text-secondary">
           {download}
+        </p>
+      )}
+      {generation.status === "loading" && generation.attempt > 1 && (
+        <p role="status" className="text-xs text-text-secondary">
+          Repairing chart (attempt {generation.attempt}): {generation.lastError}
         </p>
       )}
       {error && (
