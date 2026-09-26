@@ -228,7 +228,7 @@ export async function generateAiChart(
     let response: string;
     try {
       response = await session.prompt(
-        `Create a chart answering this request: ${request}\nToday's local calendar date: '${today}'. Use this quoted SQL literal if the request needs today's date.\n\n${AI_CHART_SCHEMA}\n\nReturn only one JSON object with sql (a single SELECT query) and chart (type: line or bar, title: text, x and y: names of result columns, series: result column name or "" for one series, stacked: boolean). Alias result columns as x, y, and optionally series. Use no external files or network.\n${feedback}`,
+        `Create a chart answering this request: ${request}\nToday's local calendar date: '${today}'. Use this quoted SQL literal if the request needs today's date.\n\n${AI_CHART_SCHEMA}\n\nGenerate DuckDB SELECT SQL. Use only the source tables and columns listed above; define every table alias in FROM or JOIN. Never invent identifiers or placeholder variables. SELECT aliases x, y, and series are allowed. For breakdown date filters, join entries by entry_id and use entries.period with the supplied quoted date literal, not CURRENT_DATE.\nReturn only one JSON object with sql and chart (type: line or bar, title: text, x and y: names of result columns, series: result column name or "" for one series, stacked: boolean). Alias result columns as x, y, and optionally series. Use no external files or network.\n${feedback}`,
         { responseConstraint: CHART_CONSTRAINT, signal: options.signal },
       );
     } catch (error) {
