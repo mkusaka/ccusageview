@@ -305,6 +305,59 @@ describe("buildCacheEfficiencyChartDataByBreakdown", () => {
       },
     ]);
   });
+  it("compares agents using only their selected model's cache tokens", () => {
+    const entries = [
+      makeEntry("day1", {
+        inputTokens: 999,
+        cacheReadTokens: 999,
+        agentBreakdowns: [
+          {
+            ...makeBreakdown("agent-a", { inputTokens: 100, cacheReadTokens: 900 }),
+            modelBreakdowns: [
+              makeBreakdown("model-a", { inputTokens: 100, cacheReadTokens: 300 }),
+              makeBreakdown("model-b", { cacheReadTokens: 600 }),
+            ],
+          },
+          {
+            ...makeBreakdown("agent-b", { inputTokens: 300, cacheReadTokens: 200 }),
+            modelBreakdowns: [
+              makeBreakdown("model-a", {
+                inputTokens: 100,
+                cacheCreationTokens: 100,
+                cacheReadTokens: 200,
+              }),
+              makeBreakdown("model-b", { inputTokens: 200 }),
+            ],
+          },
+          makeBreakdown("agent-without-model", { inputTokens: 50 }),
+        ],
+      }),
+      makeEntry("day2", { agentBreakdowns: [makeBreakdown("agent-a", { inputTokens: 20 })] }),
+    ];
+
+    expect(
+      buildCacheEfficiencyChartDataByBreakdown(
+        entries,
+        ["agent-a", "agent-b"],
+        true,
+        "agent",
+        "model-a",
+      ),
+    ).toEqual([
+      {
+        label: "day1",
+        "agent-a::inputTokens": 100,
+        "agent-a::cacheCreationTokens": 0,
+        "agent-a::cacheReadTokens": 300,
+        "agent-a::cacheReadRate": 300 / 400,
+        "agent-b::inputTokens": 100,
+        "agent-b::cacheCreationTokens": 100,
+        "agent-b::cacheReadTokens": 200,
+        "agent-b::cacheReadRate": 200 / 400,
+      },
+      { label: "day2" },
+    ]);
+  });
 });
 
 describe("buildCacheEfficiencyChartData", () => {

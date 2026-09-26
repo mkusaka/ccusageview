@@ -47,6 +47,7 @@ import {
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
 import { BreakdownHint, breakdownHintCommand, HintedTab } from "./BreakdownHint";
+import { AgentModelFilter, useAgentModelSelection } from "./AgentModelFilter";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -178,6 +179,11 @@ export function TokenChart({
     entries,
     isAgentModelView,
   );
+  const {
+    models: agentModels,
+    selectedModel,
+    selectModel,
+  } = useAgentModelSelection(entries, viewMode === "agent");
 
   const toggleSeries = (key: string) => {
     setHiddenSeries((prev) => {
@@ -195,9 +201,15 @@ export function TokenChart({
   const breakdownKeys = useMemo(
     () =>
       hasModeData
-        ? collectModels(entries, breakdownMode, activeProviderFilter, activeAgentFilter)
+        ? collectModels(
+            entries,
+            breakdownMode,
+            activeProviderFilter,
+            activeAgentFilter,
+            selectedModel ?? undefined,
+          )
         : [],
-    [entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter],
+    [entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter, selectedModel],
   );
 
   const breakdownChartData = useMemo(
@@ -209,6 +221,7 @@ export function TokenChart({
             breakdownMode,
             activeProviderFilter,
             activeAgentFilter,
+            selectedModel ?? undefined,
           )
         : [],
     [
@@ -218,13 +231,20 @@ export function TokenChart({
       breakdownMode,
       activeProviderFilter,
       activeAgentFilter,
+      selectedModel,
     ],
   );
 
   const tokenStackChartData = useMemo(
     () =>
       hasModeData && breakdownTokenType === "stack"
-        ? buildTokenTypeStacks(entries, breakdownMode, activeProviderFilter, activeAgentFilter)
+        ? buildTokenTypeStacks(
+            entries,
+            breakdownMode,
+            activeProviderFilter,
+            activeAgentFilter,
+            selectedModel ?? undefined,
+          )
         : [],
     [
       entries,
@@ -233,6 +253,7 @@ export function TokenChart({
       breakdownMode,
       activeProviderFilter,
       activeAgentFilter,
+      selectedModel,
     ],
   );
 
@@ -246,9 +267,18 @@ export function TokenChart({
             breakdownMode,
             activeProviderFilter,
             activeAgentFilter,
+            selectedModel ?? undefined,
           )
         : [],
-    [breakdownKeys, entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter],
+    [
+      breakdownKeys,
+      entries,
+      hasModeData,
+      breakdownMode,
+      activeProviderFilter,
+      activeAgentFilter,
+      selectedModel,
+    ],
   );
 
   const isBreakdownView =
@@ -315,6 +345,7 @@ export function TokenChart({
           ? ([["Provider", selectedProvider ?? "None"]] as [string, unknown][])
           : []),
         ...(isAgentModelView ? ([["Agent", selectedAgent ?? "None"]] as [string, unknown][]) : []),
+        ...(selectedModel ? ([["Model", selectedModel]] as [string, unknown][]) : []),
         ...(isBreakdownView
           ? ([
               [
@@ -364,6 +395,7 @@ export function TokenChart({
     selectedAgent,
     selectedTokenType,
     selectedProvider,
+    selectedModel,
     showPercent,
     timeGranularity,
     tokenStackChartData,
@@ -386,14 +418,14 @@ export function TokenChart({
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-1">
           <h3 className="text-sm font-medium text-text-secondary">Token Breakdown</h3>
           <CopyImageButton targetRef={chartRef} />
           <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
-        <div className="flex items-center gap-1">
-          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
             <button
               onClick={() => {
                 setViewMode("type");
@@ -478,6 +510,16 @@ export function TokenChart({
               By Model (Agent)
             </HintedTab>
           </div>
+          {viewMode === "agent" && (
+            <AgentModelFilter
+              models={agentModels}
+              selectedModel={selectedModel}
+              onSelect={(model) => {
+                selectModel(model);
+                setHiddenSeries(new Set());
+              }}
+            />
+          )}
           <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
             <button
               onClick={() => setShowPercent((p) => !p)}

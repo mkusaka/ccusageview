@@ -156,6 +156,40 @@ describe("groupBreakdowns", () => {
 
     expect(grouped.size).toBe(0);
   });
+  it("groups only the selected model per agent without using all-model agent totals", () => {
+    const agents = [
+      { ...SONNET, modelName: "claude", modelBreakdowns: [SONNET, HAIKU] },
+      { ...GPT, modelName: "codex", modelBreakdowns: [SONNET, GPT] },
+      { ...HAIKU, modelName: "missing-detail" },
+    ];
+    const entry = makeEntry("a", [SONNET, HAIKU, GPT], agents);
+
+    expect(groupBreakdowns(entry, "agent", undefined, undefined, SONNET.modelName)).toEqual(
+      new Map([
+        [
+          "claude",
+          {
+            inputTokens: SONNET.inputTokens,
+            outputTokens: SONNET.outputTokens,
+            cacheCreationTokens: SONNET.cacheCreationTokens,
+            cacheReadTokens: SONNET.cacheReadTokens,
+            cost: SONNET.cost,
+          },
+        ],
+        [
+          "codex",
+          {
+            inputTokens: SONNET.inputTokens,
+            outputTokens: SONNET.outputTokens,
+            cacheCreationTokens: SONNET.cacheCreationTokens,
+            cacheReadTokens: SONNET.cacheReadTokens,
+            cost: SONNET.cost,
+          },
+        ],
+      ]),
+    );
+    expect(groupBreakdowns(entry, "agent", undefined, undefined, "absent").size).toBe(0);
+  });
 });
 
 describe("collectBreakdownKeys", () => {
@@ -192,6 +226,21 @@ describe("collectBreakdownKeys", () => {
       ),
     ];
     expect(collectBreakdownKeys(entries, "model", undefined, "codex")).toEqual(["gpt-5-codex"]);
+  });
+  it("lists only agents that used the selected model", () => {
+    const entries = [
+      makeEntry(
+        "a",
+        [SONNET, GPT],
+        [
+          { ...SONNET, modelName: "claude", modelBreakdowns: [SONNET] },
+          { ...GPT, modelName: "codex", modelBreakdowns: [GPT] },
+        ],
+      ),
+    ];
+    expect(collectBreakdownKeys(entries, "agent", undefined, undefined, SONNET.modelName)).toEqual([
+      "claude",
+    ]);
   });
 });
 

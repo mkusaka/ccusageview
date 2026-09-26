@@ -318,4 +318,31 @@ describe("aggregateBreakdowns", () => {
 
     expect(aggregateBreakdowns(entries, "model", "OpenAI")).toEqual([]);
   });
+  it("totals selected-model rows by agent without counting unreported agent models", () => {
+    const entries = [
+      makeEntry("day1", {
+        agentBreakdowns: [
+          {
+            ...MB_SONNET,
+            modelName: "agent-a",
+            modelBreakdowns: [MB_SONNET, MB_HAIKU],
+          },
+          {
+            ...MB_GPT,
+            modelName: "agent-b",
+            modelBreakdowns: [{ ...MB_SONNET, cost: 0.2 }],
+          },
+        ],
+      }),
+      makeEntry("day2", {
+        agentBreakdowns: [{ ...MB_SONNET, modelName: "agent-c" }],
+      }),
+    ];
+    expect(
+      aggregateBreakdowns(entries, "agent", undefined, undefined, MB_SONNET.modelName),
+    ).toMatchObject([
+      { key: "agent-a", cost: MB_SONNET.cost, inputTokens: MB_SONNET.inputTokens },
+      { key: "agent-b", cost: 0.2, inputTokens: MB_SONNET.inputTokens },
+    ]);
+  });
 });

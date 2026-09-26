@@ -121,15 +121,16 @@ export function buildCacheEfficiencyChartDataByBreakdown(
   visibleBreakdowns: readonly string[],
   includeOther: boolean,
   mode: BreakdownMode,
+  modelFilter?: string,
 ): CacheEfficiencyBreakdownChartDatum[] {
   const visibleBreakdownSet = new Set(visibleBreakdowns);
 
   return entries.map((entry) => {
     const row: CacheEfficiencyBreakdownChartDatum = { label: entry.label };
 
-    const grouped = groupBreakdowns(entry, mode);
+    const grouped = groupBreakdowns(entry, mode, undefined, undefined, modelFilter);
     if (grouped.size === 0) {
-      if (includeOther && visibleBreakdownSet.has("Other")) {
+      if (modelFilter === undefined && includeOther && visibleBreakdownSet.has("Other")) {
         const metrics = calculateCacheEfficiency(entry);
         row[getCacheEfficiencyBreakdownDataKey("Other", "inputTokens")] = metrics.inputTokens;
         row[getCacheEfficiencyBreakdownDataKey("Other", "cacheCreationTokens")] =

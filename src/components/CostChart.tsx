@@ -40,6 +40,7 @@ import {
 } from "./chartjs-utils";
 import { useAgentSelection, useProviderSelection } from "./useProviderSelection";
 import { BreakdownHint, breakdownHintCommand, HintedTab } from "./BreakdownHint";
+import { AgentModelFilter, useAgentModelSelection } from "./AgentModelFilter";
 
 interface Props {
   entries: NormalizedEntry[];
@@ -137,6 +138,10 @@ export function CostChart({
     entries,
     isAgentModelView,
   );
+  const { models, selectedModel, selectModel } = useAgentModelSelection(
+    entries,
+    viewMode === "agent",
+  );
 
   const toggleSeries = (key: string) => {
     setHiddenSeries((prev) => {
@@ -154,17 +159,29 @@ export function CostChart({
   const breakdownKeys = useMemo(
     () =>
       hasModeData
-        ? collectModels(entries, breakdownMode, activeProviderFilter, activeAgentFilter)
+        ? collectModels(
+            entries,
+            breakdownMode,
+            activeProviderFilter,
+            activeAgentFilter,
+            selectedModel ?? undefined,
+          )
         : [],
-    [entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter],
+    [entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter, selectedModel],
   );
 
   const breakdownChartData = useMemo(
     () =>
       hasModeData
-        ? buildCostByModel(entries, breakdownMode, activeProviderFilter, activeAgentFilter)
+        ? buildCostByModel(
+            entries,
+            breakdownMode,
+            activeProviderFilter,
+            activeAgentFilter,
+            selectedModel ?? undefined,
+          )
         : [],
-    [entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter],
+    [entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter, selectedModel],
   );
 
   const breakdownSeries = useMemo(
@@ -177,9 +194,18 @@ export function CostChart({
             breakdownMode,
             activeProviderFilter,
             activeAgentFilter,
+            selectedModel ?? undefined,
           )
         : [],
-    [breakdownKeys, entries, hasModeData, breakdownMode, activeProviderFilter, activeAgentFilter],
+    [
+      breakdownKeys,
+      entries,
+      hasModeData,
+      breakdownMode,
+      activeProviderFilter,
+      activeAgentFilter,
+      selectedModel,
+    ],
   );
 
   const tokenTypeCostData = useMemo(() => buildCostByTokenType(entries), [entries]);
@@ -251,6 +277,9 @@ export function CostChart({
           ? ([["Provider", selectedProvider ?? "None"]] as [string, unknown][])
           : []),
         ...(isAgentModelView ? ([["Agent", selectedAgent ?? "None"]] as [string, unknown][]) : []),
+        ...(viewMode === "agent" && selectedModel
+          ? ([["Model", selectedModel]] as [string, unknown][])
+          : []),
         ["Show percent", (isBreakdownView || isTokenTypeView) && showPercent],
         ["Hidden series", Array.from(hiddenSeries)],
         ...(projectionMetadata
@@ -289,6 +318,7 @@ export function CostChart({
     isProviderModelView,
     isTokenTypeView,
     selectedAgent,
+    selectedModel,
     selectedProvider,
     showPercent,
     timeGranularity,
@@ -307,14 +337,14 @@ export function CostChart({
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="flex items-center gap-1 mr-auto">
           <h3 className="text-sm font-medium text-text-secondary">Cost Over Time</h3>
           <CopyImageButton targetRef={chartRef} />
           <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
         {(hasBreakdownData || hasTokenTypeCostData) && (
-          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5">
+          <div className="flex flex-wrap gap-0.5 bg-bg-secondary rounded-md p-0.5">
             <button
               onClick={() => {
                 setViewMode("total");
@@ -428,6 +458,16 @@ export function CostChart({
               </button>
             )}
           </div>
+        )}
+        {viewMode === "agent" && (
+          <AgentModelFilter
+            models={models}
+            selectedModel={selectedModel}
+            onSelect={(model) => {
+              selectModel(model);
+              setHiddenSeries(new Set());
+            }}
+          />
         )}
       </div>
       {isProviderModelView && selectedProvider && (

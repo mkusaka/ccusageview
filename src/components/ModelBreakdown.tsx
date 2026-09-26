@@ -15,6 +15,7 @@ import {
   type ModelBreakdownMetric,
   type ModelBreakdownSortKey,
 } from "../utils/modelBreakdownTable";
+import { AgentModelFilter, useAgentModelSelection } from "./AgentModelFilter";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
@@ -127,10 +128,22 @@ export function ModelBreakdown({ entries, reportType }: Props) {
     entries,
     isAgentModelView,
   );
+  const {
+    models: agentModels,
+    selectedModel,
+    selectModel,
+  } = useAgentModelSelection(entries, viewMode === "agent");
 
   const rows = useMemo(
-    () => aggregateBreakdowns(entries, mode, activeProviderFilter, activeAgentFilter),
-    [entries, mode, activeProviderFilter, activeAgentFilter],
+    () =>
+      aggregateBreakdowns(
+        entries,
+        mode,
+        activeProviderFilter,
+        activeAgentFilter,
+        selectedModel ?? undefined,
+      ),
+    [entries, mode, activeProviderFilter, activeAgentFilter, selectedModel],
   );
   const columns = useMemo(() => getTableColumns(mode), [mode]);
   const { metric, sortCol, sortDir } = sortState;
@@ -242,6 +255,7 @@ export function ModelBreakdown({ entries, reportType }: Props) {
           ...(isAgentModelView
             ? ([["Agent", selectedAgent ?? "None"]] as [string, unknown][])
             : []),
+          ...(selectedModel ? ([["Model", selectedModel]] as [string, unknown][]) : []),
           ["Pie metric", metricConfig.label],
           ["Sort", `${sortCol} ${sortDir}`],
         ],
@@ -292,6 +306,7 @@ export function ModelBreakdown({ entries, reportType }: Props) {
       pieData,
       selectedAgent,
       selectedProvider,
+      selectedModel,
       sortCol,
       sortDir,
       viewMode,
@@ -322,7 +337,7 @@ export function ModelBreakdown({ entries, reportType }: Props) {
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
-      <div className="flex items-center justify-between gap-2 mb-4">
+      <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-1 shrink-0">
           <h3 className="text-sm font-medium text-text-secondary">Breakdown</h3>
           <span className="text-xs text-text-secondary whitespace-nowrap">
@@ -331,8 +346,8 @@ export function ModelBreakdown({ entries, reportType }: Props) {
           <CopyImageButton targetRef={chartRef} />
           <CopyMarkdownButton markdown={chartMarkdown} />
         </div>
-        <div className="flex items-center gap-2 overflow-x-auto">
-          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <div className="flex flex-wrap gap-0.5 bg-bg-secondary rounded-md p-0.5 max-w-full">
             <HintedTab
               hint={hasBreakdownData ? null : breakdownHintCommand(reportType, "model")}
               onClick={() => setViewMode("model")}
@@ -389,6 +404,13 @@ export function ModelBreakdown({ entries, reportType }: Props) {
               By Model (Agent)
             </HintedTab>
           </div>
+          {viewMode === "agent" && (
+            <AgentModelFilter
+              models={agentModels}
+              selectedModel={selectedModel}
+              onSelect={selectModel}
+            />
+          )}
           {isProviderModelView && selectedProvider && (
             <label className="flex items-center gap-2 w-fit text-xs text-text-secondary shrink-0">
               <span>Provider</span>

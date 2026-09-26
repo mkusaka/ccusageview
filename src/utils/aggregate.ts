@@ -185,6 +185,7 @@ export function aggregateBreakdowns(
   mode: BreakdownMode,
   providerFilter?: string,
   agentFilter?: string,
+  modelFilter?: string,
 ): AggregatedBreakdown[] {
   const map = new Map<string, BreakdownMetrics>();
 
@@ -194,6 +195,7 @@ export function aggregateBreakdowns(
       mode,
       providerFilter,
       agentFilter,
+      modelFilter,
     ).entries()) {
       const existing = map.get(key);
       if (existing) {

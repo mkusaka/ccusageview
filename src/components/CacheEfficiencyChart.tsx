@@ -24,6 +24,7 @@ import type { ChartDataSeries } from "../utils/chartData";
 import { buildMarkdownSection } from "../utils/chartData";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
 import { BreakdownHint, breakdownHintCommand, HintedTab } from "./BreakdownHint";
+import { AgentModelFilter, useAgentModelSelection } from "./AgentModelFilter";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { SeriesLegend } from "./SeriesLegend";
@@ -201,7 +202,7 @@ function buildChartJsData(
           borderColor: getChartJsColor(4),
           backgroundColor: getChartJsColor(4),
           borderWidth: 2,
-          pointRadius: 0,
+          pointRadius: chartData.length === 1 ? 3 : 0,
           pointHoverRadius: 3,
           spanGaps: false,
         },
@@ -221,7 +222,7 @@ function buildChartJsData(
       borderColor: color,
       backgroundColor: withOpacity(color, 0.12),
       borderWidth: 2,
-      pointRadius: 0,
+      pointRadius: chartData.length === 1 ? 3 : 0,
       pointHoverRadius: 3,
       spanGaps: false,
     });
@@ -321,6 +322,11 @@ export function CacheEfficiencyChart({
   hoveredDataIndexRef.current = hoveredDataIndex;
   const [viewMode, setViewMode] = useState<ViewMode>("total");
   const [hiddenBreakdowns, setHiddenBreakdowns] = useState<Set<string>>(new Set());
+  const {
+    models: agentModels,
+    selectedModel,
+    selectModel,
+  } = useAgentModelSelection(entries, viewMode === "agent");
   const breakdownMode: BreakdownMode = viewMode === "total" ? "model" : viewMode;
 
   const hasBreakdownData = useMemo(() => hasAnyBreakdownData(entries), [entries]);
@@ -331,13 +337,26 @@ export function CacheEfficiencyChart({
       ? breakdownHintCommand(reportType, breakdownMode === "agent" ? "agent" : "model")
       : null;
   const breakdownKeys = useMemo(
-    () => (hasModeData ? collectModels(entries, breakdownMode) : []),
-    [entries, hasModeData, breakdownMode],
+    () =>
+      hasModeData
+        ? collectModels(entries, breakdownMode, undefined, undefined, selectedModel ?? undefined)
+        : [],
+    [entries, hasModeData, breakdownMode, selectedModel],
   );
   const breakdownSeries = useMemo(
     () =>
-      hasModeData ? buildModelSeries(breakdownKeys, entries, MODEL_COLORS, breakdownMode) : [],
-    [breakdownKeys, entries, hasModeData, breakdownMode],
+      hasModeData
+        ? buildModelSeries(
+            breakdownKeys,
+            entries,
+            MODEL_COLORS,
+            breakdownMode,
+            undefined,
+            undefined,
+            selectedModel ?? undefined,
+          )
+        : [],
+    [breakdownKeys, entries, hasModeData, breakdownMode, selectedModel],
   );
   const includeOther = !hiddenBreakdowns.has("Other");
   const isBreakdownView = viewMode !== "total" && hasModeData;
@@ -353,9 +372,10 @@ export function CacheEfficiencyChart({
             visibleBreakdownSeries.map((series) => series.key),
             includeOther,
             breakdownMode,
+            selectedModel ?? undefined,
           )
         : buildCacheEfficiencyChartData(entries),
-    [entries, isBreakdownView, visibleBreakdownSeries, includeOther, breakdownMode],
+    [entries, isBreakdownView, visibleBreakdownSeries, includeOther, breakdownMode, selectedModel],
   );
   const chartJsData = useMemo(
     () => buildChartJsData(chartData, isBreakdownView, visibleBreakdownSeries),
@@ -444,6 +464,7 @@ export function CacheEfficiencyChart({
                 ? "By Provider"
                 : "By Agent",
         ],
+        ...(selectedModel ? ([["Model", selectedModel]] as [string, unknown][]) : []),
         ["Hidden breakdowns", Array.from(hiddenBreakdowns)],
         [
           "Rate definition",
@@ -452,7 +473,14 @@ export function CacheEfficiencyChart({
       ],
       tables,
     });
-  }, [chartData, hiddenBreakdowns, isBreakdownView, viewMode, visibleBreakdownSeries]);
+  }, [
+    chartData,
+    hiddenBreakdowns,
+    isBreakdownView,
+    viewMode,
+    visibleBreakdownSeries,
+    selectedModel,
+  ]);
   const markdownRegistration = useMemo(
     () => ({
       id: "cache-efficiency",
@@ -465,42 +493,54 @@ export function CacheEfficiencyChart({
 
   return (
     <div ref={chartRef} className="bg-bg-card border border-border rounded-lg p-4">
-      <div className="flex items-center justify-between gap-2 mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-1">
           <h3 className="text-sm font-medium text-text-secondary">Cache Efficiency</h3>
           <CopyImageButton targetRef={chartRef} />
           <CopyMarkdownButton markdown={getChartMarkdown} />
         </div>
-        <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
-          {(["total", "model", "provider"] as const).map((mode) => (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-0.5 bg-bg-secondary rounded-md p-0.5 shrink-0">
+            {(["total", "model", "provider"] as const).map((mode) => (
+              <HintedTab
+                key={mode}
+                hint={
+                  mode !== "total" && !hasBreakdownData
+                    ? breakdownHintCommand(reportType, "model")
+                    : null
+                }
+                onClick={() => handleViewModeChange(mode)}
+                className={`px-2 py-0.5 text-xs rounded transition-colors ${
+                  viewMode === mode
+                    ? "bg-bg-card text-text-primary shadow-sm"
+                    : "text-text-secondary hover:text-text-primary"
+                }`}
+              >
+                {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
+              </HintedTab>
+            ))}
             <HintedTab
-              key={mode}
-              hint={
-                mode !== "total" && !hasBreakdownData
-                  ? breakdownHintCommand(reportType, "model")
-                  : null
-              }
-              onClick={() => handleViewModeChange(mode)}
+              hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
+              onClick={() => handleViewModeChange("agent")}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                viewMode === mode
+                viewMode === "agent"
                   ? "bg-bg-card text-text-primary shadow-sm"
                   : "text-text-secondary hover:text-text-primary"
               }`}
             >
-              {mode === "total" ? "Total" : mode === "model" ? "By Model" : "By Provider"}
+              By Agent
             </HintedTab>
-          ))}
-          <HintedTab
-            hint={hasAgentData ? null : breakdownHintCommand(reportType, "agent")}
-            onClick={() => handleViewModeChange("agent")}
-            className={`px-2 py-0.5 text-xs rounded transition-colors ${
-              viewMode === "agent"
-                ? "bg-bg-card text-text-primary shadow-sm"
-                : "text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            By Agent
-          </HintedTab>
+          </div>
+          {viewMode === "agent" && (
+            <AgentModelFilter
+              models={agentModels}
+              selectedModel={selectedModel}
+              onSelect={(model) => {
+                selectModel(model);
+                setHiddenBreakdowns(new Set());
+              }}
+            />
+          )}
         </div>
       </div>
 

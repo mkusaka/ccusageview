@@ -240,6 +240,25 @@ describe("buildCostByModel", () => {
       OpenAI: 0.8,
     });
   });
+  it("compares model-scoped agent costs without including other models or unreported totals", () => {
+    const entries = [
+      makeEntry("day1", [SONNET, HAIKU], {
+        agentBreakdowns: [
+          { ...SONNET, modelName: "agent-a", modelBreakdowns: [SONNET, HAIKU] },
+          { ...HAIKU, modelName: "agent-b", modelBreakdowns: [{ ...SONNET, cost: 0.5 }] },
+        ],
+      }),
+      makeEntry("day2", undefined, {
+        cost: 12,
+        agentBreakdowns: [{ ...SONNET, modelName: "agent-a" }],
+      }),
+    ];
+
+    expect(buildCostByModel(entries, "agent", undefined, undefined, SONNET.modelName)).toEqual([
+      { label: "day1", "agent-a": 2.5, "agent-b": 0.5 },
+      { label: "day2" },
+    ]);
+  });
 });
 
 describe("buildTokenTypeByModel", () => {
@@ -338,6 +357,43 @@ describe("buildTokenTypeByModel", () => {
       "claude-sonnet-4-20250514": 500_000,
       "claude-haiku-3-20240307": 100_000,
     });
+  });
+  it("compares selected-model tokens by agent for totals and stack metrics", () => {
+    const entries = [
+      makeEntry("day1", [SONNET, HAIKU], {
+        agentBreakdowns: [
+          { ...SONNET, modelName: "agent-a", modelBreakdowns: [SONNET, HAIKU] },
+          {
+            ...HAIKU,
+            modelName: "agent-b",
+            modelBreakdowns: [{ ...SONNET, inputTokens: 200, cacheReadTokens: 300 }],
+          },
+        ],
+      }),
+    ];
+    expect(
+      buildTokenTypeByModel(
+        entries,
+        "totalTokens",
+        "agent",
+        undefined,
+        undefined,
+        SONNET.modelName,
+      ),
+    ).toEqual([{ label: "day1", "agent-a": 1_420_000, "agent-b": 120_500 }]);
+    expect(buildTokenTypeStacks(entries, "agent", undefined, undefined, SONNET.modelName)).toEqual([
+      {
+        label: "day1",
+        [getTokenStackKey("agent-a", "inputTokens")]: 500_000,
+        [getTokenStackKey("agent-a", "outputTokens")]: 20_000,
+        [getTokenStackKey("agent-a", "cacheCreationTokens")]: 100_000,
+        [getTokenStackKey("agent-a", "cacheReadTokens")]: 800_000,
+        [getTokenStackKey("agent-b", "inputTokens")]: 200,
+        [getTokenStackKey("agent-b", "outputTokens")]: 20_000,
+        [getTokenStackKey("agent-b", "cacheCreationTokens")]: 100_000,
+        [getTokenStackKey("agent-b", "cacheReadTokens")]: 300,
+      },
+    ]);
   });
 });
 

@@ -25,8 +25,9 @@ export function collectModels(
   mode: BreakdownMode = "model",
   providerFilter?: string,
   agentFilter?: string,
+  modelFilter?: string,
 ): string[] {
-  return collectBreakdownKeys(entries, mode, providerFilter, agentFilter);
+  return collectBreakdownKeys(entries, mode, providerFilter, agentFilter, modelFilter);
 }
 
 export interface SeriesItem {
@@ -42,6 +43,7 @@ export function buildModelSeries(
   mode: BreakdownMode = "model",
   providerFilter?: string,
   agentFilter?: string,
+  modelFilter?: string,
 ): SeriesItem[] {
   const result = allModels.map((m, i) => ({
     key: m,
@@ -51,6 +53,7 @@ export function buildModelSeries(
   if (
     providerFilter === undefined &&
     agentFilter === undefined &&
+    modelFilter === undefined &&
     entries.some((e) => !getEntryBreakdowns(e, mode) || getEntryBreakdowns(e, mode)!.length === 0)
   ) {
     result.push({
@@ -70,13 +73,14 @@ function buildMetricByBreakdown(
   mode: BreakdownMode,
   providerFilter?: string,
   agentFilter?: string,
+  modelFilter?: string,
 ): Record<string, string | number>[] {
   return entries.map((entry) => {
     const row: Record<string, string | number> = { label: entry.label };
-    const grouped = groupBreakdowns(entry, mode, providerFilter, agentFilter);
+    const grouped = groupBreakdowns(entry, mode, providerFilter, agentFilter, modelFilter);
 
     if (grouped.size === 0) {
-      if (providerFilter === undefined && agentFilter === undefined) {
+      if (providerFilter === undefined && agentFilter === undefined && modelFilter === undefined) {
         row[OTHER_BREAKDOWN_KEY] = metric === "cost" ? entry.cost : entry[metric];
       }
       return row;
@@ -95,8 +99,9 @@ export function buildCostByModel(
   mode: BreakdownMode = "model",
   providerFilter?: string,
   agentFilter?: string,
+  modelFilter?: string,
 ): Record<string, string | number>[] {
-  return buildMetricByBreakdown(entries, "cost", mode, providerFilter, agentFilter);
+  return buildMetricByBreakdown(entries, "cost", mode, providerFilter, agentFilter, modelFilter);
 }
 
 export type ModelTokenType =
@@ -114,8 +119,9 @@ export function buildTokenTypeByModel(
   mode: BreakdownMode = "model",
   providerFilter?: string,
   agentFilter?: string,
+  modelFilter?: string,
 ): TokenBreakdownChartRow[] {
-  return buildMetricByBreakdown(entries, tokenType, mode, providerFilter, agentFilter);
+  return buildMetricByBreakdown(entries, tokenType, mode, providerFilter, agentFilter, modelFilter);
 }
 
 export function getTokenStackKey(
@@ -130,13 +136,14 @@ export function buildTokenTypeStacks(
   mode: BreakdownMode = "model",
   providerFilter?: string,
   agentFilter?: string,
+  modelFilter?: string,
 ): TokenBreakdownChartRow[] {
   return entries.map((entry) => {
     const row: Record<string, string | number> = { label: entry.label };
-    const grouped = groupBreakdowns(entry, mode, providerFilter, agentFilter);
+    const grouped = groupBreakdowns(entry, mode, providerFilter, agentFilter, modelFilter);
 
     if (grouped.size === 0) {
-      if (providerFilter === undefined && agentFilter === undefined) {
+      if (providerFilter === undefined && agentFilter === undefined && modelFilter === undefined) {
         for (const tokenType of [
           "inputTokens",
           "outputTokens",

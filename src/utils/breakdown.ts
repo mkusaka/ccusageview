@@ -115,8 +115,29 @@ export function groupBreakdowns(
   mode: BreakdownMode,
   providerFilter?: string,
   agentFilter?: string,
+  modelFilter?: string,
 ): Map<string, BreakdownMetrics> {
   const grouped = new Map<string, BreakdownMetrics>();
+  if (mode === "agent" && modelFilter !== undefined) {
+    for (const agent of entry.agentBreakdowns ?? []) {
+      for (const breakdown of agent.modelBreakdowns ?? []) {
+        if (breakdown.modelName !== modelFilter) continue;
+        const existing = grouped.get(agent.modelName);
+        if (existing) {
+          for (const metric of BREAKDOWN_KEYS) existing[metric] += breakdown[metric];
+        } else {
+          grouped.set(agent.modelName, {
+            inputTokens: breakdown.inputTokens,
+            outputTokens: breakdown.outputTokens,
+            cacheCreationTokens: breakdown.cacheCreationTokens,
+            cacheReadTokens: breakdown.cacheReadTokens,
+            cost: breakdown.cost,
+          });
+        }
+      }
+    }
+    return grouped;
+  }
   const breakdowns = getEntryBreakdowns(entry, mode, agentFilter);
 
   if (!breakdowns || breakdowns.length === 0) {
@@ -153,10 +174,19 @@ export function collectBreakdownKeys(
   mode: BreakdownMode,
   providerFilter?: string,
   agentFilter?: string,
+  modelFilter?: string,
 ): string[] {
   const keys = new Set<string>();
 
   for (const entry of entries) {
+    if (mode === "agent" && modelFilter !== undefined) {
+      for (const agent of entry.agentBreakdowns ?? []) {
+        if (agent.modelBreakdowns?.some((model) => model.modelName === modelFilter)) {
+          keys.add(agent.modelName);
+        }
+      }
+      continue;
+    }
     const breakdowns = getEntryBreakdowns(entry, mode, agentFilter);
     if (!breakdowns || breakdowns.length === 0) continue;
 
@@ -169,4 +199,14 @@ export function collectBreakdownKeys(
   }
 
   return Array.from(keys).toSorted();
+}
+
+export function collectAgentModels(entries: readonly NormalizedEntry[]): string[] {
+  const models = new Set<string>();
+  for (const entry of entries) {
+    for (const agent of entry.agentBreakdowns ?? []) {
+      for (const model of agent.modelBreakdowns ?? []) models.add(model.modelName);
+    }
+  }
+  return Array.from(models).toSorted();
 }
