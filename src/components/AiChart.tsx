@@ -98,6 +98,7 @@ export function AiChart({ inputs }: Props) {
           });
         },
       });
+      console.log("[AI chart] model session created", { run: currentRun });
       try {
         controller.signal.throwIfAborted();
         if (!database.current) database.current = createAiChartDatabase(inputs);
@@ -113,9 +114,11 @@ export function AiChart({ inputs }: Props) {
         if (currentRun === runId.current) setGeneration({ status: "ready", chart: nextChart });
       } finally {
         session.destroy();
+        console.log("[AI chart] model session destroyed", { run: currentRun });
       }
     } catch (cause) {
       if (currentRun === runId.current) {
+        console.error("[AI chart] generation failed", { run: currentRun, error: cause });
         setGeneration({
           status: "error",
           message: cause instanceof Error ? cause.message : String(cause),

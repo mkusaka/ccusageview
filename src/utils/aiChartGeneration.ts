@@ -6,6 +6,8 @@ export interface PromptSession {
     input: string,
     options: { responseConstraint: object; signal?: AbortSignal },
   ): Promise<string>;
+  readonly contextUsage?: number;
+  readonly contextWindow?: number;
   destroy(): void;
 }
 
@@ -204,10 +206,24 @@ export async function generateAiChart(
   while (true) {
     options.signal?.throwIfAborted();
     // Prompt API failures cannot be repaired by changing SQL; surface them to the caller.
-    const response = await session.prompt(
-      `Create a chart answering this request: ${request}\n\n${AI_CHART_SCHEMA}\n\nChart specification: type is line or bar; x and y are the result column names; series is the result column name or an empty string for a single series; stacked is a boolean. Return only JSON. Use only SELECT queries, no external files or network.\n${feedback}`,
-      { responseConstraint: CHART_CONSTRAINT, signal: options.signal },
-    );
+    let response: string;
+    try {
+      response = await session.prompt(
+        `Create a chart answering this request: ${request}\n\n${AI_CHART_SCHEMA}\n\nChart specification: type is line or bar; x and y are the result column names; series is the result column name or an empty string for a single series; stacked is a boolean. Return only JSON. Use only SELECT queries, no external files or network.\n${feedback}`,
+        { responseConstraint: CHART_CONSTRAINT, signal: options.signal },
+      );
+    } catch (error) {
+      if (!options.signal?.aborted)
+        console.error("[AI chart] model prompt failed", { attempt, error });
+      throw error;
+    }
+    console.log("[AI chart] model response", {
+      attempt,
+      responseLength: response.length,
+      response,
+      contextUsage: session.contextUsage ?? null,
+      contextWindow: session.contextWindow ?? null,
+    });
     options.signal?.throwIfAborted();
     try {
       const spec = v.parse(CHART_SCHEMA, JSON.parse(response));
@@ -222,6 +238,7 @@ export async function generateAiChart(
           : error instanceof Error
             ? error.message
             : String(error);
+      console.warn("[AI chart] repair needed", { attempt, error: message });
       const previousOutput = response.length > 4000 ? `${response.slice(0, 4000)}…` : response;
       feedback = `Previous output: ${previousOutput || "(empty)"}\nError: ${message}\nFix the JSON, SQL, or chart definition without changing the user's request.`;
       options.onRetry?.(++attempt, message);
