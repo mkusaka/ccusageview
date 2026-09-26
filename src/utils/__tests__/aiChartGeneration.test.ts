@@ -110,6 +110,87 @@ it("restarts a stuck constrained conversation while preserving the SQL parser fe
   expect(result.datasets).toEqual([{ label: "Cost", values: [2.5] }]);
 });
 
+it("charts SQL result columns when the model supplies SQL expressions after a binder repair", async () => {
+  const chart = {
+    type: "bar",
+    title: "Agent input tokens",
+    x: "e.label",
+    y: "SUM(oa.input_tokens)",
+    series: "",
+    stacked: false,
+  };
+  let calls = 0;
+  const original: PromptSession = {
+    async prompt() {
+      calls++;
+      return calls === 1 ? JSON.stringify({ sql: "SELECT i.label FROM entries e", chart }) : "";
+    },
+    destroy() {},
+  };
+  const fresh: PromptSession = {
+    async prompt(input) {
+      expect(input).toContain('Referenced table "i" not found');
+      return JSON.stringify({
+        sql: "SELECT e.label, SUM(oa.input_tokens) AS y FROM entries e JOIN agent_usage oa USING (entry_id) GROUP BY e.label",
+        chart,
+      });
+    },
+    destroy() {},
+  };
+  const result = await generateAiChart(
+    original,
+    "agent usage",
+    async (sql) => {
+      if (sql.includes("i.label")) throw new Error('Binder Error: Referenced table "i" not found');
+      return [{ label: "daily", y: 42 }];
+    },
+    { restartSession: async () => fresh },
+  );
+  expect(calls).toBe(2);
+  expect(result.labels).toEqual(["daily"]);
+  expect(result.datasets).toEqual([{ label: "Agent input tokens", values: [42] }]);
+});
+
+it("stops when a model repeats the same invalid response across fresh sessions", async () => {
+  const response = JSON.stringify({
+    sql: "SELECT missing FROM entries",
+    chart: { type: "bar", title: "Cost", x: "x", y: "y", series: "", stacked: false },
+  });
+  let calls = 0;
+  let restarts = 0;
+  const original: PromptSession = {
+    async prompt() {
+      calls++;
+      return calls === 1 ? response : "";
+    },
+    destroy() {},
+  };
+  const fresh: PromptSession = {
+    async prompt() {
+      calls++;
+      return response;
+    },
+    destroy() {},
+  };
+  await expect(
+    generateAiChart(
+      original,
+      "agent usage",
+      async () => {
+        throw new Error("Binder Error: missing column");
+      },
+      {
+        async restartSession() {
+          restarts++;
+          return fresh;
+        },
+      },
+    ),
+  ).rejects.toThrow("repeated an invalid chart response: Binder Error: missing column");
+  expect(calls).toBe(3);
+  expect(restarts).toBe(1);
+});
+
 it("reports repeated empty model outputs instead of draining the session indefinitely", async () => {
   let originalCalls = 0;
   let freshCalls = 0;

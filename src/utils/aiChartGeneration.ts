@@ -154,13 +154,23 @@ function chartFromRows(
   const { sql, chart } = spec;
   const { type, title, x, y, series, stacked } = chart;
   if (!rows.length) throw new Error("The query returned no rows.");
+  const firstRow = rows[0];
+  const resultColumn = (requested: string, alias: string) => {
+    if (Object.hasOwn(firstRow, requested)) return requested;
+    const unqualified = /^[A-Za-z_]\w*\.([A-Za-z_]\w*)$/.exec(requested)?.[1];
+    if (unqualified && Object.hasOwn(firstRow, unqualified)) return unqualified;
+    return Object.hasOwn(firstRow, alias) ? alias : requested;
+  };
+  const xColumn = resultColumn(x, "x");
+  const yColumn = resultColumn(y, "y");
+  const seriesColumn = series ? resultColumn(series, "series") : "";
 
   const xValues = new Map<string, Map<string, number>>();
   const seriesNames = new Set<string>();
   for (const row of rows) {
-    const xValue = row[x];
-    const yValue = row[y];
-    const seriesValue = series ? row[series] : title;
+    const xValue = row[xColumn];
+    const yValue = row[yColumn];
+    const seriesValue = series ? row[seriesColumn] : title;
     if (
       (typeof xValue !== "string" && typeof xValue !== "number") ||
       (typeof yValue !== "number" && typeof yValue !== "bigint") ||
@@ -168,7 +178,7 @@ function chartFromRows(
       (typeof seriesValue !== "string" && typeof seriesValue !== "number")
     ) {
       throw new Error(
-        `Expected x (${x}) and series (${series || "none"}) to be labels and y (${y}) to be numeric.`,
+        `Expected x (${x}) and series (${series || "none"}) to be labels and y (${y}) to be numeric. Available result columns: ${Object.keys(row).join(", ")}. Chart fields must name SQL result columns, not SQL expressions.`,
       );
     }
     const label = String(xValue);
@@ -208,6 +218,7 @@ export async function generateAiChart(
   let feedback = "";
   let attempt = 1;
   let consecutiveEmptyResponses = 0;
+  const failedResponses = new Set<string>();
   while (true) {
     options.signal?.throwIfAborted();
     // Prompt API failures cannot be repaired by changing SQL; surface them to the caller.
@@ -262,6 +273,10 @@ export async function generateAiChart(
             ? error.message
             : String(error);
       console.warn("[AI chart] repair needed", { attempt, error: message });
+      if (failedResponses.has(response)) {
+        throw new Error(`The on-device model repeated an invalid chart response: ${message}`);
+      }
+      failedResponses.add(response);
       const previousOutput = response.length > 4000 ? `${response.slice(0, 4000)}…` : response;
       feedback = `Previous output: ${previousOutput || "(empty)"}\nError: ${message}\nFix the JSON, SQL, or chart definition without changing the user's request.`;
       options.onRetry?.(++attempt, message);
