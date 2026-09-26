@@ -100,6 +100,10 @@ pnpm cf:dev       # Build frontend + start wrangler dev
 pnpm cf:deploy    # Build frontend + deploy to Cloudflare Workers
 ```
 
+The build compresses DuckDB's Wasm files into self-hosted `.wasm.gz` assets because
+the uncompressed files exceed Cloudflare Workers' 25 MiB per-asset limit.
+The browser decompresses only the selected DuckDB variant when opening an AI chart.
+
 ## License
 
 MIT

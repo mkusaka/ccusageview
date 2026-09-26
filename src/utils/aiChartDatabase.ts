@@ -1,7 +1,7 @@
 import * as duckdb from "@duckdb/duckdb-wasm";
-import mvpWasm from "@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url";
+import mvpWasm from "./generated-duckdb/duckdb-mvp.wasm.gz?url";
 import mvpWorker from "@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url";
-import ehWasm from "@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url";
+import ehWasm from "./generated-duckdb/duckdb-eh.wasm.gz?url";
 import ehWorker from "@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url";
 import type { ReportData } from "../types";
 import { detectReportType } from "./detect";
@@ -113,6 +113,22 @@ export interface AiChartDatabase {
   close(): Promise<void>;
 }
 
+async function loadWasmBlobUrl(url: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok || !response.body) {
+    throw new Error(`Unable to load DuckDB Wasm: ${response.status} ${response.statusText}`);
+  }
+  // Fetch transparently decodes Content-Encoding; Vite preview serves .gz files this way.
+  const stream =
+    response.headers.get("Content-Encoding") === "gzip"
+      ? response.body
+      : response.body.pipeThrough(new DecompressionStream("gzip"));
+  const blob = await new Response(stream, {
+    headers: { "Content-Type": "application/wasm" },
+  }).blob();
+  return URL.createObjectURL(blob);
+}
+
 export async function createAiChartDatabase(inputs: SourceInput[]): Promise<AiChartDatabase> {
   const bundles: duckdb.DuckDBBundles = {
     mvp: { mainModule: mvpWasm, mainWorker: mvpWorker },
@@ -122,10 +138,12 @@ export async function createAiChartDatabase(inputs: SourceInput[]): Promise<AiCh
   const worker = new Worker(bundle.mainWorker!);
   const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
   try {
-    await db.instantiate(
-      new URL(bundle.mainModule, window.location.href).href,
-      bundle.pthreadWorker,
-    );
+    const wasmUrl = await loadWasmBlobUrl(bundle.mainModule);
+    try {
+      await db.instantiate(wasmUrl, bundle.pthreadWorker);
+    } finally {
+      URL.revokeObjectURL(wasmUrl);
+    }
     const conn = await db.connect();
     const tables = buildAiChartRows(inputs);
     await conn.query(
