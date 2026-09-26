@@ -219,7 +219,11 @@ export function AiChart({ inputs }: Props) {
           <button
             type="submit"
             disabled={
-              !canGenerate || busy || !!download || !prompt.trim() || availability === "checking"
+              !canGenerate ||
+              busy ||
+              (!!download && availability !== "available") ||
+              !prompt.trim() ||
+              availability === "checking"
             }
             className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
