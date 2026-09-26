@@ -219,13 +219,16 @@ export async function generateAiChart(
   let attempt = 1;
   let consecutiveEmptyResponses = 0;
   const failedResponses = new Set<string>();
+  const failedIssues = new Set<string>();
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   while (true) {
     options.signal?.throwIfAborted();
     // Prompt API failures cannot be repaired by changing SQL; surface them to the caller.
     let response: string;
     try {
       response = await session.prompt(
-        `Create a chart answering this request: ${request}\n\n${AI_CHART_SCHEMA}\n\nReturn only one JSON object with sql (a single SELECT query) and chart (type: line or bar, title: text, x and y: names of result columns, series: result column name or "" for one series, stacked: boolean). Alias result columns as x, y, and optionally series. Use no external files or network.\n${feedback}`,
+        `Create a chart answering this request: ${request}\nToday's local calendar date: '${today}'. Use this quoted SQL literal if the request needs today's date.\n\n${AI_CHART_SCHEMA}\n\nReturn only one JSON object with sql (a single SELECT query) and chart (type: line or bar, title: text, x and y: names of result columns, series: result column name or "" for one series, stacked: boolean). Alias result columns as x, y, and optionally series. Use no external files or network.\n${feedback}`,
         { responseConstraint: CHART_CONSTRAINT, signal: options.signal },
       );
     } catch (error) {
@@ -277,6 +280,11 @@ export async function generateAiChart(
         throw new Error(`The on-device model repeated an invalid chart response: ${message}`);
       }
       failedResponses.add(response);
+      const issue = message.split("\n", 1)[0];
+      if (failedIssues.has(issue)) {
+        throw new Error(`The on-device model could not repair the recurring chart error: ${issue}`);
+      }
+      failedIssues.add(issue);
       const previousOutput = response.length > 4000 ? `${response.slice(0, 4000)}…` : response;
       feedback = `Previous output: ${previousOutput || "(empty)"}\nError: ${message}\nFix the JSON, SQL, or chart definition without changing the user's request.`;
       options.onRetry?.(++attempt, message);

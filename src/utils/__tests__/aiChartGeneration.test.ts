@@ -191,6 +191,56 @@ it("stops when a model repeats the same invalid response across fresh sessions",
   expect(restarts).toBe(1);
 });
 
+it("stops recurring undefined-column errors even when the model changes its SQL", async () => {
+  const chart = {
+    type: "line",
+    title: "Daily tokens",
+    x: "period",
+    y: "total_tokens",
+    series: "",
+    stacked: false,
+  };
+  const sql =
+    "SELECT period AS x, total_tokens AS y FROM entries WHERE period <= aktuelle_datum ORDER BY period";
+  let calls = 0;
+  let restarts = 0;
+  const original: PromptSession = {
+    async prompt() {
+      calls++;
+      return calls === 1 ? JSON.stringify({ sql, chart }) : "";
+    },
+    destroy() {},
+  };
+  const fresh: PromptSession = {
+    async prompt() {
+      calls++;
+      return JSON.stringify({ sql: `${sql} LIMIT 500`, chart });
+    },
+    destroy() {},
+  };
+  await expect(
+    generateAiChart(
+      original,
+      "daily tokens through today",
+      async (query) => {
+        throw new Error(
+          `Binder Error: Referenced column "aktuelle_datum" not found in FROM clause!\nLINE 1: ${query}`,
+        );
+      },
+      {
+        async restartSession() {
+          restarts++;
+          return fresh;
+        },
+      },
+    ),
+  ).rejects.toThrow(
+    'could not repair the recurring chart error: Binder Error: Referenced column "aktuelle_datum" not found',
+  );
+  expect(calls).toBe(3);
+  expect(restarts).toBe(1);
+});
+
 it("reports repeated empty model outputs instead of draining the session indefinitely", async () => {
   let originalCalls = 0;
   let freshCalls = 0;

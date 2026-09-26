@@ -57,6 +57,8 @@ Suggestions are optional: you can click **Generate chart** while suggestions are
 
 If the model supplies SQL expressions for chart fields instead of result-column names, the chart uses matching returned column names or the conventional `x`, `y`, and `series` aliases when present. Otherwise the model receives the available column names for correction.
 
+Date requests include the browser's local date as a quoted `YYYY-MM-DD` literal. The offline DuckDB build cannot load the ICU extension required by `CURRENT_DATE`, so generated SQL should use that literal instead. Only `entries` contains `period`; filter breakdown data by joining it to `entries` via `entry_id`. If the same error recurs despite changed SQL, generation stops with the error instead of repeatedly creating model sessions.
+
 This requires a [Chrome environment with the Prompt API available](https://developer.chrome.com/docs/ai/prompt-api); the on-device model may need to download on first use. The AI panel shows an unavailable message in other environments. The model receives column names and types in plain language, your request, and any query/validation errors; the usage rows stay in the browser rather than being sent to an AI service. AI-generated charts can still be misleading: check the SQL and aggregation grain before relying on their conclusions. Individual models and agents can only be charted when their breakdowns exist in the supplied report.
 
 For repeated repair attempts, open DevTools Console and filter for `[AI chart]`. The logs show session creation/destruction, each model response and its length, context usage (when supported), and repair errors. Responses may contain your prompt or generated SQL; redact them before sharing logs.
