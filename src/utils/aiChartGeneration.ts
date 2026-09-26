@@ -199,17 +199,22 @@ export async function generateAiChart(
   session: PromptSession,
   request: string,
   query: (sql: string) => Promise<Record<string, unknown>[]>,
-  options: { signal?: AbortSignal; onRetry?: (attempt: number, error: string) => void } = {},
+  options: {
+    signal?: AbortSignal;
+    onRetry?: (attempt: number, error: string) => void;
+    restartSession?: () => Promise<PromptSession>;
+  } = {},
 ): Promise<GeneratedChart> {
   let feedback = "";
   let attempt = 1;
+  let consecutiveEmptyResponses = 0;
   while (true) {
     options.signal?.throwIfAborted();
     // Prompt API failures cannot be repaired by changing SQL; surface them to the caller.
     let response: string;
     try {
       response = await session.prompt(
-        `Create a chart answering this request: ${request}\n\n${AI_CHART_SCHEMA}\n\nChart specification: type is line or bar; x and y are the result column names; series is the result column name or an empty string for a single series; stacked is a boolean. Return only JSON. Use only SELECT queries, no external files or network.\n${feedback}`,
+        `Create a chart answering this request: ${request}\n\n${AI_CHART_SCHEMA}\n\nReturn only one JSON object with sql (a single SELECT query) and chart (type: line or bar, title: text, x and y: names of result columns, series: result column name or "" for one series, stacked: boolean). Alias result columns as x, y, and optionally series. Use no external files or network.\n${feedback}`,
         { responseConstraint: CHART_CONSTRAINT, signal: options.signal },
       );
     } catch (error) {
@@ -225,6 +230,24 @@ export async function generateAiChart(
       contextWindow: session.contextWindow ?? null,
     });
     options.signal?.throwIfAborted();
+    if (!response.trim()) {
+      if (!options.restartSession || consecutiveEmptyResponses) {
+        const error = new Error(
+          consecutiveEmptyResponses
+            ? "The on-device model returned an empty response in two sessions. Try a simpler chart request."
+            : "The on-device model returned an empty response. Try generating again.",
+        );
+        console.error("[AI chart] model output stayed empty", { attempt, error });
+        throw error;
+      }
+      consecutiveEmptyResponses++;
+      console.warn("[AI chart] restarting model session after empty output", { attempt });
+      options.onRetry?.(++attempt, "Empty model response; restarting the model session.");
+      options.signal?.throwIfAborted();
+      session = await options.restartSession();
+      continue;
+    }
+    consecutiveEmptyResponses = 0;
     try {
       const spec = v.parse(CHART_SCHEMA, JSON.parse(response));
       const rows = await query(spec.sql);

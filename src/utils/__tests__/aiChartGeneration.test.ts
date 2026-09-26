@@ -45,7 +45,7 @@ it("repairs malformed JSON, invalid fields, and executable SQL errors beyond thr
   const inputs: string[] = [];
   const chart = { type: "bar", title: "Cost by day", x: "x", y: "y", series: "", stacked: false };
   const responses = [
-    "",
+    '{"sql":',
     JSON.stringify({ sql: "SELECT missing", chart: { ...chart, title: "" } }),
     JSON.stringify({ sql: "SELECT missing", chart }),
     JSON.stringify({ sql: "SELECT valid", chart }),
@@ -70,6 +70,75 @@ it("repairs malformed JSON, invalid fields, and executable SQL errors beyond thr
   expect(result.datasets).toEqual([{ label: "Cost by day", values: [2.5] }]);
 });
 
+it("restarts a stuck constrained conversation while preserving the SQL parser feedback", async () => {
+  const chart = { type: "bar", title: "Cost", x: "x", y: "y", series: "", stacked: false };
+  let originalCalls = 0;
+  let restarts = 0;
+  const freshPrompts: string[] = [];
+  const original: PromptSession = {
+    async prompt() {
+      originalCalls++;
+      return originalCalls === 1 ? JSON.stringify({ sql: "SELECT model VARCHAR", chart }) : "";
+    },
+    destroy() {},
+  };
+  const fresh: PromptSession = {
+    async prompt(input) {
+      freshPrompts.push(input);
+      return JSON.stringify({ sql: "SELECT valid", chart });
+    },
+    destroy() {},
+  };
+
+  const result = await generateAiChart(
+    original,
+    "model cost",
+    async (sql) => {
+      if (sql.includes("VARCHAR")) throw new Error('Parser Error: syntax error near "VARCHAR"');
+      return [{ x: "Monday", y: 2.5 }];
+    },
+    {
+      async restartSession() {
+        restarts++;
+        return fresh;
+      },
+    },
+  );
+  expect(originalCalls).toBe(2);
+  expect(restarts).toBe(1);
+  expect(freshPrompts[0]).toContain('Parser Error: syntax error near "VARCHAR"');
+  expect(result.datasets).toEqual([{ label: "Cost", values: [2.5] }]);
+});
+
+it("reports repeated empty model outputs instead of draining the session indefinitely", async () => {
+  let originalCalls = 0;
+  let freshCalls = 0;
+  const original: PromptSession = {
+    async prompt() {
+      originalCalls++;
+      return "";
+    },
+    destroy() {},
+  };
+  const fresh: PromptSession = {
+    async prompt() {
+      freshCalls++;
+      return "";
+    },
+    destroy() {},
+  };
+
+  await expect(
+    generateAiChart(original, "cost", async () => [], {
+      async restartSession() {
+        return fresh;
+      },
+    }),
+  ).rejects.toThrow("empty response");
+  expect(originalCalls).toBe(1);
+  expect(freshCalls).toBe(1);
+});
+
 it("stops an unrecoverable model call instead of retrying without feedback", async () => {
   let calls = 0;
   const session: PromptSession = {
@@ -92,7 +161,7 @@ it("stops repair attempts after cancellation", async () => {
   const session: PromptSession = {
     async prompt() {
       calls++;
-      return "";
+      return '{"sql":';
     },
     destroy() {},
   };

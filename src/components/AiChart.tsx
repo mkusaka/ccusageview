@@ -8,6 +8,7 @@ import {
   generateAiChart,
   MODEL_OPTIONS,
   type GeneratedChart,
+  type PromptSession,
 } from "../utils/aiChartGeneration";
 import { useAiChartSuggestions } from "./useAiChartSuggestions";
 import { getChartJsColor } from "./chartjs-utils";
@@ -85,10 +86,10 @@ export function AiChart({ inputs }: Props) {
     setDownload("");
     // Start create() directly from the user gesture; a first-time model download requires it.
     try {
-      const session = await model.create({
+      const modelOptions = {
         ...MODEL_OPTIONS,
         signal: controller.signal,
-        monitor(monitor) {
+        monitor(monitor: EventTarget) {
           monitor.addEventListener("downloadprogress", (event) => {
             if (currentRun === runId.current) {
               setDownload(
@@ -97,8 +98,10 @@ export function AiChart({ inputs }: Props) {
             }
           });
         },
-      });
-      console.log("[AI chart] model session created", { run: currentRun });
+      };
+      let session: PromptSession | null = await model.create(modelOptions);
+      let sessionNumber = 1;
+      console.log("[AI chart] model session created", { run: currentRun, session: sessionNumber });
       try {
         controller.signal.throwIfAborted();
         if (!database.current) database.current = createAiChartDatabase(inputs);
@@ -110,11 +113,32 @@ export function AiChart({ inputs }: Props) {
               setGeneration({ status: "loading", attempt, lastError });
             }
           },
+          async restartSession() {
+            session?.destroy();
+            console.log("[AI chart] model session destroyed", {
+              run: currentRun,
+              session: sessionNumber,
+            });
+            session = null;
+            controller.signal.throwIfAborted();
+            session = await model.create(modelOptions);
+            sessionNumber++;
+            console.log("[AI chart] model session created", {
+              run: currentRun,
+              session: sessionNumber,
+            });
+            return session;
+          },
         });
         if (currentRun === runId.current) setGeneration({ status: "ready", chart: nextChart });
       } finally {
-        session.destroy();
-        console.log("[AI chart] model session destroyed", { run: currentRun });
+        if (session) {
+          session.destroy();
+          console.log("[AI chart] model session destroyed", {
+            run: currentRun,
+            session: sessionNumber,
+          });
+        }
       }
     } catch (cause) {
       if (currentRun === runId.current) {

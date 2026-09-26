@@ -8,11 +8,12 @@ import { detectReportType } from "./detect";
 import type { SourceInput } from "./inputs";
 import { normalizeEntries } from "./normalize";
 
-export const AI_CHART_SCHEMA = `Tables (one report type per dashboard):
-entries(entry_id INTEGER, source_id VARCHAR, source_label VARCHAR, report_type VARCHAR, period VARCHAR, label VARCHAR, input_tokens DOUBLE, output_tokens DOUBLE, cache_creation_tokens DOUBLE, cache_read_tokens DOUBLE, total_tokens DOUBLE, cost DOUBLE)
-model_usage(entry_id INTEGER, model VARCHAR, input_tokens DOUBLE, output_tokens DOUBLE, cache_creation_tokens DOUBLE, cache_read_tokens DOUBLE, total_tokens DOUBLE, cost DOUBLE)
-agent_usage(entry_id INTEGER, agent VARCHAR, input_tokens DOUBLE, output_tokens DOUBLE, cache_creation_tokens DOUBLE, cache_read_tokens DOUBLE, total_tokens DOUBLE, cost DOUBLE)
-agent_model_usage(entry_id INTEGER, agent VARCHAR, model VARCHAR, input_tokens DOUBLE, output_tokens DOUBLE, cache_creation_tokens DOUBLE, cache_read_tokens DOUBLE, total_tokens DOUBLE, cost DOUBLE)
+export const AI_CHART_SCHEMA = `Available tables (one report type per dashboard; these are column names, not SQL SELECT expressions):
+entries(entry_id, source_id, source_label, report_type, period, label, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost)
+model_usage(entry_id, model, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost)
+agent_usage(entry_id, agent, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost)
+agent_model_usage(entry_id, agent, model, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost)
+IDs are integers; names, dates and labels are text; token counts and cost are numeric. In SELECT, reference columns or aggregate them; never append type declarations.
 Join breakdowns to entries via entry_id. entries has one row per source and report item; source_id distinguishes inputs, source_label is the user label. period is the original ISO-like date/hour (or session lastActivity / block startTime); label is display text. cost is USD. Each breakdown table has its own grain: entry x model, entry x agent, or entry x agent x model. A missing breakdown means unknown, not zero. Do not sum entries metrics after joining to a breakdown, or join two independent breakdown tables before aggregating: that duplicates totals. Use the breakdown table's metrics for breakdown charts. Some reports (notably blocks) have no per-model or per-agent metrics. Do not invent them.
 Return SQL with named result columns matching the chart fields: x (date or category), y (numeric), and optionally series (category). Sort x in SQL. Return at most 500 rows.`;
 
