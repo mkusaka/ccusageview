@@ -7,14 +7,16 @@ interface Props {
   entries: NormalizedEntry[];
 }
 
+type TableEntry = NormalizedEntry & { agentName?: string };
+
 type SortDir = "asc" | "desc";
 
 interface Column {
   key: string;
   label: string;
   align: "left" | "right";
-  render: (entry: NormalizedEntry) => string;
-  sortValue: (entry: NormalizedEntry) => number | string | null;
+  render: (entry: TableEntry) => string;
+  sortValue: (entry: TableEntry) => number | string | null;
 }
 
 const COLUMNS: Column[] = [
@@ -24,6 +26,13 @@ const COLUMNS: Column[] = [
     align: "left",
     render: (e) => e.label,
     sortValue: (e) => e.label,
+  },
+  {
+    key: "agentName",
+    label: "Agent",
+    align: "left",
+    render: (e) => e.agentName ?? "",
+    sortValue: (e) => e.agentName ?? "",
   },
   {
     key: "inputTokens",
@@ -83,7 +92,9 @@ const COLUMNS: Column[] = [
   },
 ];
 
-function getEntryKey(entry: NormalizedEntry): string {
+const TOTAL_COLUMNS = COLUMNS.filter((column) => column.key !== "agentName");
+
+function getEntryKey(entry: TableEntry): string {
   return [
     entry.label,
     entry.inputTokens,
@@ -93,20 +104,47 @@ function getEntryKey(entry: NormalizedEntry): string {
     entry.totalTokens,
     entry.cost,
     entry.models.join("|"),
+    entry.agentName ?? "",
   ].join(":");
 }
 
 export function DataTable({ entries }: Props) {
   const [open, setOpen] = useState(false);
   const [sortCol, setSortCol] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"total" | "agent">("total");
+  const hasAgentData = entries.some((entry) => entry.agentBreakdowns?.length);
+  const columns = viewMode === "agent" && hasAgentData ? COLUMNS : TOTAL_COLUMNS;
+  const rows = useMemo(
+    () =>
+      viewMode === "agent" && hasAgentData
+        ? entries.flatMap((entry) =>
+            (entry.agentBreakdowns ?? []).map((agent) => ({
+              label: entry.label,
+              agentName: agent.modelName,
+              inputTokens: agent.inputTokens,
+              outputTokens: agent.outputTokens,
+              cacheCreationTokens: agent.cacheCreationTokens,
+              cacheReadTokens: agent.cacheReadTokens,
+              totalTokens:
+                agent.inputTokens +
+                agent.outputTokens +
+                agent.cacheCreationTokens +
+                agent.cacheReadTokens,
+              cost: agent.cost,
+              models: agent.modelBreakdowns?.map((model) => model.modelName) ?? [],
+            })),
+          )
+        : entries,
+    [entries, hasAgentData, viewMode],
+  );
   const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   // Default: reverse order (newest first, since entries are typically time-ascending)
   const sorted = useMemo(() => {
-    if (!sortCol) return entries.toReversed();
-    const col = COLUMNS.find((c) => c.key === sortCol);
-    if (!col) return entries.toReversed();
-    return entries.toSorted((a, b) => {
+    if (!sortCol) return rows.toReversed();
+    const col = columns.find((c) => c.key === sortCol);
+    if (!col) return rows.toReversed();
+    return rows.toSorted((a, b) => {
       const va = col.sortValue(a);
       const vb = col.sortValue(b);
       if (va == null && vb == null) return 0;
@@ -115,7 +153,7 @@ export function DataTable({ entries }: Props) {
       const cmp = va < vb ? -1 : va > vb ? 1 : 0;
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [entries, sortCol, sortDir]);
+  }, [rows, columns, sortCol, sortDir]);
 
   function handleSort(key: string) {
     if (sortCol === key) {
@@ -135,12 +173,27 @@ export function DataTable({ entries }: Props) {
         <span>Raw Data</span>
         <span className="text-xs">{open ? "Hide" : "Show"}</span>
       </button>
+      {hasAgentData && open && (
+        <div className="flex gap-0.5 border-t border-border px-4 py-2 text-xs">
+          {(["total", "agent"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setViewMode(mode)}
+              aria-pressed={viewMode === mode}
+              className={`rounded px-2 py-1 ${viewMode === mode ? "bg-bg-secondary text-text-primary" : "text-text-secondary hover:text-text-primary"}`}
+            >
+              {mode === "total" ? "Total" : "By Agent"}
+            </button>
+          ))}
+        </div>
+      )}
       {open && (
         <div className="overflow-x-auto border-t border-border">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
-                {COLUMNS.map((col) => (
+                {columns.map((col) => (
                   <th
                     key={col.key}
                     aria-sort={
@@ -171,12 +224,12 @@ export function DataTable({ entries }: Props) {
             <tbody>
               {sorted.map((entry) => (
                 <tr key={getEntryKey(entry)} className="border-b border-border/50">
-                  {COLUMNS.map((col) => (
+                  {columns.map((col) => (
                     <td
                       key={col.key}
                       className={`py-2 px-3 whitespace-nowrap text-text-primary ${
                         col.align === "right" ? "text-right" : "text-left"
-                      } ${col.key === "label" || col.key === "models" ? "font-mono text-xs" : ""}`}
+                      } ${col.key === "label" || col.key === "agentName" || col.key === "models" ? "font-mono text-xs" : ""}`}
                     >
                       {col.render(entry)}
                     </td>

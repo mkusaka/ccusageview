@@ -6,7 +6,7 @@ A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppi
 
 ## Features
 
-- **Interactive dashboard** — cost chart, token chart, model/provider breakdown, activity heatmap, and data table
+- **Interactive dashboard** — cost chart, token chart, model/provider/agent breakdown, activity heatmap, and data table (including per-agent rows for `ccusage --by-agent`)
 - **Multiple report types** — daily, weekly, monthly, hourly, session, and blocks
 - **Multi-source comparison** — load multiple JSON files with labels and toggle them on/off
 - **Shareable URLs** — data is compressed into the URL hash, or use short URLs via `/s/:id`
