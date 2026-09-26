@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DailyReport } from "../../types";
-import { buildAiChartRows } from "../aiChartDatabase";
+import { buildAiChartRows, prepareAiChartSql } from "../aiChartDatabase";
 import { BLOCKS_REPORT, DAILY_REPORT, SESSION_REPORT } from "./fixtures";
 
 describe("buildAiChartRows", () => {
@@ -79,5 +79,30 @@ describe("buildAiChartRows", () => {
       "2025-07-01T11:00:00Z",
     ]);
     expect(blocks.model_usage).toEqual([]);
+  });
+});
+
+describe("prepareAiChartSql", () => {
+  it("accepts a single SELECT or WITH query with an optional trailing terminator", () => {
+    expect(prepareAiChartSql(" \nSELECT period AS x FROM entries; \n")).toBe(
+      "SELECT period AS x FROM entries",
+    );
+    expect(
+      prepareAiChartSql(
+        "WITH totals AS (SELECT SUM(cost) AS y FROM entries) SELECT y FROM totals;",
+      ),
+    ).toBe("WITH totals AS (SELECT SUM(cost) AS y FROM entries) SELECT y FROM totals");
+  });
+
+  it("rejects multiple statements and non-query commands", () => {
+    expect(() => prepareAiChartSql("SELECT * FROM entries; DELETE FROM entries")).toThrow(
+      "Only one SQL statement is allowed.",
+    );
+    expect(() => prepareAiChartSql("SELECT * FROM entries;;")).toThrow(
+      "Only one SQL statement is allowed.",
+    );
+    expect(() => prepareAiChartSql("DELETE FROM entries")).toThrow(
+      "SQL must start with SELECT or WITH.",
+    );
   });
 });

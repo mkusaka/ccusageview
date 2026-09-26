@@ -61,6 +61,8 @@ Date requests include the browser's local date as a quoted `YYYY-MM-DD` literal.
 
 The chart prompt explicitly requests DuckDB `SELECT` SQL using only the listed source tables and columns, declared table aliases, and the supplied date literal. This is guidance, not a guarantee: DuckDB still executes and validates the generated query, and an unrepairable error is shown to the user.
 
+A generated `SELECT` (or `WITH` query) may end with one semicolon. Multiple statements and commands that do not begin with `SELECT` or `WITH` are rejected before execution.
+
 This requires a [Chrome environment with the Prompt API available](https://developer.chrome.com/docs/ai/prompt-api); the on-device model may need to download on first use. The AI panel shows an unavailable message in other environments. The model receives column names and types in plain language, your request, and any query/validation errors; the usage rows stay in the browser rather than being sent to an AI service. AI-generated charts can still be misleading: check the SQL and aggregation grain before relying on their conclusions. Individual models and agents can only be charted when their breakdowns exist in the supplied report.
 
 For repeated repair attempts, open DevTools Console and filter for `[AI chart]`. The logs show session creation/destruction, each model response and its length, context usage (when supported), and repair errors. Responses may contain your prompt or generated SQL; redact them before sharing logs.

@@ -115,6 +115,18 @@ export interface AiChartDatabase {
   close(): Promise<void>;
 }
 
+export function prepareAiChartSql(sql: string): string {
+  const trimmed = sql.trim();
+  if (!/^(SELECT|WITH)\b/i.test(trimmed)) {
+    throw new Error("SQL must start with SELECT or WITH.");
+  }
+  const statement = trimmed.endsWith(";") ? trimmed.slice(0, -1).trimEnd() : trimmed;
+  if (statement.includes(";")) {
+    throw new Error("Only one SQL statement is allowed.");
+  }
+  return statement;
+}
+
 async function loadWasmBlobUrl(url: string): Promise<string> {
   const response = await fetch(url);
   if (!response.ok || !response.body) {
@@ -170,10 +182,8 @@ export async function createAiChartDatabase(inputs: SourceInput[]): Promise<AiCh
     await conn.query("SET enable_external_access = false");
     return {
       async query(sql: string) {
-        if (!/^\s*(SELECT|WITH)\b/i.test(sql) || sql.includes(";")) {
-          throw new Error("Only a single SELECT query is allowed.");
-        }
-        const result = await conn.query(`SELECT * FROM (${sql}) AS chart_result LIMIT 501`);
+        const statement = prepareAiChartSql(sql);
+        const result = await conn.query(`SELECT * FROM (${statement}) AS chart_result LIMIT 501`);
         if (result.numRows > 500)
           throw new Error("Query returned more than 500 rows. Aggregate or filter the result.");
         return result.toArray().map((row) => row.toJSON() as Record<string, unknown>);
