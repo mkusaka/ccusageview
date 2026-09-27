@@ -6,6 +6,14 @@
   platformAutomerge: false,
   packageRules: [
     {
+      // config:best-practices (security:minimumReleaseAgeNpm) lowers npm updates
+      // to 3 days; re-assert 7 days for all npm deps incl. pnpm-workspace
+      // overrides so Renovate never proposes versions pnpm still rejects
+      description: "Keep all npm updates at a 7-day minimum release age",
+      matchDatasources: ["npm"],
+      minimumReleaseAge: "7 days",
+    },
+    {
       description: "Automerge non-major updates for production npm dependencies after 7 days",
       groupName: "npm dependencies (non-major)",
       matchManagers: ["npm"],
