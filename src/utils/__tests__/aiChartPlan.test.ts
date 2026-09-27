@@ -26,8 +26,12 @@ const basePlan: ChartPlan = {
 
 let connection: duckdb.DuckDBConnection;
 
-function results(changes: Partial<ChartPlan> = {}, metadata: ChartContext = context) {
-  const { sql, chart } = compileAiChartPlan({ ...basePlan, ...changes }, metadata, today);
+function results(
+  changes: Partial<ChartPlan> = {},
+  metadata: ChartContext = context,
+  date: Date = today,
+) {
+  const { sql, chart } = compileAiChartPlan({ ...basePlan, ...changes }, metadata, date);
   return {
     chart,
     rows: connection
@@ -35,6 +39,9 @@ function results(changes: Partial<ChartPlan> = {}, metadata: ChartContext = cont
       .toArray()
       .map((row) => row.toJSON() as Record<string, unknown>),
   };
+}
+function periods(time: ChartPlan["time"], date: Date = today) {
+  return results({ time }, context, date).rows.map((row) => row.x);
 }
 
 beforeAll(async () => {
@@ -150,6 +157,42 @@ describe("compileAiChartPlan", () => {
     expect(() => results({ time: "last_7_days" }, { ...context, reportTypes: ["weekly"] })).toThrow(
       /weekly or monthly/,
     );
+  });
+
+  it("selects current calendar periods through today, including Monday-based weeks and leap days", () => {
+    const feb1 = "2024-02-01T09:00:00Z";
+    const feb29 = "2024-02-29T09:00:00Z";
+    const mar1 = "2024-03-01T09:00:00Z";
+    expect(periods("yesterday")).toEqual([feb29]);
+    expect(periods("this_week")).toEqual([feb29, mar1]);
+    expect(periods("this_month")).toEqual([mar1]);
+    expect(periods("this_quarter")).toEqual([feb1, feb29, mar1]);
+    expect(periods("this_year")).toEqual([feb1, feb29, mar1]);
+    expect(() => results({ time: "this_month" }, { ...context, reportTypes: ["monthly"] })).toThrow(
+      /weekly or monthly/,
+    );
+  });
+
+  it("selects complete preceding calendar periods across month and year boundaries", () => {
+    const feb1 = "2024-02-01T09:00:00Z";
+    const feb29 = "2024-02-29T09:00:00Z";
+    const mar1 = "2024-03-01T09:00:00Z";
+    const mar2 = "2024-03-02T09:00:00Z";
+    expect(periods("last_week", new Date(2024, 2, 4, 12))).toEqual([feb29, mar1, mar2]);
+    expect(periods("last_month")).toEqual([feb1, feb29]);
+    expect(periods("last_quarter", new Date(2024, 3, 1, 12))).toEqual([feb1, feb29, mar1, mar2]);
+    expect(periods("last_year", new Date(2025, 0, 1, 12))).toEqual([feb1, feb29, mar1, mar2]);
+  });
+
+  it("distinguishes rolling 7, 30, 90, and 365 days from calendar periods", () => {
+    const feb1 = "2024-02-01T09:00:00Z";
+    const feb29 = "2024-02-29T09:00:00Z";
+    const mar1 = "2024-03-01T09:00:00Z";
+    const mar2 = "2024-03-02T09:00:00Z";
+    expect(periods("last_7_days")).toEqual([feb29, mar1]);
+    expect(periods("last_30_days")).toEqual([feb1, feb29, mar1]);
+    expect(periods("last_90_days", new Date(2024, 4, 2, 12))).toEqual([feb29, mar1, mar2]);
+    expect(periods("last_365_days", new Date(2025, 2, 1, 12))).toEqual([mar2]);
   });
 
   it("reports only breakdown dates when today's entry has no model breakdown", () => {

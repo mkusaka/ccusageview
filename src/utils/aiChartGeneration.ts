@@ -3,6 +3,7 @@ import { AI_CHART_SCHEMA } from "./aiChartDatabase";
 import {
   CHART_PLAN_CONSTRAINT,
   CHART_PLAN_SCHEMA,
+  CHART_TIME_SCOPES,
   compileAiChartPlan,
   type CompiledAiChart,
   type ChartContext,
@@ -92,7 +93,7 @@ export async function suggestAiChartPrompts(
       ? "候補文はすべて自然な日本語で書いてください。英語の文にしないでください。"
       : "Write every suggestion in natural English, not Japanese.";
   const response = await session.prompt(
-    `${languageRule}\nSuggest up to 3 distinct, useful chart requests refining this user's intent: ${request}\n\n${AI_CHART_SCHEMA}\n\nCurrent report type: ${reportType}. Available tables with data: ${availableTables.join(", ")}. The optional series breakdown can be model, agent, or source, never the same as the axis. Combining model and agent requires agent_model_usage. Source means a distinct input source, not an arbitrary label. The only time scopes are all data, today, through today, last 7 days, and last 30 days; do not suggest date filtering for weekly or monthly reports. Do not suggest comparisons, extrema, weekday breakdowns, averages, percentages, derived metrics, other filters, or analyses the available tables cannot represent. Suggestions must be natural-language requests, not SQL or explanations.`,
+    `${languageRule}\nSuggest up to 3 distinct, useful chart requests refining this user's intent: ${request}\n\n${AI_CHART_SCHEMA}\n\nCurrent report type: ${reportType}. Available tables with data: ${availableTables.join(", ")}. The optional series breakdown can be model, agent, or source, never the same as the axis. Combining model and agent requires agent_model_usage. Source means a distinct input source, not an arbitrary label. The only time scopes are ${CHART_TIME_SCOPES.join(", ")}. This week starts Monday; this week/month/quarter/year end today, last week/month/quarter/year mean the previous complete calendar period, and last N days include today. Do not suggest date filtering for weekly or monthly reports. Do not suggest comparisons, extrema, weekday breakdowns, averages, percentages, derived metrics, other filters, or analyses the available tables cannot represent. Suggestions must be natural-language requests, not SQL or explanations.`,
     { responseConstraint: SUGGESTION_CONSTRAINT, signal },
   );
   const suggestions = parseSuggestions(response, request);
@@ -188,7 +189,7 @@ export async function generateAiChart(
     let response: string;
     try {
       response = await session.prompt(
-        `Select a chart plan for this request: ${request}\nToday's local calendar date: ${today}.\nAvailable tables with data: ${context.availableTables.join(", ")}.\nReport types: ${context.reportTypes.join(", ")}.\nReturn only a JSON chart plan with metric (input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost, or unsupported), x (period, model, agent, or source), series (none, model, agent, or source), time (all, today, through_today, last_7_days, or last_30_days), chart (type: line or bar, title: text, stacked: boolean), and reason (explain only when unsupported; otherwise empty string). Metrics are sums, not averages or percentages. Model and agent dimensions need populated breakdown tables; combining both needs agent_model_usage. Do not select the same x and series. Weekly and monthly reports cannot use date filtering. If the request cannot be faithfully expressed by these fields and available data, choose metric "unsupported" and explain why in reason. Do not invent a different analysis. Do not generate SQL or add any fields.${feedback ? `\n\n${feedback}` : ""}`,
+        `Select a chart plan for this request: ${request}\nToday's local calendar date: ${today}.\nAvailable tables with data: ${context.availableTables.join(", ")}.\nReport types: ${context.reportTypes.join(", ")}.\nReturn only a JSON chart plan with metric (input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost, or unsupported), x (period, model, agent, or source), series (none, model, agent, or source), time (${CHART_TIME_SCOPES.join(", ")}), chart (type: line or bar, title: text, stacked: boolean), and reason (explain only when unsupported; otherwise empty string). For 今月 / this month choose this_month (first day of the current month through today), not today or through_today. This week starts Monday; this week/month/quarter/year end today, last week/month/quarter/year mean the previous complete calendar period, and last N days include today. Metrics are sums, not averages or percentages. Model and agent dimensions need populated breakdown tables; combining both needs agent_model_usage. Do not select the same x and series. Weekly and monthly reports cannot use date filtering. If the request cannot be faithfully expressed by these fields and available data, choose metric "unsupported" and explain why in reason. Do not invent a different analysis. Do not generate SQL or add any fields.${feedback ? `\n\n${feedback}` : ""}`,
         { responseConstraint: CHART_PLAN_CONSTRAINT, signal: options.signal },
       );
     } catch (error) {
@@ -266,6 +267,17 @@ export async function generateAiChart(
         through_today: `through today (${today})`,
         last_7_days: `the last 7 days (through ${today})`,
         last_30_days: `the last 30 days (through ${today})`,
+        yesterday: "yesterday",
+        this_week: "this week (through today)",
+        last_week: "last week",
+        this_month: "this month (through today)",
+        last_month: "last month",
+        this_quarter: "this quarter (through today)",
+        last_quarter: "last quarter",
+        this_year: "this year (through today)",
+        last_year: "last year",
+        last_90_days: "the last 90 days (through today)",
+        last_365_days: "the last 365 days (through today)",
       }[plan.time];
       const first = coverage[0]?.first;
       const last = coverage[0]?.last;

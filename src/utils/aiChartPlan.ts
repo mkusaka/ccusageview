@@ -1,5 +1,24 @@
 import * as v from "valibot";
 
+export const CHART_TIME_SCOPES = [
+  "all",
+  "today",
+  "yesterday",
+  "through_today",
+  "this_week",
+  "last_week",
+  "this_month",
+  "last_month",
+  "this_quarter",
+  "last_quarter",
+  "this_year",
+  "last_year",
+  "last_7_days",
+  "last_30_days",
+  "last_90_days",
+  "last_365_days",
+] as const;
+
 export const CHART_PLAN_CONSTRAINT = {
   type: "object",
   properties: {
@@ -19,7 +38,7 @@ export const CHART_PLAN_CONSTRAINT = {
     series: { type: "string", enum: ["none", "model", "agent", "source"] },
     time: {
       type: "string",
-      enum: ["all", "today", "through_today", "last_7_days", "last_30_days"],
+      enum: CHART_TIME_SCOPES,
     },
     chart: {
       type: "object",
@@ -49,7 +68,7 @@ export const CHART_PLAN_SCHEMA = v.strictObject({
   ]),
   x: v.picklist(["period", "model", "agent", "source"]),
   series: v.picklist(["none", "model", "agent", "source"]),
-  time: v.picklist(["all", "today", "through_today", "last_7_days", "last_30_days"]),
+  time: v.picklist(CHART_TIME_SCOPES),
   chart: v.strictObject({
     type: v.picklist(["line", "bar"]),
     title: v.pipe(v.string(), v.trim(), v.nonEmpty("Chart title is required.")),
@@ -144,24 +163,68 @@ export function compileAiChartPlan(
     if (context.reportTypes.includes("weekly") || context.reportTypes.includes("monthly")) {
       throw new Error("Date filtering is unavailable for weekly or monthly aggregate reports.");
     }
-    const end = localDate(today);
     const periodDay = "substr(e.period, 1, 10)";
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const day = today.getDate();
+    let start: Date | undefined;
+    let finish = today;
     switch (plan.time) {
       case "today":
-        filters.push(`${periodDay} = '${end}'`);
+        start = today;
+        break;
+      case "yesterday":
+        start = new Date(year, month, day - 1);
+        finish = start;
         break;
       case "through_today":
-        filters.push(`${periodDay} <= '${end}'`);
+        filters.push(`${periodDay} <= '${localDate(today)}'`);
         break;
-      case "last_7_days":
-      case "last_30_days": {
-        const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        start.setDate(start.getDate() - (plan.time === "last_7_days" ? 6 : 29));
-        filters.push(`${periodDay} >= '${localDate(start)}'`, `${periodDay} <= '${end}'`);
+      case "this_week":
+      case "last_week": {
+        const daysSinceMonday = (today.getDay() + 6) % 7;
+        start = new Date(year, month, day - daysSinceMonday - (plan.time === "last_week" ? 7 : 0));
+        if (plan.time === "last_week") finish = new Date(year, month, day - daysSinceMonday - 1);
         break;
       }
+      case "this_month":
+        start = new Date(year, month, 1);
+        break;
+      case "last_month":
+        start = new Date(year, month - 1, 1);
+        finish = new Date(year, month, 0);
+        break;
+      case "this_quarter":
+        start = new Date(year, Math.floor(month / 3) * 3, 1);
+        break;
+      case "last_quarter": {
+        const quarterMonth = Math.floor(month / 3) * 3;
+        start = new Date(year, quarterMonth - 3, 1);
+        finish = new Date(year, quarterMonth, 0);
+        break;
+      }
+      case "this_year":
+        start = new Date(year, 0, 1);
+        break;
+      case "last_year":
+        start = new Date(year - 1, 0, 1);
+        finish = new Date(year - 1, 11, 31);
+        break;
+      case "last_7_days":
+      case "last_30_days":
+      case "last_90_days":
+      case "last_365_days":
+        start = new Date(year, month, day);
+        start.setDate(day - Number(plan.time.slice(5, -5)) + 1);
+        break;
       default:
         throw new Error("The requested chart time range is invalid.");
+    }
+    if (start) {
+      filters.push(
+        `${periodDay} >= '${localDate(start)}'`,
+        `${periodDay} <= '${localDate(finish)}'`,
+      );
     }
   }
 
