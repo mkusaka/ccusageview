@@ -264,6 +264,7 @@ export async function generateAiChart(
     consecutiveEmptyResponses = 0;
     try {
       const spec = v.parse(CHART_SCHEMA, JSON.parse(response));
+      console.log(`[AI chart] generated SQL (attempt ${attempt}):\n${spec.sql}`);
       const rows = await query(spec.sql);
       options.signal?.throwIfAborted();
       return chartFromRows(spec, rows);

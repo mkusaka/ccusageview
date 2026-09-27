@@ -65,7 +65,7 @@ A generated `SELECT` (or `WITH` query) may end with one semicolon. Multiple stat
 
 This requires a [Chrome environment with the Prompt API available](https://developer.chrome.com/docs/ai/prompt-api); the on-device model may need to download on first use. The AI panel shows an unavailable message in other environments. The model receives column names and types in plain language, your request, and any query/validation errors; the usage rows stay in the browser rather than being sent to an AI service. AI-generated charts can still be misleading: check the SQL and aggregation grain before relying on their conclusions. Individual models and agents can only be charted when their breakdowns exist in the supplied report.
 
-For repeated repair attempts, open DevTools Console and filter for `[AI chart]`. The logs show session creation/destruction, each model response and its length, context usage (when supported), and repair errors. Responses may contain your prompt or generated SQL; redact them before sharing logs.
+For repeated repair attempts, open DevTools Console and filter for `[AI chart]`. The logs show session creation/destruction, each model response and its length, context usage (when supported), and repair errors. `[AI chart] generated SQL (attempt N):` logs the complete query as a separate string before execution, including when DuckDB rejects it; copy that entry rather than the abbreviated object preview. Responses and SQL may contain your prompt or usage data; redact them before sharing logs.
 
 ## CLI options
 
