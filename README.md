@@ -13,7 +13,7 @@ A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppi
 - **Shareable URLs** — data is compressed into the URL hash, or use short URLs via `/s/:id`
 - **Copy as image** — export individual charts or the entire dashboard to clipboard
 - **Dark mode** — respects system preference, toggleable
-- **Ask AI for a chart** — describe a chart in natural language; Chrome's on-device model generates a local DuckDB query and a line or bar chart
+- **Ask AI for a chart** — describe a chart in natural language; Chrome's on-device model selects a chart plan, and the browser builds a local DuckDB query for a line or bar chart
 
 ## Quick start
 
@@ -51,21 +51,17 @@ Open https://ccusageview.polyfill.workers.dev/ and paste your ccusage JSON into 
 
 ### Ask AI for a chart
 
-Load a report, click **Ask AI for a chart**, then start typing a request. The on-device model suggests more specific chart requests based on the report type and available breakdown tables, using the same language as the request (English or Japanese). Select a suggestion to fill the prompt, then click **Generate chart**. The app imports normalized, source-aware usage rows into DuckDB-Wasm in your browser. `window.LanguageModel` generates a SQL query and a chart definition; the query runs locally, and you can inspect it under **Generated SQL**. Valibot validates the chart definition, and invalid JSON, schema, SQL, or chart-row results are returned to the model for correction until the chart succeeds, the model repeats an invalid response, or you click **Stop generation**. An empty model response starts a fresh model session with the last repair error preserved; a second consecutive empty response ends the attempt with an error. Model API failures are shown directly.
+Load a report, click **Ask AI for a chart**, and describe an analysis. Chrome's on-device model suggests requests in the same language as your input (English or Japanese); suggestions are optional. You can click **Generate chart** while suggestions are loading, which cancels the pending suggestion request.
 
-Suggestions are optional: you can click **Generate chart** while suggestions are still loading. This cancels the pending suggestion request and generates the chart from the text you entered.
+The model selects a **chart plan**, not SQL. Supported plans sum `input_tokens`, `output_tokens`, `cache_creation_tokens`, `cache_read_tokens`, `total_tokens`, or `cost` by period, model, agent, or input source, with an optional different series dimension. Available time scopes are all data, today, through today, last 7 days, and last 30 days. Weekly and monthly aggregate reports cannot use those date filters. The model is instructed to mark requests outside these metrics and dimensions (such as averages, percentiles, or arbitrary filters) as unsupported rather than choosing a different chart.
 
-If the model supplies SQL expressions for chart fields instead of result-column names, the chart uses matching returned column names or the conventional `x`, `y`, and `series` aliases when present. Otherwise the model receives the available column names for correction.
+The browser compiles the plan into a DuckDB-Wasm `SELECT` query using the appropriate source-aware usage table. Model and agent breakdowns are only charted when the supplied report contains those rows; metrics are summed at the selected breakdown's grain, so joining cannot multiply entry totals. Date filters use the browser's local calendar date and the original report period; no model-generated SQL or external files are executed. A query returning more than 500 rows is rejected instead of silently truncated. Inspect the app-built query under **Generated SQL**.
 
-Date requests include the browser's local date as a quoted `YYYY-MM-DD` literal. The offline DuckDB build cannot load the ICU extension required by `CURRENT_DATE`, so generated SQL should use that literal instead. Only `entries` contains `period`; filter breakdown data by joining it to `entries` via `entry_id`. If the same error recurs despite changed SQL, generation stops with the error instead of repeatedly creating model sessions.
+Valibot validates the model's plan. Malformed responses may be retried with validation feedback; an empty response starts one fresh model session, while repeated invalid or empty responses stop. Click **Stop generation** to cancel. Unsupported plans, missing breakdowns, and DuckDB errors are shown rather than asking the model to rewrite SQL.
 
-The chart prompt explicitly requests DuckDB `SELECT` SQL using only the listed source tables and columns, declared table aliases, and the supplied date literal. This is guidance, not a guarantee: DuckDB still executes and validates the generated query, and an unrepairable error is shown to the user.
+This requires a [Chrome environment with the Prompt API available](https://developer.chrome.com/docs/ai/prompt-api); the on-device model may need to download on first use. Usage rows stay in your browser instead of being sent to an AI service. The model can still choose the wrong **valid** plan: check the selected metric and dimensions against your request before relying on the chart.
 
-A generated `SELECT` (or `WITH` query) may end with one semicolon. Multiple statements and commands that do not begin with `SELECT` or `WITH` are rejected before execution.
-
-This requires a [Chrome environment with the Prompt API available](https://developer.chrome.com/docs/ai/prompt-api); the on-device model may need to download on first use. The AI panel shows an unavailable message in other environments. The model receives column names and types in plain language, your request, and any query/validation errors; the usage rows stay in the browser rather than being sent to an AI service. AI-generated charts can still be misleading: check the SQL and aggregation grain before relying on their conclusions. Individual models and agents can only be charted when their breakdowns exist in the supplied report.
-
-For repeated repair attempts, open DevTools Console and filter for `[AI chart]`. The logs show session creation/destruction, each model response and its length, context usage (when supported), and repair errors. `[AI chart] generated SQL (attempt N):` logs the complete query as a separate string before execution, including when DuckDB rejects it; copy that entry rather than the abbreviated object preview. Responses and SQL may contain your prompt or usage data; redact them before sharing logs.
+For diagnostics, filter DevTools Console for `[AI chart]`. Logs show the model response, selected plan, session lifecycle, and the complete app-compiled SQL before execution. Responses or SQL may contain your request or usage data; redact them before sharing logs.
 
 ## CLI options
 

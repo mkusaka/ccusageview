@@ -7,16 +7,15 @@ import type { ReportData } from "../types";
 import { detectReportType } from "./detect";
 import type { SourceInput } from "./inputs";
 import { normalizeEntries } from "./normalize";
+import type { ChartContext } from "./aiChartPlan";
 
-export const AI_CHART_SCHEMA = `Available tables (one report type per dashboard; these are column names, not SQL SELECT expressions):
-entries(entry_id, source_id, source_label, report_type, period, label, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost)
-model_usage(entry_id, model, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost)
-agent_usage(entry_id, agent, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost)
-agent_model_usage(entry_id, agent, model, input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost)
-IDs are integers; names, dates and labels are text; token counts and cost are numeric. In SELECT, reference columns or aggregate them; never append type declarations.
-Join breakdowns to entries via entry_id. entries has one row per source and report item; source_id distinguishes inputs, source_label is the user label. period is the original ISO-like date/hour (or session lastActivity / block startTime); label is display text. cost is USD. Each breakdown table has its own grain: entry x model, entry x agent, or entry x agent x model. A missing breakdown means unknown, not zero. Do not sum entries metrics after joining to a breakdown, or join two independent breakdown tables before aggregating: that duplicates totals. Use the breakdown table's metrics for breakdown charts. Some reports (notably blocks) have no per-model or per-agent metrics. Do not invent them.
-Date filters: do not invent date variables or use CURRENT_DATE; this local DuckDB build cannot load its required ICU extension. The chart request supplies today's local date; compare ISO-like day periods to that quoted YYYY-MM-DD string. Only entries has period; join breakdown tables to entries by entry_id and filter on entries.period.
-Return SQL with named result columns matching the chart fields: x (date or category), y (numeric), and optionally series (category). Sort x in SQL. Return at most 500 rows.`;
+export const AI_CHART_SCHEMA = `Available usage data (one report type per dashboard):
+entries: one row per source and report item; period (date/hour), source_label, total usage metrics.
+model_usage: one row per entry and model; model and its usage metrics.
+agent_usage: one row per entry and agent; agent and its usage metrics.
+agent_model_usage: one row per entry, agent, and model; both names and their usage metrics.
+Metrics: input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost (USD).
+Only suggest sums of these metrics by period, model, agent, or source. A breakdown table may be empty; do not suggest a missing breakdown or invent metrics.`;
 
 const METRICS =
   "input_tokens DOUBLE, output_tokens DOUBLE, cache_creation_tokens DOUBLE, cache_read_tokens DOUBLE, total_tokens DOUBLE, cost DOUBLE";
@@ -112,6 +111,7 @@ export function buildAiChartRows(inputs: SourceInput[]) {
 
 export interface AiChartDatabase {
   query(sql: string): Promise<Record<string, unknown>[]>;
+  readonly chartContext: ChartContext;
   close(): Promise<void>;
 }
 
@@ -160,6 +160,12 @@ export async function createAiChartDatabase(inputs: SourceInput[]): Promise<AiCh
     }
     const conn = await db.connect();
     const tables = buildAiChartRows(inputs);
+    const chartContext: ChartContext = {
+      availableTables: (
+        ["entries", "model_usage", "agent_usage", "agent_model_usage"] as const
+      ).filter((name) => tables[name].length > 0),
+      reportTypes: [...new Set(tables.entries.map((row) => String(row.report_type)))],
+    };
     await conn.query(
       `CREATE TABLE entries (entry_id INTEGER, source_id VARCHAR, source_label VARCHAR, report_type VARCHAR, period VARCHAR, label VARCHAR, ${METRICS})`,
     );
@@ -181,6 +187,7 @@ export async function createAiChartDatabase(inputs: SourceInput[]): Promise<AiCh
     }
     await conn.query("SET enable_external_access = false");
     return {
+      chartContext,
       async query(sql: string) {
         const statement = prepareAiChartSql(sql);
         const result = await conn.query(`SELECT * FROM (${statement}) AS chart_result LIMIT 501`);

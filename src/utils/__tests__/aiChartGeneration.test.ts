@@ -1,311 +1,165 @@
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { generateAiChart, suggestAiChartPrompts, type PromptSession } from "../aiChartGeneration";
+import type { ChartContext, ChartPlan } from "../aiChartPlan";
 
-it("repairs an invalid result shape and plots distinct series without inventing missing values", async () => {
-  const inputs: string[] = [];
-  const session: PromptSession = {
-    async prompt(input) {
-      inputs.push(input);
-      return JSON.stringify({
-        sql: inputs.length === 1 ? "SELECT duplicate_rows" : "SELECT grouped_rows",
-        chart: {
-          type: "bar",
-          title: "Cost by model",
-          x: "x",
-          y: "y",
-          series: "series",
-          stacked: true,
-        },
-      });
-    },
-    destroy() {},
+const context: ChartContext = {
+  availableTables: ["entries", "model_usage", "agent_usage", "agent_model_usage"],
+  reportTypes: ["daily"],
+};
+
+function plan(overrides: Partial<ChartPlan> = {}): ChartPlan {
+  return {
+    metric: "cost",
+    x: "period",
+    series: "model",
+    time: "all",
+    chart: { type: "line", title: "Cost by model", stacked: false },
+    reason: "",
+    ...overrides,
   };
-  const chart = await generateAiChart(session, "cost by model", async (sql) =>
-    sql.includes("duplicate")
-      ? [
-          { x: "Monday", y: 1, series: "A" },
-          { x: "Monday", y: 2, series: "A" },
-        ]
-      : [
-          { x: "Monday", y: 3, series: "A" },
-          { x: "Monday", y: 4, series: "B" },
-          { x: "Tuesday", y: 5, series: "B" },
-        ],
-  );
-  expect(inputs).toHaveLength(2);
-  expect(inputs[1]).toContain("Duplicate x/series pair");
-  expect(chart.labels).toEqual(["Monday", "Tuesday"]);
-  expect(chart.datasets).toEqual([
-    { label: "A", values: [3, null] },
-    { label: "B", values: [4, 5] },
-  ]);
-});
+}
 
-it("repairs malformed JSON, invalid fields, and executable SQL errors beyond three attempts", async () => {
-  const inputs: string[] = [];
-  const chart = { type: "bar", title: "Cost by day", x: "x", y: "y", series: "", stacked: false };
-  const responses = [
-    '{"sql":',
-    JSON.stringify({ sql: "SELECT missing", chart: { ...chart, title: "" } }),
-    JSON.stringify({ sql: "SELECT missing", chart }),
-    JSON.stringify({ sql: "SELECT valid", chart }),
-  ];
-  const session: PromptSession = {
-    async prompt(input) {
-      inputs.push(input);
+function sessionFor(...responses: string[]): PromptSession {
+  return {
+    async prompt() {
       return responses.shift() ?? "";
     },
     destroy() {},
   };
+}
 
-  const result = await generateAiChart(session, "daily cost", async (sql) => {
-    if (sql === "SELECT missing") throw new Error("Binder Error: column missing");
-    return [{ x: "Monday", y: 2.5 }];
-  });
-  expect(inputs).toHaveLength(4);
-  expect(inputs[1]).toContain("Unexpected end");
-  expect(inputs[2]).toContain("title");
-  expect(inputs[3]).toContain("Binder Error");
-  expect(result.labels).toEqual(["Monday"]);
-  expect(result.datasets).toEqual([{ label: "Cost by day", values: [2.5] }]);
-});
-
-it("restarts a stuck constrained conversation while preserving the SQL parser feedback", async () => {
-  const chart = { type: "bar", title: "Cost", x: "x", y: "y", series: "", stacked: false };
-  let originalCalls = 0;
-  let restarts = 0;
-  const freshPrompts: string[] = [];
-  const original: PromptSession = {
-    async prompt() {
-      originalCalls++;
-      return originalCalls === 1 ? JSON.stringify({ sql: "SELECT model VARCHAR", chart }) : "";
-    },
-    destroy() {},
-  };
-  const fresh: PromptSession = {
-    async prompt(input) {
-      freshPrompts.push(input);
-      return JSON.stringify({ sql: "SELECT valid", chart });
-    },
-    destroy() {},
-  };
-
-  const result = await generateAiChart(
-    original,
-    "model cost",
-    async (sql) => {
-      if (sql.includes("VARCHAR")) throw new Error('Parser Error: syntax error near "VARCHAR"');
-      return [{ x: "Monday", y: 2.5 }];
-    },
-    {
-      async restartSession() {
-        restarts++;
-        return fresh;
-      },
-    },
+it("charts compiled model totals and keeps absent series points empty", async () => {
+  const query = vi.fn(async () => [
+    { x: "2026-09-25", y: 3, series: "opus" },
+    { x: "2026-09-25", y: 5, series: "sonnet" },
+    { x: "2026-09-26", y: 7, series: "sonnet" },
+  ]);
+  const chart = await generateAiChart(
+    sessionFor(JSON.stringify(plan())),
+    "daily cost by model",
+    query,
+    context,
   );
-  expect(originalCalls).toBe(2);
-  expect(restarts).toBe(1);
-  expect(freshPrompts[0]).toContain('Parser Error: syntax error near "VARCHAR"');
-  expect(result.datasets).toEqual([{ label: "Cost", values: [2.5] }]);
+  expect(chart.labels).toEqual(["2026-09-25", "2026-09-26"]);
+  expect(chart.datasets).toEqual([
+    { label: "opus", values: [3, null] },
+    { label: "sonnet", values: [5, 7] },
+  ]);
 });
 
-it("charts SQL result columns when the model supplies SQL expressions after a binder repair", async () => {
-  const chart = {
-    type: "bar",
-    title: "Agent input tokens",
-    x: "e.label",
-    y: "SUM(oa.input_tokens)",
-    series: "",
-    stacked: false,
-  };
-  let calls = 0;
-  const original: PromptSession = {
-    async prompt() {
-      calls++;
-      return calls === 1 ? JSON.stringify({ sql: "SELECT i.label FROM entries e", chart }) : "";
-    },
-    destroy() {},
-  };
-  const fresh: PromptSession = {
-    async prompt(input) {
-      expect(input).toContain('Referenced table "i" not found');
-      return JSON.stringify({
-        sql: "SELECT e.label, SUM(oa.input_tokens) AS y FROM entries e JOIN agent_usage oa USING (entry_id) GROUP BY e.label",
-        chart,
-      });
-    },
-    destroy() {},
-  };
-  const result = await generateAiChart(
-    original,
-    "agent usage",
-    async (sql) => {
-      if (sql.includes("i.label")) throw new Error('Binder Error: Referenced table "i" not found');
-      return [{ label: "daily", y: 42 }];
-    },
-    { restartSession: async () => fresh },
-  );
-  expect(calls).toBe(2);
-  expect(result.labels).toEqual(["daily"]);
-  expect(result.datasets).toEqual([{ label: "Agent input tokens", values: [42] }]);
-});
-
-it("stops when a model repeats the same invalid response across fresh sessions", async () => {
-  const response = JSON.stringify({
-    sql: "SELECT missing FROM entries",
-    chart: { type: "bar", title: "Cost", x: "x", y: "y", series: "", stacked: false },
+it("rejects unsupported intent rather than querying a substituted metric", async () => {
+  const query = vi.fn(async () => []);
+  const unsupported = plan({
+    metric: "unsupported",
+    reason: "An average cannot be represented by sums.",
   });
-  let calls = 0;
-  let restarts = 0;
-  const original: PromptSession = {
-    async prompt() {
-      calls++;
-      return calls === 1 ? response : "";
-    },
-    destroy() {},
-  };
-  const fresh: PromptSession = {
-    async prompt() {
-      calls++;
-      return response;
-    },
-    destroy() {},
-  };
   await expect(
     generateAiChart(
-      original,
-      "agent usage",
-      async () => {
-        throw new Error("Binder Error: missing column");
-      },
-      {
-        async restartSession() {
-          restarts++;
-          return fresh;
-        },
-      },
+      sessionFor(JSON.stringify(unsupported)),
+      "average cost by model",
+      query,
+      context,
     ),
-  ).rejects.toThrow("repeated an invalid chart response: Binder Error: missing column");
-  expect(calls).toBe(3);
-  expect(restarts).toBe(1);
+  ).rejects.toThrow(/average/i);
+  expect(query).not.toHaveBeenCalled();
 });
 
-it("stops recurring undefined-column errors even when the model changes its SQL", async () => {
-  const chart = {
-    type: "line",
-    title: "Daily tokens",
-    x: "period",
-    y: "total_tokens",
-    series: "",
-    stacked: false,
-  };
-  const sql =
-    "SELECT period AS x, total_tokens AS y FROM entries WHERE period <= aktuelle_datum ORDER BY period";
-  let calls = 0;
-  let restarts = 0;
-  const original: PromptSession = {
-    async prompt() {
-      calls++;
-      return calls === 1 ? JSON.stringify({ sql, chart }) : "";
-    },
-    destroy() {},
-  };
-  const fresh: PromptSession = {
-    async prompt() {
-      calls++;
-      return JSON.stringify({ sql: `${sql} LIMIT 500`, chart });
-    },
-    destroy() {},
+it("rejects unavailable model-agent breakdown without asking for another plan", async () => {
+  const prompt = vi.fn(async () => JSON.stringify(plan({ x: "agent", series: "model" })));
+  const query = vi.fn(async () => []);
+  const limited: ChartContext = {
+    availableTables: ["entries", "agent_usage", "model_usage"],
+    reportTypes: ["daily"],
   };
   await expect(
-    generateAiChart(
-      original,
-      "daily tokens through today",
-      async (query) => {
-        throw new Error(
-          `Binder Error: Referenced column "aktuelle_datum" not found in FROM clause!\nLINE 1: ${query}`,
-        );
-      },
-      {
-        async restartSession() {
-          restarts++;
-          return fresh;
-        },
-      },
+    generateAiChart({ prompt, destroy() {} }, "cost by agent and model", query, limited),
+  ).rejects.toThrow(/agent_model_usage|agent.*model|unavailable/i);
+  expect(prompt).toHaveBeenCalledOnce();
+  expect(query).not.toHaveBeenCalled();
+});
+
+it("repairs malformed JSON and schema-invalid output without accepting model SQL", async () => {
+  const responses = [
+    "not json",
+    JSON.stringify({ ...plan(), sql: "SELECT 999 AS x, 1 AS y" }),
+    JSON.stringify(
+      plan({
+        x: "source",
+        series: "none",
+        chart: { type: "bar", title: "Source cost", stacked: false },
+      }),
     ),
-  ).rejects.toThrow(
-    'could not repair the recurring chart error: Binder Error: Referenced column "aktuelle_datum" not found',
-  );
-  expect(calls).toBe(3);
-  expect(restarts).toBe(1);
+  ];
+  const retries: number[] = [];
+  const session = sessionFor(...responses);
+  const query = vi.fn(async (_sql: string) => [{ x: "work", y: 12 }]);
+  const chart = await generateAiChart(session, "cost per source", query, context, {
+    onRetry(attempt) {
+      retries.push(attempt);
+    },
+  });
+  expect(retries).toEqual([2, 3]);
+  expect(query).toHaveBeenCalledOnce();
+  expect(query.mock.calls[0][0]).toMatch(/SUM\(e\.cost\)/);
+  expect(query.mock.calls[0][0]).not.toContain("SELECT 999");
+  expect(chart.datasets).toEqual([{ label: "Source cost", values: [12] }]);
 });
 
-it("reports repeated empty model outputs instead of draining the session indefinitely", async () => {
-  let originalCalls = 0;
-  let freshCalls = 0;
-  const original: PromptSession = {
-    async prompt() {
-      originalCalls++;
-      return "";
-    },
-    destroy() {},
-  };
-  const fresh: PromptSession = {
-    async prompt() {
-      freshCalls++;
-      return "";
-    },
-    destroy() {},
-  };
-
+it("stops when the model repeats an invalid plan", async () => {
+  const prompt = vi.fn(async () => "bad json");
   await expect(
-    generateAiChart(original, "cost", async () => [], {
-      async restartSession() {
-        return fresh;
-      },
-    }),
-  ).rejects.toThrow("empty response");
-  expect(originalCalls).toBe(1);
-  expect(freshCalls).toBe(1);
+    generateAiChart({ prompt, destroy() {} }, "cost", async () => [], context),
+  ).rejects.toThrow(/repeated an invalid chart plan/);
+  expect(prompt).toHaveBeenCalledTimes(2);
 });
 
-it("stops an unrecoverable model call instead of retrying without feedback", async () => {
-  let calls = 0;
-  const session: PromptSession = {
-    async prompt() {
-      calls++;
-      throw new Error("On-device model unavailable");
-    },
-    destroy() {},
-  };
-
-  await expect(generateAiChart(session, "daily cost", async () => [])).rejects.toThrow(
-    "On-device model unavailable",
-  );
-  expect(calls).toBe(1);
-});
-
-it("stops repair attempts after cancellation", async () => {
+it("does not retry a malformed plan after cancellation", async () => {
   const controller = new AbortController();
-  let calls = 0;
-  const session: PromptSession = {
-    async prompt() {
-      calls++;
-      return '{"sql":';
-    },
-    destroy() {},
-  };
-
+  const prompt = vi.fn(async () => "invalid json");
   await expect(
-    generateAiChart(session, "daily cost", async () => [], {
+    generateAiChart({ prompt, destroy() {} }, "cost", async () => [], context, {
       signal: controller.signal,
       onRetry() {
         controller.abort();
       },
     }),
   ).rejects.toMatchObject({ name: "AbortError" });
-  expect(calls).toBe(1);
+  expect(prompt).toHaveBeenCalledOnce();
+});
+
+it("restarts one empty session and charts the next valid plan", async () => {
+  const restarted = sessionFor(JSON.stringify(plan({ series: "none" })));
+  const restartSession = vi.fn(async () => restarted);
+  const query = vi.fn(async () => [{ x: "2026-09-26", y: 9 }]);
+  const chart = await generateAiChart(sessionFor(""), "daily cost", query, context, {
+    restartSession,
+  });
+  expect(restartSession).toHaveBeenCalledOnce();
+  expect(chart.datasets).toEqual([{ label: "Cost by model", values: [9] }]);
+});
+
+it("stops after two empty sessions", async () => {
+  const restartSession = vi.fn(async () => sessionFor(""));
+  await expect(
+    generateAiChart(sessionFor(""), "cost", async () => [], context, { restartSession }),
+  ).rejects.toThrow(/empty response in two sessions/);
+  expect(restartSession).toHaveBeenCalledOnce();
+});
+
+it("surfaces database errors without prompting the model to repair SQL", async () => {
+  const prompt = vi.fn(async () => JSON.stringify(plan()));
+  const failure = new Error("Database failed to execute the chart query");
+  await expect(
+    generateAiChart(
+      { prompt, destroy() {} },
+      "cost by model",
+      async () => {
+        throw failure;
+      },
+      context,
+    ),
+  ).rejects.toBe(failure);
+  expect(prompt).toHaveBeenCalledOnce();
 });
 
 it("keeps distinct actionable suggestions and drops duplicates and echoes", async () => {
@@ -329,8 +183,8 @@ it("keeps distinct actionable suggestions and drops duplicates and echoes", asyn
 
 it("rewrites English suggestions into the Japanese used by the request", async () => {
   const responses = [
-    { suggestions: ["Show the cost per model on the busiest day."] },
-    { suggestions: ["利用が最も多い日のモデル別費用を表示"] },
+    { suggestions: ["Show the total cost per model."] },
+    { suggestions: ["モデル別の費用合計を表示"] },
   ];
   const session: PromptSession = {
     async prompt() {
@@ -338,21 +192,20 @@ it("rewrites English suggestions into the Japanese used by the request", async (
     },
     destroy() {},
   };
-
   expect(
     await suggestAiChartPrompts(
       session,
-      "一番使った日のmodelごとの利用金額",
+      "モデルごとの利用金額",
       ["entries", "model_usage"],
       "daily",
     ),
-  ).toEqual(["利用が最も多い日のモデル別費用を表示"]);
+  ).toEqual(["モデル別の費用合計を表示"]);
 });
 
 it("rewrites Japanese suggestions into the English used by the request", async () => {
   const responses = [
-    { suggestions: ["曜日ごとのモデル別費用を表示"] },
-    { suggestions: ["Show model costs by weekday"] },
+    { suggestions: ["モデル別の費用合計を表示"] },
+    { suggestions: ["Show total cost by model"] },
   ];
   const session: PromptSession = {
     async prompt() {
@@ -360,26 +213,19 @@ it("rewrites Japanese suggestions into the English used by the request", async (
     },
     destroy() {},
   };
-
   expect(
-    await suggestAiChartPrompts(
-      session,
-      "cost by model and weekday",
-      ["entries", "model_usage"],
-      "daily",
-    ),
-  ).toEqual(["Show model costs by weekday"]);
+    await suggestAiChartPrompts(session, "cost by model", ["entries", "model_usage"], "daily"),
+  ).toEqual(["Show total cost by model"]);
 });
 
 it("does not show suggestions in the wrong language when the model cannot correct them", async () => {
   const session: PromptSession = {
     async prompt() {
-      return JSON.stringify({ suggestions: ["Show the cost per model each day."] });
+      return JSON.stringify({ suggestions: ["Show total cost per model."] });
     },
     destroy() {},
   };
-
   await expect(
-    suggestAiChartPrompts(session, "モデル別の日額費用", ["entries", "model_usage"], "daily"),
+    suggestAiChartPrompts(session, "モデル別の費用合計", ["entries", "model_usage"], "daily"),
   ).rejects.toThrow("input language");
 });

@@ -1,5 +1,12 @@
 import * as v from "valibot";
 import { AI_CHART_SCHEMA } from "./aiChartDatabase";
+import {
+  CHART_PLAN_CONSTRAINT,
+  CHART_PLAN_SCHEMA,
+  compileAiChartPlan,
+  type CompiledAiChart,
+  type ChartContext,
+} from "./aiChartPlan";
 
 export interface PromptSession {
   prompt(
@@ -33,39 +40,6 @@ export const MODEL_OPTIONS: ModelOptions = {
 export function browserLanguageModel(): BrowserLanguageModel | undefined {
   return (window as Window & { LanguageModel?: BrowserLanguageModel }).LanguageModel;
 }
-
-const CHART_CONSTRAINT = {
-  type: "object",
-  properties: {
-    sql: { type: "string" },
-    chart: {
-      type: "object",
-      properties: {
-        type: { type: "string", enum: ["line", "bar"] },
-        title: { type: "string" },
-        x: { type: "string" },
-        y: { type: "string" },
-        series: { type: "string" },
-        stacked: { type: "boolean" },
-      },
-      required: ["type", "title", "x", "y", "series", "stacked"],
-      additionalProperties: false,
-    },
-  },
-  required: ["sql", "chart"],
-  additionalProperties: false,
-};
-const CHART_SCHEMA = v.strictObject({
-  sql: v.pipe(v.string(), v.trim(), v.nonEmpty("SQL query is required.")),
-  chart: v.strictObject({
-    type: v.picklist(["line", "bar"]),
-    title: v.pipe(v.string(), v.trim(), v.nonEmpty("Chart title is required.")),
-    x: v.pipe(v.string(), v.trim(), v.nonEmpty("Chart x column is required.")),
-    y: v.pipe(v.string(), v.trim(), v.nonEmpty("Chart y column is required.")),
-    series: v.string(),
-    stacked: v.boolean(),
-  }),
-});
 
 const SUGGESTION_CONSTRAINT = {
   type: "object",
@@ -118,7 +92,7 @@ export async function suggestAiChartPrompts(
       ? "候補文はすべて自然な日本語で書いてください。英語の文にしないでください。"
       : "Write every suggestion in natural English, not Japanese.";
   const response = await session.prompt(
-    `${languageRule}\nSuggest up to 3 specific, useful chart requests refining this user's intent: ${request}\n\n${AI_CHART_SCHEMA}\n\nCurrent report type: ${reportType}. Only these tables contain data: ${availableTables.join(", ")}. Do not suggest analyses using empty breakdown tables. Suggestions must be natural-language requests, not SQL or explanations. Make each suggestion distinct and directly chartable with the available tables.`,
+    `${languageRule}\nSuggest up to 3 distinct, useful chart requests refining this user's intent: ${request}\n\n${AI_CHART_SCHEMA}\n\nCurrent report type: ${reportType}. Available tables with data: ${availableTables.join(", ")}. The optional series breakdown can be model, agent, or source, never the same as the axis. Combining model and agent requires agent_model_usage. Source means a distinct input source, not an arbitrary label. The only time scopes are all data, today, through today, last 7 days, and last 30 days; do not suggest date filtering for weekly or monthly reports. Do not suggest comparisons, extrema, weekday breakdowns, averages, percentages, derived metrics, other filters, or analyses the available tables cannot represent. Suggestions must be natural-language requests, not SQL or explanations.`,
     { responseConstraint: SUGGESTION_CONSTRAINT, signal },
   );
   const suggestions = parseSuggestions(response, request);
@@ -147,30 +121,17 @@ export interface GeneratedChart {
   datasets: { label: string; values: (number | null)[] }[];
 }
 
-function chartFromRows(
-  spec: v.InferOutput<typeof CHART_SCHEMA>,
-  rows: Record<string, unknown>[],
-): GeneratedChart {
+function chartFromRows(spec: CompiledAiChart, rows: Record<string, unknown>[]): GeneratedChart {
   const { sql, chart } = spec;
-  const { type, title, x, y, series, stacked } = chart;
+  const { type, title, series, stacked } = chart;
   if (!rows.length) throw new Error("The query returned no rows.");
-  const firstRow = rows[0];
-  const resultColumn = (requested: string, alias: string) => {
-    if (Object.hasOwn(firstRow, requested)) return requested;
-    const unqualified = /^[A-Za-z_]\w*\.([A-Za-z_]\w*)$/.exec(requested)?.[1];
-    if (unqualified && Object.hasOwn(firstRow, unqualified)) return unqualified;
-    return Object.hasOwn(firstRow, alias) ? alias : requested;
-  };
-  const xColumn = resultColumn(x, "x");
-  const yColumn = resultColumn(y, "y");
-  const seriesColumn = series ? resultColumn(series, "series") : "";
 
   const xValues = new Map<string, Map<string, number>>();
   const seriesNames = new Set<string>();
   for (const row of rows) {
-    const xValue = row[xColumn];
-    const yValue = row[yColumn];
-    const seriesValue = series ? row[seriesColumn] : title;
+    const xValue = row.x;
+    const yValue = row.y;
+    const seriesValue = series ? row.series : title;
     if (
       (typeof xValue !== "string" && typeof xValue !== "number") ||
       (typeof yValue !== "number" && typeof yValue !== "bigint") ||
@@ -178,14 +139,14 @@ function chartFromRows(
       (typeof seriesValue !== "string" && typeof seriesValue !== "number")
     ) {
       throw new Error(
-        `Expected x (${x}) and series (${series || "none"}) to be labels and y (${y}) to be numeric. Available result columns: ${Object.keys(row).join(", ")}. Chart fields must name SQL result columns, not SQL expressions.`,
+        `Expected x and ${series || "no series"} to be labels and y to be numeric. Available result columns: ${Object.keys(row).join(", ")}.`,
       );
     }
     const label = String(xValue);
     const seriesLabel = String(seriesValue);
     const values = xValues.get(label) ?? new Map<string, number>();
     if (values.has(seriesLabel)) {
-      throw new Error("Duplicate x/series pair. Aggregate rows in SQL before charting.");
+      throw new Error("Chart data contains a duplicate x/series pair.");
     }
     values.set(seriesLabel, Number(yValue));
     xValues.set(label, values);
@@ -209,6 +170,7 @@ export async function generateAiChart(
   session: PromptSession,
   request: string,
   query: (sql: string) => Promise<Record<string, unknown>[]>,
+  context: ChartContext,
   options: {
     signal?: AbortSignal;
     onRetry?: (attempt: number, error: string) => void;
@@ -219,17 +181,15 @@ export async function generateAiChart(
   let attempt = 1;
   let consecutiveEmptyResponses = 0;
   const failedResponses = new Set<string>();
-  const failedIssues = new Set<string>();
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   while (true) {
     options.signal?.throwIfAborted();
-    // Prompt API failures cannot be repaired by changing SQL; surface them to the caller.
     let response: string;
     try {
       response = await session.prompt(
-        `Create a chart answering this request: ${request}\nToday's local calendar date: '${today}'. Use this quoted SQL literal if the request needs today's date.\n\n${AI_CHART_SCHEMA}\n\nGenerate DuckDB SELECT SQL. Use only the source tables and columns listed above; define every table alias in FROM or JOIN. Never invent identifiers or placeholder variables. SELECT aliases x, y, and series are allowed. For breakdown date filters, join entries by entry_id and use entries.period with the supplied quoted date literal, not CURRENT_DATE.\nReturn only one JSON object with sql and chart (type: line or bar, title: text, x and y: names of result columns, series: result column name or "" for one series, stacked: boolean). Alias result columns as x, y, and optionally series. Use no external files or network.\n${feedback}`,
-        { responseConstraint: CHART_CONSTRAINT, signal: options.signal },
+        `Select a chart plan for this request: ${request}\nToday's local calendar date: ${today}.\nAvailable tables with data: ${context.availableTables.join(", ")}.\nReport types: ${context.reportTypes.join(", ")}.\nReturn only a JSON chart plan with metric (input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost, or unsupported), x (period, model, agent, or source), series (none, model, agent, or source), time (all, today, through_today, last_7_days, or last_30_days), chart (type: line or bar, title: text, stacked: boolean), and reason (explain only when unsupported; otherwise empty string). Metrics are sums, not averages or percentages. Model and agent dimensions need populated breakdown tables; combining both needs agent_model_usage. Do not select the same x and series. Weekly and monthly reports cannot use date filtering. If the request cannot be faithfully expressed by these fields and available data, choose metric "unsupported" and explain why in reason. Do not invent a different analysis. Do not generate SQL or add any fields.${feedback ? `\n\n${feedback}` : ""}`,
+        { responseConstraint: CHART_PLAN_CONSTRAINT, signal: options.signal },
       );
     } catch (error) {
       if (!options.signal?.aborted)
@@ -246,13 +206,11 @@ export async function generateAiChart(
     options.signal?.throwIfAborted();
     if (!response.trim()) {
       if (!options.restartSession || consecutiveEmptyResponses) {
-        const error = new Error(
+        throw new Error(
           consecutiveEmptyResponses
             ? "The on-device model returned an empty response in two sessions. Try a simpler chart request."
             : "The on-device model returned an empty response. Try generating again.",
         );
-        console.error("[AI chart] model output stayed empty", { attempt, error });
-        throw error;
       }
       consecutiveEmptyResponses++;
       console.warn("[AI chart] restarting model session after empty output", { attempt });
@@ -262,12 +220,9 @@ export async function generateAiChart(
       continue;
     }
     consecutiveEmptyResponses = 0;
+    let plan;
     try {
-      const spec = v.parse(CHART_SCHEMA, JSON.parse(response));
-      console.log(`[AI chart] generated SQL (attempt ${attempt}):\n${spec.sql}`);
-      const rows = await query(spec.sql);
-      options.signal?.throwIfAborted();
-      return chartFromRows(spec, rows);
+      plan = v.parse(CHART_PLAN_SCHEMA, JSON.parse(response));
     } catch (error) {
       options.signal?.throwIfAborted();
       const message =
@@ -276,21 +231,21 @@ export async function generateAiChart(
           : error instanceof Error
             ? error.message
             : String(error);
-      console.warn("[AI chart] repair needed", { attempt, error: message });
       if (failedResponses.has(response)) {
-        throw new Error(`The on-device model repeated an invalid chart response: ${message}`);
+        throw new Error(`The on-device model repeated an invalid chart plan: ${message}`);
       }
       failedResponses.add(response);
-      const issue = message.split("\n", 1)[0];
-      if (failedIssues.has(issue)) {
-        throw new Error(`The on-device model could not repair the recurring chart error: ${issue}`);
-      }
-      failedIssues.add(issue);
-      const previousOutput = response.length > 4000 ? `${response.slice(0, 4000)}…` : response;
-      feedback = `Previous output: ${previousOutput || "(empty)"}\nError: ${message}\nFix the JSON, SQL, or chart definition without changing the user's request.`;
+      console.warn("[AI chart] invalid chart plan", { attempt, error: message });
+      feedback = `The previous JSON chart plan was invalid: ${message}. Return a valid chart plan without changing the user's request. Never generate SQL.`;
       options.onRetry?.(++attempt, message);
-      // Keep the Stop button responsive even if the model immediately repeats an invalid output.
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      continue;
     }
+    console.log("[AI chart] selected plan", plan);
+    const spec = compileAiChartPlan(plan, context, now);
+    console.log(`[AI chart] compiled SQL (attempt ${attempt}):\n${spec.sql}`);
+    const rows = await query(spec.sql);
+    options.signal?.throwIfAborted();
+    return chartFromRows(spec, rows);
   }
 }

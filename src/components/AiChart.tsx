@@ -106,7 +106,7 @@ export function AiChart({ inputs }: Props) {
         controller.signal.throwIfAborted();
         if (!database.current) database.current = createAiChartDatabase(inputs);
         const db = await database.current;
-        const nextChart = await generateAiChart(session, prompt.trim(), db.query, {
+        const nextChart = await generateAiChart(session, prompt.trim(), db.query, db.chartContext, {
           signal: controller.signal,
           onRetry(attempt, lastError) {
             if (currentRun === runId.current) {
@@ -185,7 +185,7 @@ export function AiChart({ inputs }: Props) {
       <div>
         <h3 className="text-sm font-medium">Ask AI for a chart</h3>
         <p className="text-xs text-text-secondary">
-          Generate a chart from your local usage data with Chrome's on-device AI.
+          Chrome's on-device AI selects an analysis; your browser builds and runs the query locally.
         </p>
       </div>
       {!model ? (
