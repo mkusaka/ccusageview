@@ -47,6 +47,29 @@ it("charts compiled model totals and keeps absent series points empty", async ()
   ]);
 });
 
+it("explains an empty today model chart with the model breakdown's available dates", async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(2024, 2, 1, 12));
+  try {
+    const query = vi.fn(async (sql: string) =>
+      sql.includes(" AS first") ? [{ first: "2024-02-01", last: "2024-02-29" }] : [],
+    );
+    await expect(
+      generateAiChart(
+        sessionFor(JSON.stringify(plan({ metric: "total_tokens", time: "today" }))),
+        "model tokens today",
+        query,
+        context,
+      ),
+    ).rejects.toThrow(
+      "No model breakdown rows match today (2024-03-01). Available model breakdown dates: 2024-02-01 to 2024-02-29.",
+    );
+    expect(query).toHaveBeenCalledTimes(2);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it("rejects unsupported intent rather than querying a substituted metric", async () => {
   const query = vi.fn(async () => []);
   const unsupported = plan({

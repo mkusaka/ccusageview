@@ -152,6 +152,38 @@ describe("compileAiChartPlan", () => {
     );
   });
 
+  it("reports only breakdown dates when today's entry has no model breakdown", () => {
+    connection.query(
+      "INSERT INTO entries VALUES (5, 'a', 'Shared', '2024-03-03T09:00:00Z', 25, 0.5)",
+    );
+    try {
+      const date = new Date(2024, 2, 3, 12);
+      const spec = compileAiChartPlan(
+        { ...basePlan, series: "model", time: "today" },
+        context,
+        date,
+      );
+      expect(connection.query(spec.sql).toArray()).toHaveLength(0);
+      expect(
+        connection
+          .query(
+            `SELECT MIN(substr(e.period, 1, 10)) AS first, MAX(substr(e.period, 1, 10)) AS last FROM ${spec.from}`,
+          )
+          .toArray()[0]
+          ?.toJSON(),
+      ).toEqual({ first: "2024-02-01", last: "2024-03-02" });
+      const entrySql = compileAiChartPlan({ ...basePlan, time: "today" }, context, date).sql;
+      expect(
+        connection
+          .query(entrySql)
+          .toArray()
+          .map((row) => row.toJSON()),
+      ).toEqual([{ x: "2024-03-03T09:00:00Z", y: 25 }]);
+    } finally {
+      connection.query("DELETE FROM entries WHERE entry_id = 5");
+    }
+  });
+
   it("rejects missing data, unavailable breakdowns, and duplicate dimensions rather than choosing other analysis", () => {
     expect(() => results({}, { availableTables: [], reportTypes: [] })).toThrow(/No chart data/);
     expect(() =>

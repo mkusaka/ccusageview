@@ -62,6 +62,7 @@ export type ChartPlan = v.InferOutput<typeof CHART_PLAN_SCHEMA>;
 export type ChartContext = { availableTables: readonly string[]; reportTypes: readonly string[] };
 export type CompiledAiChart = {
   sql: string;
+  from: string;
   chart: {
     type: "line" | "bar";
     title: string;
@@ -180,6 +181,7 @@ export function compileAiChartPlan(
 
   return {
     sql,
+    from,
     chart: {
       type: plan.chart.type,
       title: plan.chart.title,

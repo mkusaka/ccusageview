@@ -246,6 +246,37 @@ export async function generateAiChart(
     console.log(`[AI chart] compiled SQL (attempt ${attempt}):\n${spec.sql}`);
     const rows = await query(spec.sql);
     options.signal?.throwIfAborted();
+    if (!rows.length) {
+      const coverage = await query(
+        `SELECT MIN(substr(e.period, 1, 10)) AS first, MAX(substr(e.period, 1, 10)) AS last\nFROM ${spec.from}`,
+      );
+      options.signal?.throwIfAborted();
+      const model = plan.x === "model" || plan.series === "model";
+      const agent = plan.x === "agent" || plan.series === "agent";
+      const breakdown = model
+        ? agent
+          ? "model/agent breakdown"
+          : "model breakdown"
+        : agent
+          ? "agent breakdown"
+          : "usage";
+      const scope = {
+        all: "all dates",
+        today: `today (${today})`,
+        through_today: `through today (${today})`,
+        last_7_days: `the last 7 days (through ${today})`,
+        last_30_days: `the last 30 days (through ${today})`,
+      }[plan.time];
+      const first = coverage[0]?.first;
+      const last = coverage[0]?.last;
+      throw new Error(
+        `No ${breakdown} rows match ${scope}. ${
+          typeof first === "string" && typeof last === "string"
+            ? `Available ${breakdown} dates: ${first} to ${last}.`
+            : `No ${breakdown} dates are available in this report.`
+        }`,
+      );
+    }
     return chartFromRows(spec, rows);
   }
 }
