@@ -7,10 +7,10 @@ import type {
   ChartOptions,
   TooltipModel,
 } from "chart.js";
-import { Bar } from "react-chartjs-2";
+import { Chart } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { ReportType } from "../types";
-import type { DashboardChartTabId } from "../utils/dashboardCatalog";
+import type { ChartPresentationId, DashboardChartTabId } from "../utils/dashboardCatalog";
 import type { TimeGranularity } from "../utils/projection";
 import { formatProjectionMetadata, getProjectionMetrics } from "../utils/projection";
 import type { BreakdownMode } from "../utils/breakdown";
@@ -56,6 +56,7 @@ interface Props {
   initialTab?: DashboardChartTabId;
   syncId?: string;
   timeGranularity?: TimeGranularity;
+  presentation?: ChartPresentationId;
   hoveredDataIndex?: number | null;
   hoveredSyncSource?: string | null;
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
@@ -90,13 +91,14 @@ type TokenTypeSeries = (typeof TYPE_SERIES)[number];
 type StackTokenType = Exclude<ModelTokenType, "totalTokens">;
 type BreakdownTokenType = ModelTokenType | "stack";
 type TokenChartRow = NormalizedEntry | TokenBreakdownChartRow;
-type TokenChartDataset = ChartDataset<"bar", number[]>;
+type TokenChartType = "bar" | "line";
+type TokenChartDataset = ChartDataset<TokenChartType, (number | null)[]>;
 
 interface TokenChartSeries extends ChartDataSeries {
   color: string;
   stack: string;
 }
-type TokenChartJsData = ChartData<"bar", number[], string>;
+type TokenChartJsData = ChartData<TokenChartType, (number | null)[], string>;
 
 function getVisibleTypeSeries(
   typeSeries: readonly TokenTypeSeries[],
@@ -162,6 +164,7 @@ export function TokenChart({
   reportType,
   syncId,
   timeGranularity,
+  presentation,
   hoveredDataIndex = null,
   hoveredSyncSource = null,
   onHoverDataIndexChange,
@@ -604,6 +607,7 @@ export function TokenChart({
       )}
       <TokenBarChart
         entries={entries}
+        presentation={presentation}
         syncId={syncId}
         isBreakdownView={isBreakdownView}
         isTokenStackView={isTokenStackView}
@@ -626,6 +630,7 @@ export function TokenChart({
 
 function TokenBarChart({
   entries,
+  presentation,
   syncId,
   isBreakdownView,
   isTokenStackView,
@@ -643,6 +648,7 @@ function TokenBarChart({
   onHoverDataIndexChange,
 }: {
   entries: NormalizedEntry[];
+  presentation?: ChartPresentationId;
   syncId?: string;
   isBreakdownView: boolean;
   isTokenStackView: boolean;
@@ -689,6 +695,16 @@ function TokenBarChart({
     }));
   }, [breakdownSeries, hiddenSeries, isBreakdownView, isTokenStackView, typeSeries]);
   const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
+  const chartType: TokenChartType =
+    presentation === "line" || presentation === "stackedLine" || presentation === "stackedArea"
+      ? "line"
+      : "bar";
+  const isStackedPresentation =
+    presentation == null ||
+    presentation === "stackedLine" ||
+    presentation === "stackedArea" ||
+    presentation === "stackedBar";
+  const isIndependentLine = presentation === "line";
   const projection = useMemo(
     () =>
       getProjectionMetrics(
@@ -699,7 +715,7 @@ function TokenBarChart({
     [showPercent, sourceData, timeGranularity, visibleKeys],
   );
   const hasProjection = projection.projection != null;
-  const chartInstanceRef = useRef<ChartJsInstance<"bar"> | null>(null);
+  const chartInstanceRef = useRef<ChartJsInstance<TokenChartType> | null>(null);
   const hoveredDataIndexRef = useRef<number | null>(hoveredDataIndex);
   // Deliberate exception to the "no ref writes during render" rule. This ref is a
   // display-only bridge to Chart.js: it is read solely by the `afterDatasetsDraw`
@@ -710,7 +726,7 @@ function TokenBarChart({
   // waiting for React effects.
   hoveredDataIndexRef.current = hoveredDataIndex;
   const hoverLinePlugin = useMemo(
-    () => createVerticalHoverLinePlugin<"bar">(hoveredDataIndexRef),
+    () => createVerticalHoverLinePlugin<TokenChartType>(hoveredDataIndexRef),
     [],
   );
   useEffect(() => {
@@ -722,7 +738,7 @@ function TokenBarChart({
     const actualDatasets: TokenChartDataset[] = visibleSeries.map((series) => {
       const color = series.color;
       return {
-        type: "bar",
+        type: chartType,
         label: series.label,
         data: sourceData.map((row) => {
           const record = row as Record<string, unknown>;
@@ -730,10 +746,15 @@ function TokenBarChart({
             ? normalizeStackValue(record, series.key, visibleKeys)
             : (asNumber(record[series.key]) ?? 0);
         }),
-        backgroundColor: withOpacity(color, 0.85),
+        backgroundColor: withOpacity(color, chartType === "bar" ? 0.85 : 0.55),
         borderColor: color,
-        borderWidth: 0,
-        stack: series.stack,
+        borderWidth: chartType === "bar" ? 0 : 2,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        fill: chartType === "line" && presentation === "stackedArea",
+        tension: 0.25,
+        stack:
+          presentation === "bar" ? series.key : isStackedPresentation ? series.stack : undefined,
       };
     });
 
@@ -741,22 +762,49 @@ function TokenBarChart({
       ? visibleSeries.map((series) => {
           const color = series.color;
           return {
-            type: "bar",
+            type: chartType,
             label: `${series.label} projected`,
             data: sourceData.map((_, rowIndex) =>
-              rowIndex === sourceData.length - 1 ? (projection.remaining[series.key] ?? 0) : 0,
+              rowIndex === sourceData.length - 1
+                ? isIndependentLine
+                  ? (projection.projected[series.key] ?? 0)
+                  : (projection.remaining[series.key] ?? 0)
+                : chartType === "bar"
+                  ? 0
+                  : null,
             ),
             backgroundColor: withOpacity(color, 0.28),
             borderColor: withOpacity(color, 0.45),
-            borderWidth: 0,
-            stack: series.stack,
+            borderWidth: chartType === "bar" ? 0 : 1,
+            borderDash: [4, 3],
+            pointRadius: chartType === "bar" ? 0 : 3,
+            pointHoverRadius: chartType === "bar" ? 0 : 4,
+            fill: chartType === "line" && presentation === "stackedArea",
+            stack:
+              presentation === "bar"
+                ? series.key
+                : isStackedPresentation
+                  ? series.stack
+                  : undefined,
           };
         })
       : [];
 
     return { labels, datasets: [...actualDatasets, ...projectedDatasets] };
-  }, [hasProjection, projection.remaining, showPercent, sourceData, visibleKeys, visibleSeries]);
-  const chartJsOptions = useMemo<ChartOptions<"bar">>(
+  }, [
+    chartType,
+    hasProjection,
+    isIndependentLine,
+    isStackedPresentation,
+    presentation,
+    projection.projected,
+    projection.remaining,
+    showPercent,
+    sourceData,
+    visibleKeys,
+    visibleSeries,
+  ]);
+  const chartJsOptions = useMemo<ChartOptions<TokenChartType>>(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
@@ -773,13 +821,19 @@ function TokenBarChart({
         tooltip: {
           enabled: false,
           external(context) {
-            renderTokenTooltip(context, sourceData, visibleKeys, showPercent);
+            renderTokenTooltip(
+              context,
+              sourceData,
+              visibleKeys,
+              showPercent,
+              isIndependentLine ? projection.remaining : undefined,
+            );
           },
         },
       },
       scales: {
         x: {
-          stacked: true,
+          stacked: chartType === "bar" || isStackedPresentation,
           grid: { display: false },
           ticks: {
             color: "rgb(107, 114, 128)",
@@ -789,7 +843,7 @@ function TokenBarChart({
           },
         },
         y: {
-          stacked: true,
+          stacked: isStackedPresentation || (chartType === "bar" && hasProjection),
           min: 0,
           max: showPercent ? 1 : undefined,
           grid: { color: "rgba(148, 163, 184, 0.2)" },
@@ -805,7 +859,17 @@ function TokenBarChart({
         },
       },
     }),
-    [onHoverDataIndexChange, showPercent, sourceData, visibleKeys],
+    [
+      chartType,
+      hasProjection,
+      isIndependentLine,
+      isStackedPresentation,
+      onHoverDataIndexChange,
+      projection.remaining,
+      showPercent,
+      sourceData,
+      visibleKeys,
+    ],
   );
   const legendItems = isBreakdownView
     ? breakdownSeries.map((series, index) => ({
@@ -818,7 +882,8 @@ function TokenBarChart({
   return (
     <>
       <div className="relative h-96">
-        <Bar
+        <Chart
+          type={chartType}
           ref={chartInstanceRef}
           data={chartJsData}
           options={chartJsOptions}
@@ -836,10 +901,11 @@ function TokenBarChart({
 }
 
 function renderTokenTooltip(
-  { chart, tooltip }: { chart: ChartJsInstance; tooltip: TooltipModel<"bar"> },
+  { chart, tooltip }: { chart: ChartJsInstance; tooltip: TooltipModel<TokenChartType> },
   sourceData: readonly TokenChartRow[],
   visibleKeys: readonly string[],
   showPercent: boolean,
+  projectedRemaining?: Record<string, number>,
 ) {
   const tooltipEl = getOrCreateExternalTooltipElement(chart, "tokens");
   if (tooltip.opacity === 0) {
@@ -883,7 +949,9 @@ function renderTokenTooltip(
         visibleKeys.length > 0 ? item.datasetIndex % visibleKeys.length : item.datasetIndex;
       const key = visibleKeys[keyIndex] ?? "";
       const isProjectionItem = item.datasetIndex >= visibleKeys.length;
-      const raw = isProjectionItem ? Number(item.parsed.y ?? 0) : (asNumber(row?.[key]) ?? 0);
+      const raw = isProjectionItem
+        ? (projectedRemaining?.[key] ?? Number(item.parsed.y ?? 0))
+        : (asNumber(row?.[key]) ?? 0);
       const value =
         !isProjectionItem && showPercent && total > 0
           ? `${((raw / total) * 100).toFixed(1)}% (${formatTokens(raw)})`

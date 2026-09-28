@@ -5,7 +5,11 @@ import { Chart } from "react-chartjs-2";
 import { buildAxisAnalysisData, type AxisSource } from "../utils/axisAnalysis";
 import { formatCacheReadRate } from "../utils/cacheEfficiency";
 import { buildMarkdownSection } from "../utils/chartData";
-import { ANALYSIS_AXIS_OPTIONS, type AnalysisAxisId } from "../utils/dashboardCatalog";
+import {
+  ANALYSIS_AXIS_OPTIONS,
+  type AnalysisAxisId,
+  type ChartPresentationId,
+} from "../utils/dashboardCatalog";
 import { formatCostAxis, formatTokens } from "../utils/format";
 import type { NormalizedEntry } from "../utils/normalize";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
@@ -17,6 +21,7 @@ interface Props {
   entries: NormalizedEntry[];
   sources?: readonly AxisSource[];
   axis: AnalysisAxisId;
+  presentation?: ChartPresentationId;
 }
 
 const TOKEN_SERIES = [
@@ -28,7 +33,7 @@ const TOKEN_SERIES = [
 
 type ChartKind = "bar" | "line";
 
-export function AxisChart({ entries, sources, axis }: Props) {
+export function AxisChart({ entries, sources, axis, presentation }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const option = ANALYSIS_AXIS_OPTIONS.find((item) => item.id === axis)!;
   const rows = useMemo(
@@ -104,8 +109,9 @@ export function AxisChart({ entries, sources, axis }: Props) {
   );
   useRegisterChartMarkdown(registration);
 
-  const kind: ChartKind = option.visualization === "line" ? "line" : "bar";
-  const categorical = kind === "bar";
+  const kind: ChartKind = option.dimension === "period" && presentation !== "bar" ? "line" : "bar";
+  const categorical = option.dimension !== "period";
+  const stacked = isTokenMix && presentation !== "bar";
   const dimensionLabel = option.dimension[0].toUpperCase() + option.dimension.slice(1);
   const data: ChartData<ChartKind, (number | null)[], string> = {
     labels: rows.map((row) => row.label),
@@ -115,7 +121,7 @@ export function AxisChart({ entries, sources, axis }: Props) {
           data: rows.map((row) => row[key]),
           backgroundColor: getChartJsColor(index),
           borderColor: getChartJsColor(index),
-          stack: "tokens",
+          stack: stacked ? "tokens" : undefined,
         }))
       : [
           {
@@ -147,7 +153,7 @@ export function AxisChart({ entries, sources, axis }: Props) {
     },
     scales: {
       x: {
-        stacked: isTokenMix,
+        stacked,
         beginAtZero: categorical,
         title: { display: true, text: categorical ? unit : dimensionLabel },
         ticks: categorical
@@ -161,7 +167,7 @@ export function AxisChart({ entries, sources, axis }: Props) {
         grid: categorical ? { color: "rgba(148, 163, 184, 0.2)" } : { display: false },
       },
       y: {
-        stacked: isTokenMix,
+        stacked,
         beginAtZero: !categorical,
         title: { display: true, text: categorical ? dimensionLabel : unit },
         ticks: categorical

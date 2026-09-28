@@ -3,8 +3,10 @@ import {
   DASHBOARD_CHART_TABS,
   availableAnalysisGranularities,
   isAnalysisAxisAvailable,
+  isChartPresentationAvailable,
   type AnalysisAvailability,
   type DashboardChartId,
+  type ChartPresentationId,
   type DashboardChartTabId,
   type DashboardRangeId,
 } from "./dashboardCatalog";
@@ -14,13 +16,14 @@ export interface PickerSuggestion {
   chart: DashboardChartId;
   tab?: DashboardChartTabId;
   range: DashboardRangeId;
+  presentation?: ChartPresentationId;
   chartGranularity?: TimeGranularity;
   confidence: number;
 }
 
 export type PickerSelection = Pick<
   PickerSuggestion,
-  "chart" | "tab" | "range" | "chartGranularity"
+  "chart" | "tab" | "range" | "chartGranularity" | "presentation"
 >;
 
 export function defaultPickerTab(
@@ -41,6 +44,7 @@ export function isPickerSelectionAvailable(
   return (
     charts.includes(selection.chart) &&
     ranges.includes(selection.range) &&
+    isChartPresentationAvailable(selection.chart, selection.tab, selection.presentation) &&
     (selection.chart === "analysis"
       ? ANALYSIS_AXIS_OPTIONS.some(
           ({ id }) => id === selection.tab && isAnalysisAxisAvailable(id, metadata),

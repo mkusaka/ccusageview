@@ -1,12 +1,15 @@
 import type { ReportType } from "../types";
 import {
   ANALYSIS_GRANULARITY_OPTIONS,
+  CHART_PRESENTATIONS,
   DASHBOARD_CHART_OPTIONS,
   DASHBOARD_RANGES,
   isAnalysisAxisAvailable,
   availableAnalysisGranularities,
   availableChartIds,
   availableRangeIds,
+  availableChartPresentations,
+  type ChartPresentationId,
   type AnalysisAxisId,
 } from "../utils/dashboardCatalog";
 import type { TimeGranularity } from "../utils/projection";
@@ -115,7 +118,7 @@ const api = new Hono<{ Bindings: Bindings }>()
             chart: {
               type: "choice",
               instructions:
-                "Choose the closest chart and tab for the request. For a daily activity calendar heatmap, choose Total Tokens for token activity and Cost only for cost activity; preserve specific input, output, or cache token metrics when requested. Distinguish time trends from shares of total usage, and models across all agents from models within each agent or harness. The analysis options offer token mix, effective cost per million tokens, and cache read rate by fixed dimensions. Prefer options marked available for this dashboard.",
+                "Choose the closest chart and tab for the request. For a daily activity calendar heatmap, choose Total Tokens for token activity and Cost only for cost activity; preserve specific input, output, or cache token metrics when requested. Distinguish time trends from shares of total usage, and models across all agents from models within each agent or harness. The analysis options offer token mix, effective cost per million tokens, and cache read rate by fixed dimensions. Some chart presentations only apply to ordered time trends or additive series; prefer options marked available for this dashboard.",
               criteria: Object.fromEntries(
                 DASHBOARD_CHART_OPTIONS.map(({ id, chart, tab, label, description }) => {
                   const available =
@@ -152,6 +155,21 @@ const api = new Hono<{ Bindings: Bindings }>()
                   `${label}: ${description}${availableGranularities.includes(id) ? "" : " (unavailable in this dashboard)"}`,
                 ]),
               ),
+            },
+            presentation: {
+              type: "choice",
+              instructions:
+                "Choose default unless the request asks for a specific chart style. Independent lines show original, unstacked series; stacked lines show cumulative series without fill; stacked area is the filled wave of cumulative values; side-by-side bars keep series separate; stacked bars show component totals. Do not stack rates or ratios, and do not use lines/areas for unordered model, agent, or source categories.",
+              criteria: {
+                default:
+                  "Use the existing presentation of the selected chart and tab when no style is requested",
+                ...Object.fromEntries(
+                  CHART_PRESENTATIONS.map(({ id, label, description }) => [
+                    id,
+                    `${label}: ${description}`,
+                  ]),
+                ),
+              },
             },
           },
         });
@@ -204,6 +222,15 @@ const api = new Hono<{ Bindings: Bindings }>()
                     ANALYSIS_GRANULARITY_OPTIONS.some(({ id }) => id === value),
                 ),
               }),
+              presentation: v.object({
+                type: v.literal("choice"),
+                choice: v.custom<"default" | ChartPresentationId>(
+                  (value) =>
+                    value === "default" ||
+                    (typeof value === "string" &&
+                      CHART_PRESENTATIONS.some(({ id }) => id === value)),
+                ),
+              }),
             }),
           }),
         }),
@@ -213,6 +240,8 @@ const api = new Hono<{ Bindings: Bindings }>()
         return c.json({ error: "Chart suggestion provider returned invalid choices" }, 502);
       }
       const chartAnswer = suggestion.output.result.answers.chart;
+      const chosenPresentation = suggestion.output.result.answers.presentation.choice;
+      const presentation = chosenPresentation === "default" ? undefined : chosenPresentation;
       const ranked = chartAnswer.probabilities
         ? Object.entries(chartAnswer.probabilities)
             .filter(([, probability]) => probability > 0)
@@ -224,8 +253,18 @@ const api = new Hono<{ Bindings: Bindings }>()
       if (!ranked.length) {
         return c.json({ error: "Chart suggestion provider returned invalid choices" }, 502);
       }
+      const compatible = ranked.filter(([id]) => {
+        const { chart, tab } = DASHBOARD_CHART_OPTIONS.find((option) => option.id === id)!;
+        return (
+          presentation === undefined ||
+          availableChartPresentations(chart, tab).includes(presentation)
+        );
+      });
+      if (!compatible.length) {
+        return c.json({ error: "No chart supports the requested presentation" }, 502);
+      }
       return c.json({
-        suggestions: ranked.map(([id, confidence]) => {
+        suggestions: compatible.map(([id, confidence]) => {
           const { chart, tab } = DASHBOARD_CHART_OPTIONS.find((option) => option.id === id)!;
           const chosenGranularity = suggestion.output.result.answers.granularity.choice;
           const item: {
@@ -233,8 +272,10 @@ const api = new Hono<{ Bindings: Bindings }>()
             tab: typeof tab;
             range: typeof suggestion.output.result.answers.range.choice;
             confidence: number;
+            presentation?: ChartPresentationId;
             chartGranularity?: TimeGranularity;
           } = { chart, tab, range: suggestion.output.result.answers.range.choice, confidence };
+          if (presentation) item.presentation = presentation;
           if (chart === "analysis" && chosenGranularity !== "dashboard") {
             item.chartGranularity = chosenGranularity;
           }

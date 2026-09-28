@@ -11,7 +11,7 @@ import type {
 import { Chart as ReactChart } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { ReportType } from "../types";
-import type { DashboardChartTabId } from "../utils/dashboardCatalog";
+import type { ChartPresentationId, DashboardChartTabId } from "../utils/dashboardCatalog";
 import type { BreakdownMode } from "../utils/breakdown";
 import {
   buildCacheEfficiencyChartData,
@@ -49,6 +49,7 @@ interface Props {
   entries: NormalizedEntry[];
   reportType?: ReportType;
   initialTab?: DashboardChartTabId;
+  presentation?: ChartPresentationId;
   syncId?: string;
   hoveredDataIndex?: number | null;
   hoveredSyncSource?: string | null;
@@ -66,8 +67,9 @@ type CacheEfficiencyChartRow = CacheEfficiencyChartDatum | CacheEfficiencyBreakd
 type CacheEfficiencyBreakdownChartDatum = {
   label: string;
 } & Record<string, string | number | null>;
-type CacheEfficiencyDataset = ChartDataset<"line", (number | null)[]>;
-type CacheEfficiencyChartData = ChartData<"line", (number | null)[], string>;
+type CacheEfficiencyChartType = "line" | "bar";
+type CacheEfficiencyDataset = ChartDataset<CacheEfficiencyChartType, (number | null)[]>;
+type CacheEfficiencyChartData = ChartData<CacheEfficiencyChartType, (number | null)[], string>;
 
 type CacheEfficiencyBreakdownSeries = ChartDataSeries & {
   chartColor: string;
@@ -102,12 +104,12 @@ function hasAnyBreakdownData(entries: readonly NormalizedEntry[]): boolean {
   return entries.some((entry) => entry.modelBreakdowns && entry.modelBreakdowns.length > 0);
 }
 
-function shouldShowTooltipItem(context: TooltipItem<"line">): boolean {
+function shouldShowTooltipItem(context: TooltipItem<CacheEfficiencyChartType>): boolean {
   const value = context.parsed.y;
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function formatTooltipItem(context: TooltipItem<"line">): string {
+function formatTooltipItem(context: TooltipItem<CacheEfficiencyChartType>): string {
   const label = context.dataset.label ?? "";
   const value = context.parsed.y;
   return `${label}: ${formatCacheReadRate(value == null ? null : value)}`;
@@ -118,7 +120,7 @@ function renderExternalTooltip({
   tooltip,
 }: {
   chart: ChartJsInstance;
-  tooltip: TooltipModel<"line">;
+  tooltip: TooltipModel<CacheEfficiencyChartType>;
 }) {
   const tooltipEl = getOrCreateExternalTooltipElement(chart, "cache-efficiency");
 
@@ -189,6 +191,7 @@ function buildChartJsData(
   chartData: readonly CacheEfficiencyChartRow[],
   isBreakdownView: boolean,
   visibleBreakdownSeries: readonly CacheEfficiencyBreakdownSeries[],
+  type: CacheEfficiencyChartType,
 ): CacheEfficiencyChartData {
   const labels = chartData.map((row) => row.label);
 
@@ -197,7 +200,7 @@ function buildChartJsData(
       labels,
       datasets: [
         {
-          type: "line",
+          type,
           label: RATE_SERIES.name,
           data: chartData.map((row) => asNumber(row.cacheReadRate)),
           yAxisID: "rate",
@@ -217,12 +220,12 @@ function buildChartJsData(
   for (const series of visibleBreakdownSeries) {
     const color = series.chartColor;
     datasets.push({
-      type: "line",
+      type,
       label: `${series.label} ${RATE_SERIES.name}`,
       data: chartData.map((row) => asNumber((row as Record<string, unknown>)[series.rateKey])),
       yAxisID: "rate",
       borderColor: color,
-      backgroundColor: withOpacity(color, 0.12),
+      backgroundColor: type === "bar" ? color : withOpacity(color, 0.12),
       borderWidth: 2,
       pointRadius: chartData.length === 1 ? 3 : 0,
       pointHoverRadius: 3,
@@ -236,7 +239,7 @@ function buildChartJsData(
 function buildChartJsOptions(
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void,
   hoveredDataIndexRef?: { current: number | null },
-): ChartOptions<"line"> {
+): ChartOptions<CacheEfficiencyChartType> {
   return {
     responsive: true,
     maintainAspectRatio: false,
@@ -260,7 +263,7 @@ function buildChartJsOptions(
         filter: shouldShowTooltipItem,
         external: renderExternalTooltip,
         callbacks: {
-          label(context: TooltipItem<"line">) {
+          label(context: TooltipItem<CacheEfficiencyChartType>) {
             return formatTooltipItem(context);
           },
         },
@@ -306,6 +309,7 @@ export function CacheEfficiencyChart({
   entries,
   initialTab,
   reportType,
+  presentation,
   syncId,
   hoveredDataIndex = null,
   hoveredSyncSource = null,
@@ -313,7 +317,7 @@ export function CacheEfficiencyChart({
 }: Props) {
   void syncId;
   const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstanceRef = useRef<ChartJsInstance<"line"> | null>(null);
+  const chartInstanceRef = useRef<ChartJsInstance<CacheEfficiencyChartType> | null>(null);
   const hoveredDataIndexRef = useRef<number | null>(hoveredDataIndex);
   // Deliberate exception to the "no ref writes during render" rule. This ref is a
   // display-only bridge to Chart.js: it is read solely by the `afterDatasetsDraw`
@@ -387,16 +391,17 @@ export function CacheEfficiencyChart({
         : buildCacheEfficiencyChartData(entries),
     [entries, isBreakdownView, visibleBreakdownSeries, includeOther, breakdownMode, selectedModel],
   );
+  const chartType = presentation === "bar" ? "bar" : "line";
   const chartJsData = useMemo(
-    () => buildChartJsData(chartData, isBreakdownView, visibleBreakdownSeries),
-    [chartData, isBreakdownView, visibleBreakdownSeries],
+    () => buildChartJsData(chartData, isBreakdownView, visibleBreakdownSeries, chartType),
+    [chartData, isBreakdownView, visibleBreakdownSeries, chartType],
   );
   const chartJsOptions = useMemo(
     () => buildChartJsOptions(onHoverDataIndexChange, hoveredDataIndexRef),
     [onHoverDataIndexChange],
   );
   const hoverLinePlugin = useMemo(
-    () => createVerticalHoverLinePlugin<"line">(hoveredDataIndexRef),
+    () => createVerticalHoverLinePlugin<CacheEfficiencyChartType>(hoveredDataIndexRef),
     [],
   );
   useEffect(() => {
@@ -560,7 +565,7 @@ export function CacheEfficiencyChart({
         <div className="relative h-80 overflow-visible">
           <ReactChart
             ref={chartInstanceRef}
-            type="line"
+            type={chartType}
             data={chartJsData}
             options={chartJsOptions}
             plugins={[hoverLinePlugin]}

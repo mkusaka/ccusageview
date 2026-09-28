@@ -9,9 +9,12 @@ import {
   DASHBOARD_RANGES,
   ANALYSIS_GRANULARITY_OPTIONS,
   ANALYSIS_AXIS_OPTIONS,
+  CHART_PRESENTATIONS,
+  isChartPresentationAvailable,
   isAnalysisAxisAvailable,
   type AnalysisAxisId,
   type DashboardChartId,
+  type ChartPresentationId,
   type DashboardChartTabId,
   type DashboardRangeId,
 } from "../utils/dashboardCatalog";
@@ -39,11 +42,13 @@ interface Props {
   initialTab?: DashboardChartTabId;
   initialRange?: DashboardRangeId;
   initialChartGranularity?: TimeGranularity;
+  initialPresentation?: ChartPresentationId;
   onApply: (
     chart: DashboardChartId,
     range: DashboardRangeId,
     tab?: DashboardChartTabId,
     chartGranularity?: TimeGranularity,
+    presentation?: ChartPresentationId,
   ) => void;
   onApplySuggestions: (selections: PickerSelection[]) => void;
   preview: (
@@ -51,6 +56,7 @@ interface Props {
     range: DashboardRangeId,
     tab?: DashboardChartTabId,
     chartGranularity?: TimeGranularity,
+    presentation?: ChartPresentationId,
   ) => ReactNode;
   onClose: () => void;
 }
@@ -71,6 +77,7 @@ export function ChartPickerModal({
   initialTab,
   initialRange,
   initialChartGranularity,
+  initialPresentation,
   onApply,
   onApplySuggestions,
   onClose,
@@ -89,6 +96,7 @@ export function ChartPickerModal({
         range: initialRange ?? ranges[0],
         tab: initialTab ?? defaultPickerTab(initialChart, metadata),
         chartGranularity: initialChart === "analysis" ? initialChartGranularity : undefined,
+        presentation: initialPresentation,
       };
     }
     const chart =
@@ -123,7 +131,10 @@ export function ChartPickerModal({
     (item, index) =>
       isPickerSelectionAvailable(item, charts, ranges, metadata) &&
       suggestions.findIndex(
-        (candidate) => candidate.chart === item.chart && candidate.tab === item.tab,
+        (candidate) =>
+          candidate.chart === item.chart &&
+          candidate.tab === item.tab &&
+          candidate.presentation === item.presentation,
       ) === index,
   );
   const [error, setError] = useState("");
@@ -167,6 +178,7 @@ export function ChartPickerModal({
             DASHBOARD_CHART_OPTIONS.some(
               (option) => option.chart === item.chart && option.tab === item.tab,
             ) &&
+            isChartPresentationAvailable(item.chart, item.tab, item.presentation) &&
             DASHBOARD_RANGES.some((itemRange) => itemRange.id === item.range) &&
             (item.chartGranularity === undefined ||
               (item.chart === "analysis" &&
@@ -183,7 +195,7 @@ export function ChartPickerModal({
         );
         if (firstAvailable) setSelection(firstAvailable);
       } else {
-        setError("Jev returned an unknown chart, tab, or date range.");
+        setError("Jev returned an unknown chart, tab, date range, or presentation.");
       }
     } catch (cause) {
       if (!request.signal.aborted)
@@ -258,6 +270,7 @@ export function ChartPickerModal({
                     tab: topSuggestion.tab,
                     range: topSuggestion.range,
                     chartGranularity: topSuggestion.chartGranularity,
+                    presentation: topSuggestion.presentation,
                   })
                 }
                 className="block text-left text-sm text-text-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
@@ -267,7 +280,9 @@ export function ChartPickerModal({
                   DASHBOARD_CHART_OPTIONS.find(
                     (item) => item.chart === topSuggestion.chart && item.tab === topSuggestion.tab,
                   )?.label
-                }{" "}
+                }
+                {topSuggestion.presentation &&
+                  ` · ${CHART_PRESENTATIONS.find(({ id }) => id === topSuggestion.presentation)?.label}`}{" "}
                 · {Math.round(topSuggestion.confidence * 100)}% confidence
                 {!isPickerSelectionAvailable(topSuggestion, charts, ranges, metadata) &&
                   " · Unavailable in this view"}

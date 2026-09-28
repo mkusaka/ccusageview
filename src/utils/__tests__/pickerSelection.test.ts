@@ -50,4 +50,44 @@ describe("analysis picker availability", () => {
       ),
     ).toBe(false);
   });
+
+  it("offers grouped or stacked token comparisons but not stacked ratios or categorical lines", () => {
+    const metadata = { ...daily, hasModelData: true };
+    const choose = (
+      tab: "modelTokenMix" | "modelCostPerMillion" | "periodCostPerMillion",
+      presentation: "bar" | "line" | "stackedBar",
+    ) =>
+      isPickerSelectionAvailable(
+        { chart: "analysis", tab, range: "all", presentation },
+        [...charts],
+        [...ranges],
+        metadata,
+      );
+
+    expect(choose("modelTokenMix", "bar")).toBe(true);
+    expect(choose("modelTokenMix", "stackedBar")).toBe(true);
+    expect(choose("modelTokenMix", "line")).toBe(false);
+    expect(choose("modelCostPerMillion", "stackedBar")).toBe(false);
+    expect(choose("periodCostPerMillion", "line")).toBe(true);
+    expect(choose("periodCostPerMillion", "bar")).toBe(true);
+  });
+
+  it("permits independent lines and side-by-side bars for time-series but not stacked totals", () => {
+    expect(
+      isPickerSelectionAvailable(
+        { chart: "cost", tab: "model", range: "all", presentation: "line" },
+        [...charts],
+        [...ranges],
+        { ...daily, hasModelData: true },
+      ),
+    ).toBe(true);
+    expect(
+      isPickerSelectionAvailable(
+        { chart: "cost", tab: "total", range: "all", presentation: "stackedBar" },
+        [...charts],
+        [...ranges],
+        daily,
+      ),
+    ).toBe(false);
+  });
 });

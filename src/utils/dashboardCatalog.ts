@@ -289,6 +289,94 @@ export const DASHBOARD_CHART_OPTIONS: ChartOption[] = DASHBOARD_CHARTS.flatMap<C
   },
 );
 
+export const CHART_PRESENTATIONS = [
+  {
+    id: "line",
+    label: "Lines",
+    description: "Draw each series as its own unstacked line, preserving its original values",
+  },
+  {
+    id: "stackedLine",
+    label: "Stacked lines",
+    description: "Draw cumulative lines that sum series at each time point, without filled areas",
+  },
+  {
+    id: "stackedArea",
+    label: "Stacked area",
+    description: "Draw filled, cumulative areas for the series over time",
+  },
+  {
+    id: "bar",
+    label: "Side-by-side bars",
+    description: "Draw separate grouped bars for each series, or one bar for a single metric",
+  },
+  {
+    id: "stackedBar",
+    label: "Stacked bars",
+    description: "Draw bars with series stacked to show the sum in each group or period",
+  },
+] as const;
+
+export type ChartPresentationId = (typeof CHART_PRESENTATIONS)[number]["id"];
+
+const TIME_PRESENTATIONS = [
+  "line",
+  "stackedLine",
+  "stackedArea",
+  "bar",
+  "stackedBar",
+] as const satisfies readonly ChartPresentationId[];
+const SINGLE_PRESENTATIONS = ["line", "bar"] as const satisfies readonly ChartPresentationId[];
+const MIX_PRESENTATIONS = ["bar", "stackedBar"] as const satisfies readonly ChartPresentationId[];
+
+export function availableChartPresentations(
+  chart: DashboardChartId,
+  tab?: DashboardChartTabId,
+): readonly ChartPresentationId[] {
+  if (chart === "analysis") {
+    if (tab === "periodCostPerMillion") return SINGLE_PRESENTATIONS;
+    if (
+      tab &&
+      ANALYSIS_AXIS_OPTIONS.some(({ id, measure }) => id === tab && measure === "tokenMix")
+    )
+      return MIX_PRESENTATIONS;
+    return tab && ANALYSIS_AXIS_OPTIONS.some(({ id }) => id === tab) ? ["bar"] : [];
+  }
+  if (chart === "cost") return tab === "total" || !tab ? SINGLE_PRESENTATIONS : TIME_PRESENTATIONS;
+  if (chart === "tokens") return TIME_PRESENTATIONS;
+  if (chart === "cache") return SINGLE_PRESENTATIONS;
+  return [];
+}
+
+export function defaultChartPresentation(
+  chart: DashboardChartId,
+  tab?: DashboardChartTabId,
+): ChartPresentationId | undefined {
+  if (chart === "analysis") {
+    if (tab === "periodCostPerMillion") return "line";
+    if (
+      tab &&
+      ANALYSIS_AXIS_OPTIONS.some(({ id, measure }) => id === tab && measure === "tokenMix")
+    )
+      return "stackedBar";
+    return tab && ANALYSIS_AXIS_OPTIONS.some(({ id }) => id === tab) ? "bar" : undefined;
+  }
+  if (chart === "cost") return !tab || tab === "total" ? "line" : "stackedArea";
+  if (chart === "tokens") return "stackedBar";
+  if (chart === "cache") return "line";
+  return undefined;
+}
+
+export function isChartPresentationAvailable(
+  chart: DashboardChartId,
+  tab: DashboardChartTabId | undefined,
+  presentation: ChartPresentationId | undefined,
+): boolean {
+  return (
+    presentation === undefined || availableChartPresentations(chart, tab).includes(presentation)
+  );
+}
+
 export const DASHBOARD_RANGES = [
   {
     id: "dashboard",

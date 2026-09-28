@@ -39,6 +39,7 @@ function createMockEnv() {
             },
             range: { type: "choice", choice: "last_7_days" },
             granularity: { type: "choice", choice: "dashboard" },
+            presentation: { type: "choice", choice: "default" },
           },
           usage: {},
         },
@@ -213,6 +214,7 @@ describe("POST /api/charts/suggest", () => {
           chart: { type: "choice", choice: "analysis.modelCostPerMillion", confidence: 0.85 },
           range: { type: "choice", choice: "dashboard" },
           granularity: { type: "choice", choice: "weekly" },
+          presentation: { type: "choice", choice: "default" },
         },
       },
     });
@@ -248,6 +250,7 @@ describe("POST /api/charts/suggest", () => {
           chart: { type: "choice", choice: "activity.cost", confidence: 0.7 },
           range: { type: "choice", choice: "dashboard" },
           granularity: { type: "choice", choice: "dashboard" },
+          presentation: { type: "choice", choice: "default" },
         },
       },
     });
@@ -267,6 +270,7 @@ describe("POST /api/charts/suggest", () => {
           chart: { type: "choice", choice: "activity.totalTokens", confidence: 0.85 },
           range: { type: "choice", choice: "this_year" },
           granularity: { type: "choice", choice: "dashboard" },
+          presentation: { type: "choice", choice: "default" },
         },
       },
     });
@@ -282,6 +286,59 @@ describe("POST /api/charts/suggest", () => {
     expect(input.questions.chart.criteria["activity.totalTokens"]).toContain(
       "Daily token activity calendar heatmap of total tokens, not cost",
     );
+  });
+
+  it.each([
+    ["tokens.type", "line", "tokens", "type"],
+    ["tokens.model", "stackedLine", "tokens", "model"],
+    ["cost.model", "stackedArea", "cost", "model"],
+    ["cost.model", "bar", "cost", "model"],
+    ["analysis.modelTokenMix", "bar", "analysis", "modelTokenMix"],
+    ["analysis.periodCostPerMillion", "bar", "analysis", "periodCostPerMillion"],
+    ["cache.model", "bar", "cache", "model"],
+  ] as const)(
+    "returns a meaningful %s presentation %s with the chosen axis",
+    async (choice, presentation, chart, tab) => {
+      env.AI.run.mockResolvedValueOnce({
+        state: "Completed",
+        result: {
+          answers: {
+            chart: { type: "choice", choice, confidence: 0.9 },
+            range: { type: "choice", choice: "all" },
+            granularity: { type: "choice", choice: "dashboard" },
+            presentation: { type: "choice", choice: presentation },
+          },
+        },
+      });
+      const res = await request({ ...validRequest, prompt: "Show this as " + presentation });
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual({
+        suggestions: [{ chart, tab, range: "all", presentation, confidence: 0.9 }],
+      });
+    },
+  );
+
+  it("rejects stacked ratios and unordered categorical lines rather than suggesting misleading charts", async () => {
+    env.AI.run.mockResolvedValueOnce({
+      state: "Completed",
+      result: {
+        answers: {
+          chart: {
+            type: "choice",
+            choice: "analysis.modelCostPerMillion",
+            probabilities: { "analysis.modelCostPerMillion": 0.8, "analysis.modelTokenMix": 0.2 },
+          },
+          range: { type: "choice", choice: "all" },
+          granularity: { type: "choice", choice: "dashboard" },
+          presentation: { type: "choice", choice: "stackedLine" },
+        },
+      },
+    });
+    const res = await request(validRequest);
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "No chart supports the requested presentation" });
   });
 
   it("marks agent tabs unavailable when agent metadata says none exist", async () => {

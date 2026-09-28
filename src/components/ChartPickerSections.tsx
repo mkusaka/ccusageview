@@ -4,11 +4,16 @@ import {
   ANALYSIS_GRANULARITY_OPTIONS,
   DASHBOARD_CHARTS,
   DASHBOARD_CHART_TABS,
+  CHART_PRESENTATIONS,
   DASHBOARD_RANGES,
   availableAnalysisGranularities,
+  availableChartPresentations,
+  defaultChartPresentation,
+  isChartPresentationAvailable,
   isAnalysisAxisAvailable,
   type AnalysisAvailability,
   type AnalysisAxisId,
+  type ChartPresentationId,
   type DashboardChartId,
   type DashboardChartTabId,
   type DashboardRangeId,
@@ -25,12 +30,14 @@ type ApplyChart = (
   range: DashboardRangeId,
   tab?: DashboardChartTabId,
   chartGranularity?: TimeGranularity,
+  presentation?: ChartPresentationId,
 ) => void;
 type PreviewChart = (
   chart: DashboardChartId,
   range: DashboardRangeId,
   tab?: DashboardChartTabId,
   chartGranularity?: TimeGranularity,
+  presentation?: ChartPresentationId,
 ) => ReactNode;
 
 function AddedBadge() {
@@ -77,10 +84,11 @@ export function ChartPickerAlternatives({
             selection.chart === item.chart &&
             selection.tab === item.tab &&
             selection.range === item.range &&
-            selection.chartGranularity === item.chartGranularity;
+            selection.chartGranularity === item.chartGranularity &&
+            selection.presentation === item.presentation;
           return (
             <li
-              key={`${item.chart}-${item.tab ?? ""}-${item.range}-${item.chartGranularity ?? "dashboard"}`}
+              key={`${item.chart}-${item.tab ?? ""}-${item.range}-${item.chartGranularity ?? "dashboard"}-${item.presentation ?? "default"}`}
             >
               <button
                 type="button"
@@ -94,6 +102,8 @@ export function ChartPickerAlternatives({
                     {DASHBOARD_CHARTS.find((entry) => entry.id === item.chart)?.label}
                     {item.tab &&
                       ` · ${DASHBOARD_CHART_TABS[item.chart].find((entry) => entry.id === item.tab)?.label}`}
+                    {item.presentation &&
+                      ` · ${CHART_PRESENTATIONS.find(({ id }) => id === item.presentation)?.label}`}
                   </span>
                   {added && <AddedBadge />}
                 </span>
@@ -138,8 +148,9 @@ export function ChartPickerChoices({
   const { chart, range, chartGranularity } = selection;
   const tab = selection.tab ?? defaultPickerTab(chart, metadata);
   const chartTabs = DASHBOARD_CHART_TABS[chart];
+  const presentations = availableChartPresentations(chart, tab);
   const available = isPickerSelectionAvailable(
-    { chart, range, tab, chartGranularity },
+    { chart, range, tab, chartGranularity, presentation: selection.presentation },
     charts,
     ranges,
     metadata,
@@ -155,7 +166,7 @@ export function ChartPickerChoices({
         id="chart-picker-form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (available) onApply(chart, range, tab, chartGranularity);
+          if (available) onApply(chart, range, tab, chartGranularity, selection.presentation);
         }}
         className="space-y-4"
       >
@@ -273,7 +284,19 @@ export function ChartPickerChoices({
                       value={item.id}
                       checked={tab === item.id}
                       disabled={!selectable}
-                      onChange={() => onSelect({ ...selection, tab: item.id })}
+                      onChange={() =>
+                        onSelect({
+                          ...selection,
+                          tab: item.id,
+                          presentation: isChartPresentationAvailable(
+                            chart,
+                            item.id,
+                            selection.presentation,
+                          )
+                            ? selection.presentation
+                            : undefined,
+                        })
+                      }
                       className="mr-1 accent-accent"
                     />
                     {item.label}
@@ -284,6 +307,48 @@ export function ChartPickerChoices({
                   </label>
                 );
               })}
+            </div>
+          </fieldset>
+        )}
+        {presentations.length > 1 && (
+          <fieldset>
+            <legend className="text-sm font-semibold">Presentation</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <label
+                className={`rounded-md border px-2 py-1.5 text-xs cursor-pointer hover:bg-bg-secondary ${selection.presentation === undefined ? "border-accent bg-accent/10" : "border-border"}`}
+              >
+                <input
+                  type="radio"
+                  name="presentation"
+                  value="default"
+                  checked={selection.presentation === undefined}
+                  onChange={() => onSelect({ ...selection, presentation: undefined })}
+                  className="mr-1 accent-accent"
+                />
+                Default (
+                {
+                  CHART_PRESENTATIONS.find(({ id }) => id === defaultChartPresentation(chart, tab))
+                    ?.label
+                }
+                )
+              </label>
+              {CHART_PRESENTATIONS.filter(({ id }) => presentations.includes(id)).map((item) => (
+                <label
+                  key={item.id}
+                  title={item.description}
+                  className={`rounded-md border px-2 py-1.5 text-xs cursor-pointer hover:bg-bg-secondary ${selection.presentation === item.id ? "border-accent bg-accent/10" : "border-border"}`}
+                >
+                  <input
+                    type="radio"
+                    name="presentation"
+                    value={item.id}
+                    checked={selection.presentation === item.id}
+                    onChange={() => onSelect({ ...selection, presentation: item.id })}
+                    className="mr-1 accent-accent"
+                  />
+                  {item.label}
+                </label>
+              ))}
             </div>
           </fieldset>
         )}
@@ -332,7 +397,7 @@ export function ChartPickerChoices({
           className={`rounded-lg border ${added ? "border-chart-green ring-2 ring-chart-green/20" : "border-border"}`}
         >
           {available ? (
-            preview(chart, range, tab, chartGranularity)
+            preview(chart, range, tab, chartGranularity, selection.presentation)
           ) : (
             <p className="p-4 text-sm text-text-secondary">
               This choice is unavailable for the current report or granularity.

@@ -7,10 +7,10 @@ import type {
   ChartOptions,
   TooltipModel,
 } from "chart.js";
-import { Line } from "react-chartjs-2";
+import { Chart } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { ReportType } from "../types";
-import type { DashboardChartTabId } from "../utils/dashboardCatalog";
+import type { ChartPresentationId, DashboardChartTabId } from "../utils/dashboardCatalog";
 import type { TimeGranularity } from "../utils/projection";
 import { formatProjectionMetadata, getProjectionMetrics } from "../utils/projection";
 import { formatCost, formatCostAxis } from "../utils/format";
@@ -49,6 +49,7 @@ interface Props {
   initialTab?: DashboardChartTabId;
   syncId?: string;
   timeGranularity?: TimeGranularity;
+  presentation?: ChartPresentationId;
   hoveredDataIndex?: number | null;
   hoveredSyncSource?: string | null;
   onHoverDataIndexChange?: (index: number | null, source?: string | null) => void;
@@ -65,8 +66,9 @@ type ViewMode =
 type CostBreakdownChartData = ReturnType<typeof buildCostByModel>;
 type TokenTypeCostData = ReturnType<typeof buildCostByTokenType>;
 type CostChartRow = NormalizedEntry | CostBreakdownChartData[number] | TokenTypeCostData[number];
-type CostChartDataset = ChartDataset<"line", (number | null)[]>;
-type CostChartJsData = ChartData<"line", (number | null)[], string>;
+type CostChartType = "line" | "bar";
+type CostChartDataset = ChartDataset<CostChartType, (number | null)[]>;
+type CostChartJsData = ChartData<CostChartType, (number | null)[], string>;
 
 const TOKEN_TYPE_COST_SERIES = [
   { key: "inputCost", name: "Input", color: "var(--color-chart-blue)" },
@@ -123,6 +125,7 @@ export function CostChart({
   reportType,
   syncId,
   timeGranularity,
+  presentation,
   hoveredDataIndex = null,
   hoveredSyncSource = null,
   onHoverDataIndexChange,
@@ -524,6 +527,7 @@ export function CostChart({
       {missingDataCommand && <BreakdownHint command={missingDataCommand} />}
       <CostAreaChart
         entries={entries}
+        presentation={presentation}
         syncId={syncId}
         isBreakdownView={isBreakdownView}
         isTokenTypeView={isTokenTypeView}
@@ -545,6 +549,7 @@ export function CostChart({
 
 function CostAreaChart({
   entries,
+  presentation,
   syncId,
   isBreakdownView,
   isTokenTypeView,
@@ -561,6 +566,7 @@ function CostAreaChart({
   onHoverDataIndexChange,
 }: {
   entries: NormalizedEntry[];
+  presentation?: ChartPresentationId;
   syncId?: string;
   isBreakdownView: boolean;
   isTokenTypeView: boolean;
@@ -599,6 +605,15 @@ function CostAreaChart({
   }, [breakdownSeries, hiddenSeries, isBreakdownView, isTokenTypeView]);
   const visibleKeys = useMemo(() => visibleSeries.map((series) => series.key), [visibleSeries]);
   const isStackedView = isBreakdownView || isTokenTypeView;
+  const chartType: CostChartType =
+    presentation === "bar" || presentation === "stackedBar" ? "bar" : "line";
+  const isStackedPresentation =
+    presentation == null
+      ? isStackedView
+      : presentation === "stackedLine" ||
+        presentation === "stackedArea" ||
+        presentation === "stackedBar";
+  const isIndependentLine = presentation === "line";
   const projection = useMemo(
     () =>
       getProjectionMetrics(
@@ -609,8 +624,11 @@ function CostAreaChart({
     [showPercent, sourceData, timeGranularity, visibleKeys],
   );
   const hasProjection = projection.projection != null;
-  const shouldStack = isStackedView || hasProjection;
-  const chartInstanceRef = useRef<ChartJsInstance<"line"> | null>(null);
+  const shouldStack =
+    presentation == null
+      ? isStackedView || hasProjection
+      : isStackedPresentation || (chartType === "bar" && hasProjection);
+  const chartInstanceRef = useRef<ChartJsInstance<CostChartType> | null>(null);
   const hoveredDataIndexRef = useRef<number | null>(hoveredDataIndex);
   // Deliberate exception to the "no ref writes during render" rule. This ref is a
   // display-only bridge to Chart.js: it is read solely by the `afterDatasetsDraw`
@@ -621,7 +639,7 @@ function CostAreaChart({
   // waiting for React effects.
   hoveredDataIndexRef.current = hoveredDataIndex;
   const hoverLinePlugin = useMemo(
-    () => createVerticalHoverLinePlugin<"line">(hoveredDataIndexRef),
+    () => createVerticalHoverLinePlugin<CostChartType>(hoveredDataIndexRef),
     [],
   );
   useEffect(() => {
@@ -633,7 +651,7 @@ function CostAreaChart({
     const actualDatasets: CostChartDataset[] = visibleSeries.map((series) => {
       const color = series.color;
       return {
-        type: "line",
+        type: chartType,
         label: series.label,
         data: sourceData.map((row) => {
           const record = row as Record<string, unknown>;
@@ -643,11 +661,17 @@ function CostAreaChart({
         }),
         borderColor: color,
         backgroundColor: isStackedView ? withOpacity(color, 0.55) : withOpacity(color, 0.2),
-        borderWidth: isStackedView ? 1 : 2,
+        borderWidth: chartType === "bar" ? 0 : isStackedView ? 1 : 2,
         pointRadius: 0,
         pointHoverRadius: 0,
-        fill: isStackedView ? true : "origin",
-        stack: shouldStack ? "cost" : undefined,
+        fill:
+          presentation == null ? (isStackedView ? true : "origin") : presentation === "stackedArea",
+        stack:
+          chartType === "bar" && presentation === "bar" && isStackedView
+            ? series.key
+            : shouldStack
+              ? "cost"
+              : undefined,
         tension: 0.25,
       };
     });
@@ -656,19 +680,28 @@ function CostAreaChart({
       ? visibleSeries.map((series) => {
           const color = series.color;
           return {
-            type: "line",
+            type: chartType,
             label: `${series.label} projected`,
             data: sourceData.map((_, rowIndex) =>
-              rowIndex === sourceData.length - 1 ? (projection.remaining[series.key] ?? 0) : null,
+              rowIndex === sourceData.length - 1
+                ? isIndependentLine
+                  ? (projection.projected[series.key] ?? 0)
+                  : (projection.remaining[series.key] ?? 0)
+                : null,
             ),
             borderColor: withOpacity(color, 0.45),
             backgroundColor: withOpacity(color, 0.18),
-            borderWidth: 1,
+            borderWidth: chartType === "bar" ? 0 : 1,
             borderDash: [4, 3],
-            pointRadius: 3,
-            pointHoverRadius: 4,
-            fill: true,
-            stack: "cost",
+            pointRadius: chartType === "bar" ? 0 : 3,
+            pointHoverRadius: chartType === "bar" ? 0 : 4,
+            fill: presentation == null || presentation === "stackedArea",
+            stack:
+              chartType === "bar" && presentation === "bar" && isStackedView
+                ? series.key
+                : shouldStack
+                  ? "cost"
+                  : undefined,
             tension: 0.25,
           };
         })
@@ -676,7 +709,11 @@ function CostAreaChart({
 
     return { labels, datasets: [...actualDatasets, ...projectedDatasets] };
   }, [
+    chartType,
     hasProjection,
+    isIndependentLine,
+    presentation,
+    projection.projected,
     isStackedView,
     projection.remaining,
     shouldStack,
@@ -685,7 +722,7 @@ function CostAreaChart({
     visibleKeys,
     visibleSeries,
   ]);
-  const chartJsOptions = useMemo<ChartOptions<"line">>(
+  const chartJsOptions = useMemo<ChartOptions<CostChartType>>(
     () => ({
       responsive: true,
       maintainAspectRatio: false,
@@ -702,13 +739,19 @@ function CostAreaChart({
         tooltip: {
           enabled: false,
           external(context) {
-            renderCostTooltip(context, sourceData, visibleKeys, isStackedView && showPercent);
+            renderCostTooltip(
+              context,
+              sourceData,
+              visibleKeys,
+              isStackedView && showPercent,
+              isIndependentLine ? projection.remaining : undefined,
+            );
           },
         },
       },
       scales: {
         x: {
-          stacked: isStackedView,
+          stacked: chartType === "bar" ? true : isStackedPresentation,
           grid: { display: false },
           ticks: {
             color: "rgb(107, 114, 128)",
@@ -734,7 +777,18 @@ function CostAreaChart({
         },
       },
     }),
-    [isStackedView, onHoverDataIndexChange, shouldStack, showPercent, sourceData, visibleKeys],
+    [
+      chartType,
+      isIndependentLine,
+      isStackedPresentation,
+      isStackedView,
+      onHoverDataIndexChange,
+      projection.remaining,
+      shouldStack,
+      showPercent,
+      sourceData,
+      visibleKeys,
+    ],
   );
   const legendItems = isTokenTypeView
     ? TOKEN_TYPE_COST_SERIES.map((series) => ({
@@ -753,7 +807,8 @@ function CostAreaChart({
   return (
     <>
       <div className="relative h-80">
-        <Line
+        <Chart
+          type={chartType}
           ref={chartInstanceRef}
           data={chartJsData}
           options={chartJsOptions}
@@ -773,10 +828,11 @@ function CostAreaChart({
 }
 
 function renderCostTooltip(
-  { chart, tooltip }: { chart: ChartJsInstance; tooltip: TooltipModel<"line"> },
+  { chart, tooltip }: { chart: ChartJsInstance; tooltip: TooltipModel<CostChartType> },
   sourceData: readonly CostChartRow[],
   visibleKeys: readonly string[],
   showPercent: boolean,
+  projectedRemaining?: Record<string, number>,
 ) {
   const tooltipEl = getOrCreateExternalTooltipElement(chart, "cost");
   if (tooltip.opacity === 0) {
@@ -829,7 +885,9 @@ function renderCostTooltip(
       marker.style.height = "8px";
       marker.style.flex = "0 0 auto";
       marker.style.background = String(item.dataset.borderColor ?? item.dataset.backgroundColor);
-      const raw = isProjectionItem ? Number(item.parsed.y ?? 0) : (asNumber(row?.[key]) ?? 0);
+      const raw = isProjectionItem
+        ? (projectedRemaining?.[key] ?? Number(item.parsed.y ?? 0))
+        : (asNumber(row?.[key]) ?? 0);
       const value =
         !isProjectionItem && showPercent && total > 0
           ? `${((raw / total) * 100).toFixed(1)}% (${formatCost(raw)})`

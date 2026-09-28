@@ -13,13 +13,16 @@ import type { TimeGranularity } from "../utils/projection";
 import {
   DASHBOARD_CHARTS,
   DASHBOARD_CHART_TABS,
+  CHART_PRESENTATIONS,
   DASHBOARD_RANGES,
   ANALYSIS_AXIS_OPTIONS,
   availableChartIds,
   availableRangeIds,
+  isChartPresentationAvailable,
   type DashboardChartId,
   isAnalysisAxisAvailable,
   type AnalysisAxisId,
+  type ChartPresentationId,
   type DashboardChartTabId,
   type DashboardRangeId,
 } from "../utils/dashboardCatalog";
@@ -94,6 +97,7 @@ interface ChartPanel {
   range: DashboardRangeId;
   tab?: DashboardChartTabId;
   granularity?: TimeGranularity;
+  presentation?: ChartPresentationId;
 }
 
 type PanelActionName = "up" | "down" | "add" | "replace" | "remove";
@@ -531,11 +535,13 @@ export function Dashboard({ data }: Props) {
     selectedRange: DashboardRangeId,
     tab?: DashboardChartTabId,
     chartGranularity?: TimeGranularity,
+    presentation?: ChartPresentationId,
   ) {
     if (
       !picker ||
       !pickerCharts.includes(id) ||
       !availableRanges.includes(selectedRange) ||
+      !isChartPresentationAvailable(id, tab, presentation) ||
       (id === "analysis" &&
         (!tab ||
           !ANALYSIS_AXIS_OPTIONS.some(
@@ -560,6 +566,7 @@ export function Dashboard({ data }: Props) {
                 range: selectedRange,
                 tab,
                 granularity: id === "analysis" ? chartGranularity : undefined,
+                presentation,
               }
             : panel,
         );
@@ -574,6 +581,7 @@ export function Dashboard({ data }: Props) {
         range: selectedRange,
         tab,
         granularity: id === "analysis" ? chartGranularity : undefined,
+        presentation,
       });
       return next;
     });
@@ -599,6 +607,7 @@ export function Dashboard({ data }: Props) {
           range: item.range,
           tab: item.tab,
           granularity: item.chart === "analysis" ? item.chartGranularity : undefined,
+          presentation: item.presentation,
         })),
       );
       return next;
@@ -655,6 +664,7 @@ export function Dashboard({ data }: Props) {
             entries={chartData}
             sources={chartSources(panel, chartData)}
             axis={panel.tab as AnalysisAxisId}
+            presentation={panel.presentation}
           />
         ) : null;
       case "statistics":
@@ -699,6 +709,7 @@ export function Dashboard({ data }: Props) {
               entries={chartData}
               key={panel.tab}
               initialTab={panel.tab}
+              presentation={panel.presentation}
               reportType={reportType}
               syncId={`${COST_TOKEN_CHART_SYNC_ID}-${panel.range}`}
               timeGranularity={timeGranularity}
@@ -715,6 +726,7 @@ export function Dashboard({ data }: Props) {
               entries={chartData}
               key={panel.tab}
               initialTab={panel.tab}
+              presentation={panel.presentation}
               reportType={reportType}
               syncId={`${COST_TOKEN_CHART_SYNC_ID}-${panel.range}`}
               timeGranularity={timeGranularity}
@@ -730,6 +742,7 @@ export function Dashboard({ data }: Props) {
             <CacheEfficiencyChart
               key={panel.tab}
               initialTab={panel.tab}
+              presentation={panel.presentation}
               entries={chartData}
               reportType={reportType}
               syncId={`${COST_TOKEN_CHART_SYNC_ID}-${panel.range}`}
@@ -852,10 +865,12 @@ export function Dashboard({ data }: Props) {
             <section key={panel.key} aria-label={`${label} chart`}>
               <div className="rounded-lg border border-border bg-bg-card">
                 <div className="flex min-h-10 items-center justify-end gap-1 px-2 pt-1">
-                  {(panel.range !== "dashboard" || panel.granularity) && (
+                  {(panel.range !== "dashboard" || panel.granularity || panel.presentation) && (
                     <span className="mr-auto text-xs text-text-secondary">
                       {panel.range !== "dashboard" ? rangeLabel : "Dashboard range"}
                       {panel.granularity && ` · ${GRANULARITY_LABELS[panel.granularity]}`}
+                      {panel.presentation &&
+                        ` · ${CHART_PRESENTATIONS.find(({ id }) => id === panel.presentation)?.label}`}
                     </span>
                   )}
                   <PanelAction
@@ -945,16 +960,22 @@ export function Dashboard({ data }: Props) {
               ? panels.find((panel) => panel.key === picker.target)?.granularity
               : undefined
           }
+          initialPresentation={
+            picker.mode === "replace"
+              ? panels.find((panel) => panel.key === picker.target)?.presentation
+              : undefined
+          }
           onApply={applyPanel}
           onApplySuggestions={applySuggestedPanels}
           onClose={closePicker}
-          preview={(id, selectedRange, tab, chartGranularity) =>
+          preview={(id, selectedRange, tab, chartGranularity, presentation) =>
             renderChart({
               key: "preview",
               id,
               range: selectedRange,
               tab,
               granularity: id === "analysis" ? chartGranularity : undefined,
+              presentation,
             })
           }
         />
