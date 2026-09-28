@@ -7,7 +7,7 @@ A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppi
 ## Features
 
 - **Interactive dashboard** — cost chart, token chart, model/provider/agent breakdown, activity heatmap, and data table (including per-agent rows for `ccusage --by-agent`)
-- **Token Breakdown** — breakdown views start with **Total** tokens; choose Input, Output, Cache Write, Cache Read, or Stack to change the metric.
+- **Token Breakdown** — breakdown views start with **Total** tokens; choose Input, Output, Cache Write, or Cache Read to change the metric. **Stack** combines every visible model/provider/agent and token type into one bar per time bucket; **%** shows each segment's share of that bar.
 - **Compare agents for a model** — in Cost Over Time, Token Breakdown, Cache Efficiency, or Breakdown, choose **By Agent** and pick a model from the adjacent **Model** menu. Requires per-agent `modelBreakdowns`; **All models** shows agent totals.
 - **Multiple report types** — daily, weekly, monthly, hourly, session, and blocks
 - **Multi-source comparison** — load multiple JSON files with labels and toggle them on/off

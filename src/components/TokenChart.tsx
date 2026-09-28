@@ -95,7 +95,6 @@ type TokenChartDataset = ChartDataset<"bar", number[]>;
 interface TokenChartSeries extends ChartDataSeries {
   color: string;
   stack: string;
-  stackKeys?: string[];
 }
 type TokenChartJsData = ChartData<"bar", number[], string>;
 
@@ -667,16 +666,12 @@ function TokenBarChart({
   const visibleSeries = useMemo<TokenChartSeries[]>(() => {
     const visibleBreakdownSeries = getVisibleChartSeries(breakdownSeries, hiddenSeries);
     if (isTokenStackView) {
-      return getTokenStackSeries(breakdownSeries, hiddenSeries).map((series) => {
-        const [breakdownKey, tokenType] = series.key.split("\0");
-        return {
-          key: series.key,
-          label: series.label,
-          color: getChartJsColorForSeries(tokenType ?? "", TYPE_SERIES),
-          stack: breakdownKey,
-          stackKeys: typeSeries.map((type) => getTokenStackKey(breakdownKey, type.key)),
-        };
-      });
+      return getTokenStackSeries(breakdownSeries, hiddenSeries).map((series) => ({
+        key: series.key,
+        label: series.label,
+        color: getChartJsColorForSeries(series.key.split("\0")[1] ?? "", TYPE_SERIES),
+        stack: "tokens",
+      }));
     }
     if (isBreakdownView) {
       return visibleBreakdownSeries.map((series) => ({
@@ -732,7 +727,7 @@ function TokenBarChart({
         data: sourceData.map((row) => {
           const record = row as Record<string, unknown>;
           return showPercent
-            ? normalizeStackValue(record, series.key, series.stackKeys ?? visibleKeys)
+            ? normalizeStackValue(record, series.key, visibleKeys)
             : (asNumber(record[series.key]) ?? 0);
         }),
         backgroundColor: withOpacity(color, 0.85),
