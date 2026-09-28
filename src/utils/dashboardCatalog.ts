@@ -26,9 +26,109 @@ export const DASHBOARD_CHARTS = [
     label: "Breakdown",
     description: "Shares of total usage by model, provider, or agent, not a time trend",
   },
+  {
+    id: "analysis",
+    label: "Analysis",
+    description: "Compare token mix, cost per million tokens, or cache read rate by dimension",
+  },
 ] as const;
 
 export type DashboardChartId = (typeof DASHBOARD_CHARTS)[number]["id"];
+export const ANALYSIS_AXIS_OPTIONS = [
+  {
+    id: "modelTokenMix",
+    label: "Token mix by model",
+    description: "Input, output, and cache tokens by model",
+    dimension: "model",
+    measure: "tokenMix",
+    visualization: "stackedBar",
+  },
+  {
+    id: "agentTokenMix",
+    label: "Token mix by agent",
+    description: "Input, output, and cache tokens by agent or harness",
+    dimension: "agent",
+    measure: "tokenMix",
+    visualization: "stackedBar",
+  },
+  {
+    id: "sourceTokenMix",
+    label: "Token mix by source",
+    description: "Input, output, and cache tokens by imported source",
+    dimension: "source",
+    measure: "tokenMix",
+    visualization: "stackedBar",
+  },
+  {
+    id: "modelCostPerMillion",
+    label: "Cost per million tokens by model",
+    description: "Effective cost per million tokens by model",
+    dimension: "model",
+    measure: "costPerMillion",
+    visualization: "bar",
+  },
+  {
+    id: "agentCostPerMillion",
+    label: "Cost per million tokens by agent",
+    description: "Effective cost per million tokens by agent or harness",
+    dimension: "agent",
+    measure: "costPerMillion",
+    visualization: "bar",
+  },
+  {
+    id: "sourceCostPerMillion",
+    label: "Cost per million tokens by source",
+    description: "Effective cost per million tokens by imported source",
+    dimension: "source",
+    measure: "costPerMillion",
+    visualization: "bar",
+  },
+  {
+    id: "periodCostPerMillion",
+    label: "Cost per million tokens over time",
+    description: "Effective cost per million tokens by period",
+    dimension: "period",
+    measure: "costPerMillion",
+    visualization: "line",
+  },
+  {
+    id: "modelCacheReadRate",
+    label: "Cache read rate by model",
+    description: "Share of input tokens read from cache by model",
+    dimension: "model",
+    measure: "cacheReadRate",
+    visualization: "bar",
+  },
+  {
+    id: "agentCacheReadRate",
+    label: "Cache read rate by agent",
+    description: "Share of input tokens read from cache by agent or harness",
+    dimension: "agent",
+    measure: "cacheReadRate",
+    visualization: "bar",
+  },
+] as const;
+
+export type AnalysisAxisId = (typeof ANALYSIS_AXIS_OPTIONS)[number]["id"];
+
+export type AnalysisAvailability = {
+  reportType: ReportType;
+  hasModelData: boolean;
+  hasAgentData: boolean;
+  hasMultipleSources: boolean;
+};
+
+export function isAnalysisAxisAvailable(
+  axisId: AnalysisAxisId,
+  metadata: AnalysisAvailability,
+): boolean {
+  const dimension = ANALYSIS_AXIS_OPTIONS.find(({ id }) => id === axisId)?.dimension;
+  if (!dimension) return false;
+  if (dimension === "model") return metadata.hasModelData;
+  if (dimension === "agent") return metadata.hasAgentData;
+  if (dimension === "source") return metadata.hasMultipleSources;
+  return metadata.reportType !== "session" && metadata.reportType !== "blocks";
+}
 
 export const DASHBOARD_CHART_TABS = {
   statistics: [
@@ -128,6 +228,7 @@ export const DASHBOARD_CHART_TABS = {
       description: "Share of total usage by model within each agent or harness; not a time trend",
     },
   ],
+  analysis: ANALYSIS_AXIS_OPTIONS.map(({ id, label, description }) => ({ id, label, description })),
 } as const satisfies Record<
   DashboardChartId,
   readonly { id: string; label: string; description: string }[]
@@ -181,14 +282,48 @@ export const DASHBOARD_RANGES = [
 ] as const;
 
 export type DashboardRangeId = (typeof DASHBOARD_RANGES)[number]["id"];
+export const ANALYSIS_GRANULARITY_OPTIONS = [
+  {
+    id: "dashboard",
+    label: "Dashboard grouping",
+    description: "Follow the dashboard's time grouping",
+  },
+  { id: "hourly", label: "Hourly", description: "Group by hour" },
+  { id: "daily", label: "Daily", description: "Group by day" },
+  { id: "weekly", label: "Weekly", description: "Group by week" },
+  { id: "monthly", label: "Monthly", description: "Group by month" },
+] as const;
+
+export type AnalysisGranularityId = (typeof ANALYSIS_GRANULARITY_OPTIONS)[number]["id"];
+
+export function availableAnalysisGranularities(
+  reportType: ReportType,
+): readonly AnalysisGranularityId[] {
+  if (reportType === "hourly") return ["dashboard", "hourly", "daily", "weekly", "monthly"];
+  if (reportType === "daily") return ["dashboard", "daily", "weekly", "monthly"];
+  return ["dashboard"];
+}
 
 export function availableChartIds(
   reportType: ReportType,
   granularity: TimeGranularity,
   entryCount: number,
+  metadata: Omit<AnalysisAvailability, "reportType"> = {
+    hasModelData: false,
+    hasAgentData: false,
+    hasMultipleSources: false,
+  },
 ): DashboardChartId[] {
   if (!entryCount) return [];
+  const analysisAvailability = { reportType, ...metadata };
   return DASHBOARD_CHARTS.flatMap(({ id }) => {
+    if (
+      id === "analysis" &&
+      !ANALYSIS_AXIS_OPTIONS.some(({ id: axis }) =>
+        isAnalysisAxisAvailable(axis, analysisAvailability),
+      )
+    )
+      return [];
     if (id === "statistics" && entryCount < 2) return [];
     if (id === "activity" && !["daily", "weekly", "hourly"].includes(reportType)) return [];
     if (

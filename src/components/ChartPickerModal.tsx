@@ -7,18 +7,21 @@ import type { TimeGranularity } from "../utils/projection";
 import {
   DASHBOARD_CHART_OPTIONS,
   DASHBOARD_RANGES,
+  ANALYSIS_GRANULARITY_OPTIONS,
+  ANALYSIS_AXIS_OPTIONS,
+  isAnalysisAxisAvailable,
+  type AnalysisAxisId,
   type DashboardChartId,
   type DashboardChartTabId,
   type DashboardRangeId,
 } from "../utils/dashboardCatalog";
+import { ChartPickerAlternatives, ChartPickerChoices } from "./ChartPickerSections";
 import {
-  ChartPickerAlternatives,
-  ChartPickerChoices,
   defaultPickerTab,
   isPickerSelectionAvailable,
   type PickerSelection,
   type PickerSuggestion,
-} from "./ChartPickerSections";
+} from "../utils/pickerSelection";
 
 interface Props {
   mode: "add" | "replace";
@@ -26,17 +29,28 @@ interface Props {
   granularity: TimeGranularity;
   hasMultipleEntries: boolean;
   hasAgentData: boolean;
+  hasModelData: boolean;
+  hasMultipleSources: boolean;
   charts: DashboardChartId[];
   addedCharts: ReadonlySet<DashboardChartId>;
+  addedAnalysisAxes: ReadonlySet<AnalysisAxisId>;
   ranges: DashboardRangeId[];
   initialChart?: DashboardChartId;
   initialTab?: DashboardChartTabId;
   initialRange?: DashboardRangeId;
-  onApply: (chart: DashboardChartId, range: DashboardRangeId, tab?: DashboardChartTabId) => void;
+  initialChartGranularity?: TimeGranularity;
+  onApply: (
+    chart: DashboardChartId,
+    range: DashboardRangeId,
+    tab?: DashboardChartTabId,
+    chartGranularity?: TimeGranularity,
+  ) => void;
+  onApplySuggestions: (selections: PickerSelection[]) => void;
   preview: (
     chart: DashboardChartId,
     range: DashboardRangeId,
     tab?: DashboardChartTabId,
+    chartGranularity?: TimeGranularity,
   ) => ReactNode;
   onClose: () => void;
 }
@@ -47,30 +61,71 @@ export function ChartPickerModal({
   granularity,
   hasMultipleEntries,
   hasAgentData,
+  hasModelData,
+  hasMultipleSources,
   charts,
   addedCharts,
+  addedAnalysisAxes,
   ranges,
   initialChart,
   initialTab,
   initialRange,
+  initialChartGranularity,
   onApply,
+  onApplySuggestions,
   onClose,
   preview,
 }: Props) {
+  const metadata = { reportType, hasModelData, hasAgentData, hasMultipleSources };
+  const nextAnalysisAxis = ANALYSIS_AXIS_OPTIONS.find(
+    ({ id }) => !addedAnalysisAxes.has(id) && isAnalysisAxisAvailable(id, metadata),
+  )?.id;
   const [prompt, setPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
   const [selection, setSelection] = useState<PickerSelection>(() => {
-    const chart = initialChart ?? charts[0];
-    return { chart, range: initialRange ?? ranges[0], tab: initialTab ?? defaultPickerTab(chart) };
+    if (mode === "replace" && initialChart) {
+      return {
+        chart: initialChart,
+        range: initialRange ?? ranges[0],
+        tab: initialTab ?? defaultPickerTab(initialChart, metadata),
+        chartGranularity: initialChart === "analysis" ? initialChartGranularity : undefined,
+      };
+    }
+    const chart =
+      nextAnalysisAxis && charts.includes("analysis")
+        ? "analysis"
+        : (charts.find((id) => id !== "analysis" && !addedCharts.has(id)) ?? charts[0]);
+    return {
+      chart,
+      range: initialRange ?? ranges[0],
+      tab: chart === "analysis" ? nextAnalysisAxis : defaultPickerTab(chart, metadata),
+    };
   });
   const [suggestions, setSuggestions] = useState<PickerSuggestion[]>([]);
-  const quickPicks: PickerSelection[] = charts.slice(0, 4).map((chart) => ({
-    chart,
-    tab: defaultPickerTab(chart),
-    range: "dashboard",
-  }));
+  const quickPicks: PickerSelection[] = charts
+    .toSorted(
+      (a, b) =>
+        Number(a === "analysis" ? !nextAnalysisAxis : addedCharts.has(a)) -
+        Number(b === "analysis" ? !nextAnalysisAxis : addedCharts.has(b)),
+    )
+    .slice(0, 4)
+    .map((chart) => ({
+      chart,
+      tab:
+        chart === "analysis"
+          ? (nextAnalysisAxis ?? defaultPickerTab(chart, metadata))
+          : defaultPickerTab(chart, metadata),
+      range: "dashboard",
+    }));
   const topSuggestion = suggestions[0];
-  const selectionAvailable = isPickerSelectionAvailable(selection, charts, ranges, hasAgentData);
-  const [loading, setLoading] = useState(false);
+  const selectionAvailable = isPickerSelectionAvailable(selection, charts, ranges, metadata);
+  const rankedAvailable = suggestions.filter(
+    (item, index) =>
+      isPickerSelectionAvailable(item, charts, ranges, metadata) &&
+      suggestions.findIndex(
+        (candidate) => candidate.chart === item.chart && candidate.tab === item.tab,
+      ) === index,
+  );
   const [error, setError] = useState("");
   const controller = useRef<AbortController | null>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
@@ -94,6 +149,8 @@ export function ChartPickerModal({
             granularity,
             hasMultipleEntries,
             hasAgentData,
+            hasModelData,
+            hasMultipleSources,
           },
         },
         { init: { signal: request.signal } },
@@ -111,6 +168,9 @@ export function ChartPickerModal({
               (option) => option.chart === item.chart && option.tab === item.tab,
             ) &&
             DASHBOARD_RANGES.some((itemRange) => itemRange.id === item.range) &&
+            (item.chartGranularity === undefined ||
+              (item.chart === "analysis" &&
+                ANALYSIS_GRANULARITY_OPTIONS.some(({ id }) => id === item.chartGranularity))) &&
             typeof item.confidence === "number" &&
             Number.isFinite(item.confidence) &&
             item.confidence >= 0 &&
@@ -118,8 +178,10 @@ export function ChartPickerModal({
         )
       ) {
         setSuggestions(result.suggestions);
-        const top = result.suggestions[0];
-        setSelection({ chart: top.chart, tab: top.tab, range: top.range });
+        const firstAvailable = result.suggestions.find((item) =>
+          isPickerSelectionAvailable(item, charts, ranges, metadata),
+        );
+        if (firstAvailable) setSelection(firstAvailable);
       } else {
         setError("Jev returned an unknown chart, tab, or date range.");
       }
@@ -189,14 +251,16 @@ export function ChartPickerModal({
             {topSuggestion && (
               <button
                 type="button"
+                disabled={!isPickerSelectionAvailable(topSuggestion, charts, ranges, metadata)}
                 onClick={() =>
                   setSelection({
                     chart: topSuggestion.chart,
                     tab: topSuggestion.tab,
                     range: topSuggestion.range,
+                    chartGranularity: topSuggestion.chartGranularity,
                   })
                 }
-                className="block text-left text-sm text-text-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent"
+                className="block text-left text-sm text-text-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Top AI match:{" "}
                 {
@@ -205,15 +269,18 @@ export function ChartPickerModal({
                   )?.label
                 }{" "}
                 · {Math.round(topSuggestion.confidence * 100)}% confidence
+                {!isPickerSelectionAvailable(topSuggestion, charts, ranges, metadata) &&
+                  " · Unavailable in this view"}
               </button>
             )}
           </div>
 
           <ChartPickerChoices
             addedCharts={addedCharts}
+            addedAnalysisAxes={addedAnalysisAxes}
             charts={charts}
             ranges={ranges}
-            hasAgentData={hasAgentData}
+            metadata={metadata}
             selection={selection}
             onSelect={setSelection}
             onApply={onApply}
@@ -227,10 +294,11 @@ export function ChartPickerModal({
             }
             picks={suggestions.length ? suggestions.slice(1) : quickPicks}
             addedCharts={addedCharts}
+            addedAnalysisAxes={addedAnalysisAxes}
             selection={selection}
             charts={charts}
             ranges={ranges}
-            hasAgentData={hasAgentData}
+            metadata={metadata}
             onSelect={setSelection}
           />
         </div>
@@ -244,6 +312,15 @@ export function ChartPickerModal({
               Cancel
             </button>
           </DialogClose>
+          {mode === "add" && rankedAvailable.length >= 2 && (
+            <button
+              type="button"
+              onClick={() => onApplySuggestions(rankedAvailable)}
+              className="rounded-md border border-accent px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              Add suggested charts in order
+            </button>
+          )}
           <button
             type="submit"
             form="chart-picker-form"

@@ -14,9 +14,12 @@ import {
   DASHBOARD_CHARTS,
   DASHBOARD_CHART_TABS,
   DASHBOARD_RANGES,
+  ANALYSIS_AXIS_OPTIONS,
   availableChartIds,
   availableRangeIds,
   type DashboardChartId,
+  isAnalysisAxisAvailable,
+  type AnalysisAxisId,
   type DashboardChartTabId,
   type DashboardRangeId,
 } from "../utils/dashboardCatalog";
@@ -35,6 +38,7 @@ import { SummaryCards } from "./SummaryCards";
 import { CostChart } from "./CostChart";
 import { TokenChart } from "./TokenChart";
 import { CacheEfficiencyChart } from "./CacheEfficiencyChart";
+import { AxisChart } from "./AxisChart";
 import { ModelBreakdown } from "./ModelBreakdown";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { DataTable } from "./DataTable";
@@ -46,6 +50,7 @@ import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { breakdownHintCommand, HintedTab } from "./BreakdownHint";
 import { RangeSlider } from "./RangeSlider";
 import { ChartPickerModal } from "./ChartPickerModal";
+import { isPickerSelectionAvailable, type PickerSelection } from "../utils/pickerSelection";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
@@ -88,6 +93,7 @@ interface ChartPanel {
   id: DashboardChartId;
   range: DashboardRangeId;
   tab?: DashboardChartTabId;
+  granularity?: TimeGranularity;
 }
 
 type PanelActionName = "up" | "down" | "add" | "replace" | "remove";
@@ -235,7 +241,9 @@ function InsertChartButton({
 }
 
 function initialPanels(available: DashboardChartId[]): ChartPanel[] {
-  return available.map((id) => ({ key: id, id, range: "dashboard" }));
+  return available
+    .filter((id) => id !== "analysis")
+    .map((id) => ({ key: id, id, range: "dashboard" }));
 }
 
 function PanelMarkdownProvider({
@@ -299,12 +307,19 @@ function filterCalendarRange(
   });
 }
 
+function chartLabel(panel: ChartPanel): string {
+  if (panel.id === "analysis") {
+    return ANALYSIS_AXIS_OPTIONS.find((axis) => axis.id === panel.tab)?.label ?? "Analysis";
+  }
+  return DASHBOARD_CHARTS.find((item) => item.id === panel.id)?.label ?? panel.id;
+}
+
 export function Dashboard({ data }: Props) {
   const dashboardRef = useRef<HTMLDivElement>(null);
   const [markdownSectionsById, setMarkdownSectionsById] = useState<
     Record<string, RegisteredMarkdownSection>
   >({});
-  const { entries: baseEntries, totals, reportType, sourceLabels } = data;
+  const { entries: baseEntries, totals, reportType, sourceLabels, sources } = data;
   const isHourly = reportType === "hourly";
 
   // Daily and hourly reports can be viewed at coarser granularities too
@@ -363,7 +378,16 @@ export function Dashboard({ data }: Props) {
     [isFullRange, totals, filteredEntries],
   );
 
-  const availableCharts = availableChartIds(reportType, granularity, entries.length);
+  const hasModelData = entries.some((entry) => !!entry.modelBreakdowns?.length);
+  const hasAgentData = entries.some((entry) => !!entry.agentBreakdowns?.length);
+  const hasMultipleSources = sources.length > 1;
+  const axisAvailability = { reportType, hasModelData, hasAgentData, hasMultipleSources };
+  const availableCharts = availableChartIds(
+    reportType,
+    granularity,
+    entries.length,
+    axisAvailability,
+  );
   const availableRanges = availableRangeIds(reportType);
   const panelKey = `${reportType}:${granularity}:${entries.length === 0}:${entries.length === 1}`;
   const [previousPanelKey, setPreviousPanelKey] = useState(panelKey);
@@ -371,6 +395,15 @@ export function Dashboard({ data }: Props) {
   const addedChartIds = useMemo(() => {
     const ids = new Set<DashboardChartId>();
     for (const panel of panels) ids.add(panel.id);
+    return ids;
+  }, [panels]);
+  const addedAnalysisAxes = useMemo(() => {
+    const ids = new Set<AnalysisAxisId>();
+    for (const panel of panels) {
+      if (panel.id === "analysis" && ANALYSIS_AXIS_OPTIONS.some((axis) => axis.id === panel.tab)) {
+        ids.add(panel.tab as AnalysisAxisId);
+      }
+    }
     return ids;
   }, [panels]);
   const [picker, setPicker] = useState<{ mode: "add" | "replace"; target?: string } | null>(null);
@@ -401,7 +434,59 @@ export function Dashboard({ data }: Props) {
   }
   const pickerCharts = availableCharts;
   const today = new Date();
+  function projectAnalysisEntries(
+    selected: NormalizedEntry[],
+    requestedGranularity: TimeGranularity,
+  ): NormalizedEntry[] {
+    if (!canToggleGranularity) return selected;
+    const daily =
+      isHourly && requestedGranularity !== "hourly" ? aggregateToDaily(selected) : selected;
+    if (requestedGranularity === "weekly") return aggregateToWeekly(daily);
+    if (requestedGranularity === "monthly") return aggregateToMonthly(daily);
+    return daily;
+  }
+  function dashboardBaseEntries(selected: NormalizedEntry[]): NormalizedEntry[] {
+    if (isFullRange) return selected;
+    if (!canToggleGranularity) {
+      const visibleLabels = new Set(filteredEntries.map((entry) => entry.label));
+      return selected.filter((entry) => visibleLabels.has(entry.label));
+    }
+    const first = filteredEntries[0]?.label;
+    const last = filteredEntries[filteredEntries.length - 1]?.label;
+    if (!first || !last) return [];
+    if (granularity === "monthly") {
+      return selected.filter((entry) => {
+        const month = entry.label.slice(0, 7);
+        return month >= first && month <= last;
+      });
+    }
+    if (granularity === "weekly") {
+      const exclusiveEnd = new Date(`${last}T00:00:00Z`);
+      exclusiveEnd.setUTCDate(exclusiveEnd.getUTCDate() + 7);
+      const end = exclusiveEnd.toISOString().slice(0, 10);
+      return selected.filter((entry) => {
+        const day = entry.label.slice(0, 10);
+        return day >= first && day < end;
+      });
+    }
+    if (granularity === "daily") {
+      return selected.filter((entry) => {
+        const day = entry.label.slice(0, 10);
+        return day >= first && day <= last;
+      });
+    }
+    return selected.filter((entry) => entry.label >= first && entry.label <= last);
+  }
   function chartEntries(panel: ChartPanel): NormalizedEntry[] {
+    if (panel.id === "analysis" && panel.granularity && panel.granularity !== granularity) {
+      const selected =
+        panel.range === "dashboard"
+          ? dashboardBaseEntries(baseEntries)
+          : panel.range === "all"
+            ? baseEntries
+            : filterCalendarRange(baseEntries, panel.range, today);
+      return projectAnalysisEntries(selected, panel.granularity);
+    }
     if (panel.range === "dashboard") {
       if (panel.id === "activity") return dailyEntries;
       if (panel.id === "day-of-week" && isHourly) return dailyEntries;
@@ -423,22 +508,60 @@ export function Dashboard({ data }: Props) {
     if (granularity === "monthly") return aggregateToMonthly(selectedDaily);
     return selectedDaily;
   }
+  function chartSources(panel: ChartPanel, chartData: NormalizedEntry[]) {
+    const visibleLabels = new Set(chartData.map((entry) => entry.label));
+    const requestedGranularity = panel.granularity ?? granularity;
+    return sources.map((source) => {
+      const selected =
+        panel.range === "dashboard"
+          ? dashboardBaseEntries(source.entries)
+          : panel.range === "all"
+            ? source.entries
+            : filterCalendarRange(source.entries, panel.range, today);
+      return {
+        label: source.label,
+        entries: projectAnalysisEntries(selected, requestedGranularity).filter((entry) =>
+          visibleLabels.has(entry.label),
+        ),
+      };
+    });
+  }
   function applyPanel(
     id: DashboardChartId,
     selectedRange: DashboardRangeId,
     tab?: DashboardChartTabId,
+    chartGranularity?: TimeGranularity,
   ) {
     if (
       !picker ||
       !pickerCharts.includes(id) ||
       !availableRanges.includes(selectedRange) ||
-      (tab !== undefined && !DASHBOARD_CHART_TABS[id].some((item) => item.id === tab))
+      (id === "analysis" &&
+        (!tab ||
+          !ANALYSIS_AXIS_OPTIONS.some(
+            (axis) => axis.id === tab && isAnalysisAxisAvailable(axis.id, axisAvailability),
+          ))) ||
+      (id === "analysis" &&
+        chartGranularity !== undefined &&
+        ((reportType !== "daily" && reportType !== "hourly") ||
+          (reportType === "daily" && chartGranularity === "hourly"))) ||
+      (id !== "analysis" &&
+        tab !== undefined &&
+        !DASHBOARD_CHART_TABS[id].some((item) => item.id === tab))
     )
       return;
     setPanels((current) => {
       if (picker.mode === "replace") {
         return current.map((panel) =>
-          panel.key === picker.target ? { ...panel, id, range: selectedRange, tab } : panel,
+          panel.key === picker.target
+            ? {
+                ...panel,
+                id,
+                range: selectedRange,
+                tab,
+                granularity: id === "analysis" ? chartGranularity : undefined,
+              }
+            : panel,
         );
       }
       const next = [...current];
@@ -450,7 +573,34 @@ export function Dashboard({ data }: Props) {
         id,
         range: selectedRange,
         tab,
+        granularity: id === "analysis" ? chartGranularity : undefined,
       });
+      return next;
+    });
+    closePicker();
+  }
+  function applySuggestedPanels(selections: PickerSelection[]) {
+    if (!picker || picker.mode !== "add") return;
+    const valid = selections.filter((item) =>
+      isPickerSelectionAvailable(item, pickerCharts, availableRanges, axisAvailability),
+    );
+    if (!valid.length) return;
+    setPanels((current) => {
+      const targetIndex = picker.target
+        ? current.findIndex((panel) => panel.key === picker.target)
+        : -1;
+      const next = [...current];
+      next.splice(
+        targetIndex < 0 ? next.length : targetIndex + 1,
+        0,
+        ...valid.map((item) => ({
+          key: crypto.randomUUID(),
+          id: item.chart,
+          range: item.range,
+          tab: item.tab,
+          granularity: item.chart === "analysis" ? item.chartGranularity : undefined,
+        })),
+      );
       return next;
     });
     closePicker();
@@ -499,6 +649,14 @@ export function Dashboard({ data }: Props) {
       );
     }
     switch (panel.id) {
+      case "analysis":
+        return panel.tab && ANALYSIS_AXIS_OPTIONS.some((axis) => axis.id === panel.tab) ? (
+          <AxisChart
+            entries={chartData}
+            sources={chartSources(panel, chartData)}
+            axis={panel.tab as AnalysisAxisId}
+          />
+        ) : null;
       case "statistics":
         return (
           <StatisticsSummary
@@ -682,14 +840,17 @@ export function Dashboard({ data }: Props) {
       <div ref={dashboardRef} className="space-y-2">
         <SummaryCards totals={filteredTotals} entryCount={filteredEntries.length} />
         {panels.map((panel, index) => {
-          const label = DASHBOARD_CHARTS.find((item) => item.id === panel.id)?.label;
+          const label = chartLabel(panel);
           const rangeLabel = DASHBOARD_RANGES.find((item) => item.id === panel.range)?.label;
           return (
             <section key={panel.key} aria-label={`${label} chart`}>
               <div className="rounded-lg border border-border bg-bg-card">
                 <div className="flex min-h-10 items-center justify-end gap-1 px-2 pt-1">
-                  {panel.range !== "dashboard" && (
-                    <span className="mr-auto text-xs text-text-secondary">{rangeLabel}</span>
+                  {(panel.range !== "dashboard" || panel.granularity) && (
+                    <span className="mr-auto text-xs text-text-secondary">
+                      {panel.range !== "dashboard" ? rangeLabel : "Dashboard range"}
+                      {panel.granularity && ` · ${GRANULARITY_LABELS[panel.granularity]}`}
+                    </span>
                   )}
                   <PanelAction
                     action="up"
@@ -752,8 +913,11 @@ export function Dashboard({ data }: Props) {
           granularity={granularity}
           hasMultipleEntries={entries.length > 1}
           addedCharts={addedChartIds}
+          addedAnalysisAxes={addedAnalysisAxes}
           charts={pickerCharts}
-          hasAgentData={entries.some((entry) => !!entry.agentBreakdowns?.length)}
+          hasAgentData={hasAgentData}
+          hasModelData={hasModelData}
+          hasMultipleSources={hasMultipleSources}
           ranges={availableRanges}
           initialChart={
             picker.mode === "replace"
@@ -770,10 +934,22 @@ export function Dashboard({ data }: Props) {
               ? panels.find((panel) => panel.key === picker.target)?.tab
               : undefined
           }
+          initialChartGranularity={
+            picker.mode === "replace"
+              ? panels.find((panel) => panel.key === picker.target)?.granularity
+              : undefined
+          }
           onApply={applyPanel}
+          onApplySuggestions={applySuggestedPanels}
           onClose={closePicker}
-          preview={(id, selectedRange, tab) =>
-            renderChart({ key: "preview", id, range: selectedRange, tab })
+          preview={(id, selectedRange, tab, chartGranularity) =>
+            renderChart({
+              key: "preview",
+              id,
+              range: selectedRange,
+              tab,
+              granularity: id === "analysis" ? chartGranularity : undefined,
+            })
           }
         />
       )}

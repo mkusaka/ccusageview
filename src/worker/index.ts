@@ -1,9 +1,13 @@
 import type { ReportType } from "../types";
 import {
+  ANALYSIS_GRANULARITY_OPTIONS,
   DASHBOARD_CHART_OPTIONS,
   DASHBOARD_RANGES,
+  isAnalysisAxisAvailable,
+  availableAnalysisGranularities,
   availableChartIds,
   availableRangeIds,
+  type AnalysisAxisId,
 } from "../utils/dashboardCatalog";
 import type { TimeGranularity } from "../utils/projection";
 import { Hono } from "hono";
@@ -45,6 +49,8 @@ const suggestionRequest = v.strictObject({
   ] as const satisfies readonly TimeGranularity[]),
   hasMultipleEntries: v.boolean(),
   hasAgentData: v.boolean(),
+  hasModelData: v.boolean(),
+  hasMultipleSources: v.boolean(),
 });
 
 type Bindings = {
@@ -82,12 +88,21 @@ const api = new Hono<{ Bindings: Bindings }>()
       return request.output;
     }),
     async (c) => {
-      const { prompt, reportType, granularity, hasMultipleEntries, hasAgentData } =
-        c.req.valid("json");
+      const {
+        prompt,
+        reportType,
+        granularity,
+        hasMultipleEntries,
+        hasAgentData,
+        hasModelData,
+        hasMultipleSources,
+      } = c.req.valid("json");
+      const metadata = { reportType, hasModelData, hasAgentData, hasMultipleSources };
       const availableCharts = new Set(
-        availableChartIds(reportType, granularity, hasMultipleEntries ? 2 : 1),
+        availableChartIds(reportType, granularity, hasMultipleEntries ? 2 : 1, metadata),
       );
       const availableRanges = new Set(availableRangeIds(reportType));
+      const availableGranularities = availableAnalysisGranularities(reportType);
       let result: unknown;
       try {
         const { success } = await c.env.AI_SUGGEST_LIMIT.limit({ key: "chart-suggest" });
@@ -100,12 +115,20 @@ const api = new Hono<{ Bindings: Bindings }>()
             chart: {
               type: "choice",
               instructions:
-                "Choose the closest chart and tab for the request. Distinguish time trends from shares of total usage, and models across all agents from models within each agent or harness. Prefer options marked available for this dashboard.",
+                "Choose the closest chart and tab for the request. Distinguish time trends from shares of total usage, and models across all agents from models within each agent or harness. The analysis options offer token mix, effective cost per million tokens, and cache read rate by fixed dimensions. Prefer options marked available for this dashboard.",
               criteria: Object.fromEntries(
-                DASHBOARD_CHART_OPTIONS.map(({ id, chart, tab, label, description }) => [
-                  id,
-                  `${label}: ${description}${availableCharts.has(chart) && ((tab !== "agent" && tab !== "agentModel") || hasAgentData) ? "" : " (unavailable in this dashboard)"}`,
-                ]),
+                DASHBOARD_CHART_OPTIONS.map(({ id, chart, tab, label, description }) => {
+                  const available =
+                    availableCharts.has(chart) &&
+                    (chart === "analysis"
+                      ? tab !== undefined &&
+                        isAnalysisAxisAvailable(tab as AnalysisAxisId, metadata)
+                      : (tab !== "agent" && tab !== "agentModel") || hasAgentData);
+                  return [
+                    id,
+                    `${label}: ${description}${available ? "" : " (unavailable in this dashboard)"}`,
+                  ];
+                }),
               ),
             },
             range: {
@@ -116,6 +139,17 @@ const api = new Hono<{ Bindings: Bindings }>()
                 DASHBOARD_RANGES.map(({ id, label, description }) => [
                   id,
                   `${label}: ${description}${availableRanges.has(id) ? "" : " (unavailable in this dashboard)"}`,
+                ]),
+              ),
+            },
+            granularity: {
+              type: "choice",
+              instructions:
+                "Choose time grouping for an analysis chart only. Choose dashboard for other charts or when no grouping is requested. Prefer an available grouping for this report type.",
+              criteria: Object.fromEntries(
+                ANALYSIS_GRANULARITY_OPTIONS.map(({ id, label, description }) => [
+                  id,
+                  `${label}: ${description}${availableGranularities.includes(id) ? "" : " (unavailable in this dashboard)"}`,
                 ]),
               ),
             },
@@ -162,6 +196,14 @@ const api = new Hono<{ Bindings: Bindings }>()
                     typeof value === "string" && DASHBOARD_RANGES.some(({ id }) => id === value),
                 ),
               }),
+              granularity: v.object({
+                type: v.literal("choice"),
+                choice: v.custom<(typeof ANALYSIS_GRANULARITY_OPTIONS)[number]["id"]>(
+                  (value) =>
+                    typeof value === "string" &&
+                    ANALYSIS_GRANULARITY_OPTIONS.some(({ id }) => id === value),
+                ),
+              }),
             }),
           }),
         }),
@@ -185,12 +227,18 @@ const api = new Hono<{ Bindings: Bindings }>()
       return c.json({
         suggestions: ranked.map(([id, confidence]) => {
           const { chart, tab } = DASHBOARD_CHART_OPTIONS.find((option) => option.id === id)!;
-          return {
-            chart,
-            tab,
-            range: suggestion.output.result.answers.range.choice,
-            confidence,
-          };
+          const chosenGranularity = suggestion.output.result.answers.granularity.choice;
+          const item: {
+            chart: typeof chart;
+            tab: typeof tab;
+            range: typeof suggestion.output.result.answers.range.choice;
+            confidence: number;
+            chartGranularity?: TimeGranularity;
+          } = { chart, tab, range: suggestion.output.result.answers.range.choice, confidence };
+          if (chart === "analysis" && chosenGranularity !== "dashboard") {
+            item.chartGranularity = chosenGranularity;
+          }
+          return item;
         }),
       });
     },

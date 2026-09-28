@@ -229,9 +229,15 @@ export function computeTotalsFromEntries(entries: NormalizedEntry[]): Normalized
   return sumEntries(entries);
 }
 
+export interface NormalizedSource {
+  label: string;
+  entries: NormalizedEntry[];
+}
+
 export interface DashboardData {
   entries: NormalizedEntry[];
   totals: NormalizedTotals;
   reportType: ReportType;
   sourceLabels: string[];
+  sources: NormalizedSource[];
 }

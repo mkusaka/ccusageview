@@ -14,7 +14,7 @@ A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppi
 - **Shareable URLs** — data is compressed into the URL hash, or use short URLs via `/s/:id`
 - **Copy as image** — export individual charts or the entire dashboard to clipboard
 - **Dark mode** — respects system preference, toggleable
-- **Modular charts** — add, replace, remove, and reorder predefined dashboard charts; optionally ask Workers AI for a chart and range suggestion
+- **Modular charts** — add, replace, remove, and reorder predefined dashboard charts; optional AI suggestions rank fixed chart recipes and choose per-card dates
 
 ## Quick start
 
@@ -52,11 +52,13 @@ Open https://ccusageview.polyfill.workers.dev/ and paste your ccusage JSON into 
 
 ### Customize dashboard charts
 
-Use the dividers below and between charts to add a predefined chart, tab, and date range; controls inside a chart move, replace, or remove it. The picker marks chart types already on the dashboard as **Added**, but keeps them selectable. The default dashboard stays unchanged. **Dashboard range** follows the main range slider; other ranges apply only to the selected chart.
+Use the dividers below and between charts to add a predefined chart, tab, and date range; controls inside a chart move, replace, or remove it. The default dashboard stays unchanged. **Dashboard range** follows the main range slider; other ranges apply only to the selected chart.
 
-In the add/replace dialog, enter a request such as “show model usage by agent” and select **Suggest**. A Cloudflare Worker asks [Jev](https://developers.cloudflare.com/ai/models/typesafe/jev/) to rank predefined chart/tab options and choose a date range. The top suggestion updates the selection and preview; other suggestions remain selectable. Unavailable options cannot be applied. Jev cannot create charts, generate SQL, or change the data. Manual selection works without AI.
+Choose **Analysis** for additional, deterministic axes: input/output/cache token mix by model, agent, or source; cost per million tokens by model, agent, source, or time; and cache-read rate by model or agent. Token mix uses stacked horizontal bars; ratios by category use horizontal bars; the time trend uses a line. Ratios are computed from summed costs and tokens (not averages of row ratios). Model, agent, and source axes require the corresponding data; source comparisons preserve each enabled input before the dashboard merges matching periods. For daily and hourly reports, an analysis chart can use its own hourly/daily/weekly/monthly granularity without changing the dashboard toggle.
 
-The browser sends the prompt, report type, displayed time granularity, whether multiple entries exist, and whether agent data exists to the Worker; it does **not** send chart or range option lists. Report contents and computed usage rows stay in the browser. Suggestions require a configured Workers AI binding **and AI Gateway credits on the Cloudflare account**. They are unavailable when serving the frontend with plain `pnpm dev`. Use `pnpm cf:dev` to test the Worker locally; Workers AI requests can incur charges even in local development.
+In the add/replace dialog, enter a request such as “show model usage by agent” and select **Suggest**. A Cloudflare Worker asks [Jev](https://developers.cloudflare.com/ai/models/typesafe/jev/) to rank predefined chart/tab options and choose a date range and, where applicable, a time granularity. The top available suggestion updates the selection and preview; other suggestions remain selectable. In **Add chart**, **Add suggested charts in order** inserts multiple available suggestions after the current chart in the AI-ranked order. Unavailable options cannot be applied. Jev cannot create charts, generate SQL, or change the data. Manual selection works without AI.
+
+The browser sends the prompt, report type, displayed time granularity, and availability flags (multiple entries, model/agent data, multiple sources) to the Worker; it does **not** send chart or range option lists. Report contents and computed usage rows stay in the browser. Suggestions require a configured Workers AI binding **and AI Gateway credits on the Cloudflare account**. They are unavailable when serving the frontend with plain `pnpm dev`. Use `pnpm cf:dev` to test the Worker locally; Workers AI requests can incur charges even in local development.
 
 If Jev returns `Insufficient AI Gateway credits`, open [Cloudflare AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway), check **Credits Available**, then use **Manage → Top-up credits**. The AI binding does not need the model page's **Generate API Token**. Purchasing credits incurs charges; if routing through a configured gateway, set that gateway's **Workers AI Billing** to **Unified billing**.
 

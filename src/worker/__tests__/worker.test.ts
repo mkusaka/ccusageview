@@ -38,6 +38,7 @@ function createMockEnv() {
               },
             },
             range: { type: "choice", choice: "last_7_days" },
+            granularity: { type: "choice", choice: "dashboard" },
           },
           usage: {},
         },
@@ -112,6 +113,8 @@ describe("POST /api/charts/suggest", () => {
     granularity: "daily",
     hasMultipleEntries: true,
     hasAgentData: true,
+    hasModelData: true,
+    hasMultipleSources: true,
   };
   let env = createMockEnv();
 
@@ -138,6 +141,10 @@ describe("POST /api/charts/suggest", () => {
     [{ ...validRequest, granularity: "yearly" }],
     [{ ...validRequest, hasMultipleEntries: "true" }],
     [{ ...validRequest, hasAgentData: "true" }],
+    [{ ...validRequest, hasModelData: "true" }],
+    [{ ...validRequest, hasMultipleSources: "true" }],
+    [{ ...validRequest, hasModelData: undefined }],
+    [{ ...validRequest, hasMultipleSources: undefined }],
     [{ ...validRequest, hasAgentData: undefined }],
     [{ ...validRequest, hasMultipleEntries: undefined }],
     [{ ...validRequest, reportType: undefined }],
@@ -196,6 +203,40 @@ describe("POST /api/charts/suggest", () => {
       }),
     );
   });
+  it("ranks a fixed analysis recipe", async () => {
+    env.AI.run.mockResolvedValueOnce({
+      state: "Completed",
+      result: {
+        answers: {
+          chart: { type: "choice", choice: "analysis.modelCostPerMillion", confidence: 0.85 },
+          range: { type: "choice", choice: "dashboard" },
+          granularity: { type: "choice", choice: "weekly" },
+        },
+      },
+    });
+    const res = await request(validRequest);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      suggestions: [
+        {
+          chart: "analysis",
+          tab: "modelCostPerMillion",
+          range: "dashboard",
+          chartGranularity: "weekly",
+          confidence: 0.85,
+        },
+      ],
+    });
+    const [, input] = env.AI.run.mock.calls[0];
+    expect(input.questions.chart.criteria["analysis.modelCostPerMillion"]).toContain(
+      "Effective cost per million tokens by model",
+    );
+    expect(input.questions.chart.criteria["analysis.sourceTokenMix"]).toContain(
+      "tokens by imported source",
+    );
+    expect(input.questions.granularity.criteria.weekly).toContain("Group by week");
+  });
 
   it("returns a single candidate if Jev supplies confidence without probabilities", async () => {
     env.AI.run.mockResolvedValueOnce({
@@ -204,6 +245,7 @@ describe("POST /api/charts/suggest", () => {
         answers: {
           chart: { type: "choice", choice: "activity", confidence: 0.7 },
           range: { type: "choice", choice: "dashboard" },
+          granularity: { type: "choice", choice: "dashboard" },
         },
       },
     });
@@ -230,6 +272,31 @@ describe("POST /api/charts/suggest", () => {
       "(unavailable in this dashboard)",
     );
   });
+  it("annotates unavailable analysis dimensions without leaking report rows", async () => {
+    const res = await request({
+      ...validRequest,
+      reportType: "blocks",
+      hasModelData: false,
+      hasAgentData: false,
+      hasMultipleSources: false,
+    });
+
+    expect(res.status).toBe(200);
+    const [, input] = env.AI.run.mock.calls[0];
+    for (const id of [
+      "analysis.modelTokenMix",
+      "analysis.agentTokenMix",
+      "analysis.sourceTokenMix",
+      "analysis.periodCostPerMillion",
+    ]) {
+      expect(input.questions.chart.criteria[id]).toContain("(unavailable in this dashboard)");
+    }
+    expect(input.questions.granularity.criteria.monthly).toContain(
+      "(unavailable in this dashboard)",
+    );
+    expect(input).not.toHaveProperty("entries");
+    expect(input).not.toHaveProperty("sources");
+  });
 
   it.each([
     [
@@ -237,6 +304,7 @@ describe("POST /api/charts/suggest", () => {
         answers: {
           chart: { type: "choice", choice: "tokens.type", confidence: 0.7 },
           range: { type: "choice", choice: "all" },
+          granularity: { type: "choice", choice: "dashboard" },
         },
       },
     ],
@@ -247,6 +315,7 @@ describe("POST /api/charts/suggest", () => {
           answers: {
             chart: { type: "choice", choice: "tokens.type", confidence: 0.7 },
             range: { type: "choice", choice: "all" },
+            granularity: { type: "choice", choice: "dashboard" },
           },
         },
       },
@@ -258,6 +327,7 @@ describe("POST /api/charts/suggest", () => {
           answers: {
             chart: { type: "choice", choice: "custom" },
             range: { type: "choice", choice: "all" },
+            granularity: { type: "choice", choice: "dashboard" },
           },
         },
       },
@@ -269,6 +339,7 @@ describe("POST /api/charts/suggest", () => {
           answers: {
             chart: { type: "choice", choice: "tokens.type", confidence: 0.7 },
             range: { type: "choice", choice: "last_decade" },
+            granularity: { type: "choice", choice: "dashboard" },
           },
         },
       },
@@ -280,6 +351,7 @@ describe("POST /api/charts/suggest", () => {
           answers: {
             chart: { type: "text", choice: "tokens.type", confidence: 0.7 },
             range: { type: "choice", choice: "all" },
+            granularity: { type: "choice", choice: "dashboard" },
           },
         },
       },
@@ -297,6 +369,7 @@ describe("POST /api/charts/suggest", () => {
           answers: {
             chart: { type: "choice", choice: "tokens", confidence: 0.7 },
             range: { type: "choice", choice: "all" },
+            granularity: { type: "choice", choice: "dashboard" },
           },
         },
       },
@@ -308,6 +381,7 @@ describe("POST /api/charts/suggest", () => {
           answers: {
             chart: { type: "choice", choice: "tokens.type" },
             range: { type: "choice", choice: "all" },
+            granularity: { type: "choice", choice: "dashboard" },
           },
         },
       },
@@ -324,6 +398,7 @@ describe("POST /api/charts/suggest", () => {
               probabilities: { "tokens.type": 0.6, "custom.tab": 0.4 },
             },
             range: { type: "choice", choice: "all" },
+            granularity: { type: "choice", choice: "dashboard" },
           },
         },
       },
@@ -334,6 +409,42 @@ describe("POST /api/charts/suggest", () => {
         result: {
           answers: {
             chart: { type: "choice", choice: "tokens.type", probabilities: { "tokens.type": 1.1 } },
+            range: { type: "choice", choice: "all" },
+            granularity: { type: "choice", choice: "dashboard" },
+          },
+        },
+      },
+    ],
+    [
+      {
+        state: "Completed",
+        result: {
+          answers: {
+            chart: { type: "choice", choice: "analysis.customRecipe", confidence: 0.7 },
+            range: { type: "choice", choice: "all" },
+            granularity: { type: "choice", choice: "dashboard" },
+          },
+        },
+      },
+    ],
+    [
+      {
+        state: "Completed",
+        result: {
+          answers: {
+            chart: { type: "choice", choice: "analysis.modelTokenMix", confidence: 0.7 },
+            range: { type: "choice", choice: "all" },
+            granularity: { type: "choice", choice: "yearly" },
+          },
+        },
+      },
+    ],
+    [
+      {
+        state: "Completed",
+        result: {
+          answers: {
+            chart: { type: "choice", choice: "analysis.modelTokenMix", confidence: 0.7 },
             range: { type: "choice", choice: "all" },
           },
         },

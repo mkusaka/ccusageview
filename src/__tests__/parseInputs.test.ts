@@ -223,12 +223,26 @@ describe("parseInputs", () => {
       expect(result.data!.reportType).toBe("daily");
       expect(result.data!.entries).toHaveLength(2);
       expect(result.data!.sourceLabels).toEqual(["Claude", "OpenCode"]);
+      expect(result.data!.sources.map(({ label, entries }) => [label, entries[0].cost])).toEqual([
+        ["Claude", 0.5],
+        ["OpenCode", 1],
+      ]);
     });
 
     it("sums totals from merged entries", () => {
       const result = parseInputs([inp(DAILY_CLAUDE), inp(DAILY_CLAUDE_2)]);
       expect(result.data!.totals.inputTokens).toBe(300);
       expect(result.data!.totals.totalCost).toBe(1.5);
+    });
+
+    it("keeps overlapping dates separate by source for comparisons", () => {
+      const result = parseInputs([inp(DAILY_CLAUDE, "Claude"), inp(DAILY_CLAUDE, "Claude")]);
+      expect(result.data!.entries).toHaveLength(1);
+      expect(result.data!.entries[0].cost).toBe(1);
+      expect(result.data!.sources.map(({ label, entries }) => [label, entries[0].cost])).toEqual([
+        ["Claude", 0.5],
+        ["Claude (2)", 0.5],
+      ]);
     });
   });
 
@@ -263,6 +277,7 @@ describe("parseInputs", () => {
       expect(result.error).toBeNull();
       expect(result.data!.entries).toHaveLength(2);
       expect(result.data!.sourceLabels).toEqual(["A", "C"]);
+      expect(result.data!.sources.map(({ label }) => label)).toEqual(["A", "C"]);
     });
   });
 

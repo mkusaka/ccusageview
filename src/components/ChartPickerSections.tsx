@@ -1,47 +1,36 @@
 import type { ReactNode } from "react";
 import {
+  ANALYSIS_AXIS_OPTIONS,
+  ANALYSIS_GRANULARITY_OPTIONS,
   DASHBOARD_CHARTS,
   DASHBOARD_CHART_TABS,
   DASHBOARD_RANGES,
+  availableAnalysisGranularities,
+  isAnalysisAxisAvailable,
+  type AnalysisAvailability,
+  type AnalysisAxisId,
   type DashboardChartId,
   type DashboardChartTabId,
   type DashboardRangeId,
 } from "../utils/dashboardCatalog";
-
-export interface PickerSuggestion {
-  chart: DashboardChartId;
-  tab?: DashboardChartTabId;
-  range: DashboardRangeId;
-  confidence: number;
-}
-export type PickerSelection = Pick<PickerSuggestion, "chart" | "tab" | "range">;
-
-export function defaultPickerTab(chart: DashboardChartId): DashboardChartTabId | undefined {
-  return DASHBOARD_CHART_TABS[chart][0]?.id;
-}
-
-export function isPickerSelectionAvailable(
-  selection: PickerSelection,
-  charts: DashboardChartId[],
-  ranges: DashboardRangeId[],
-  hasAgentData: boolean,
-): boolean {
-  return (
-    charts.includes(selection.chart) &&
-    ranges.includes(selection.range) &&
-    (hasAgentData || (selection.tab !== "agent" && selection.tab !== "agentModel"))
-  );
-}
+import type { TimeGranularity } from "../utils/projection";
+import {
+  defaultPickerTab,
+  isPickerSelectionAvailable,
+  type PickerSelection,
+} from "../utils/pickerSelection";
 
 type ApplyChart = (
   chart: DashboardChartId,
   range: DashboardRangeId,
   tab?: DashboardChartTabId,
+  chartGranularity?: TimeGranularity,
 ) => void;
 type PreviewChart = (
   chart: DashboardChartId,
   range: DashboardRangeId,
   tab?: DashboardChartTabId,
+  chartGranularity?: TimeGranularity,
 ) => ReactNode;
 
 function AddedBadge() {
@@ -55,20 +44,22 @@ function AddedBadge() {
 export function ChartPickerAlternatives({
   picks,
   addedCharts,
+  addedAnalysisAxes,
   title,
   selection,
   charts,
   ranges,
-  hasAgentData,
+  metadata,
   onSelect,
 }: {
   picks: (PickerSelection & { confidence?: number })[];
   addedCharts: ReadonlySet<DashboardChartId>;
+  addedAnalysisAxes: ReadonlySet<AnalysisAxisId>;
   title: string;
   selection: PickerSelection;
   charts: DashboardChartId[];
   ranges: DashboardRangeId[];
-  hasAgentData: boolean;
+  metadata: AnalysisAvailability;
   onSelect: (selection: PickerSelection) => void;
 }) {
   if (!picks.length) return null;
@@ -77,14 +68,20 @@ export function ChartPickerAlternatives({
       <h3 className="text-sm font-semibold">{title}</h3>
       <ul className="grid gap-2 md:grid-cols-2">
         {picks.map((item) => {
-          const available = isPickerSelectionAvailable(item, charts, ranges, hasAgentData);
-          const added = addedCharts.has(item.chart);
+          const available = isPickerSelectionAvailable(item, charts, ranges, metadata);
+          const added =
+            item.chart === "analysis"
+              ? item.tab !== undefined && addedAnalysisAxes.has(item.tab as AnalysisAxisId)
+              : addedCharts.has(item.chart);
           const selected =
             selection.chart === item.chart &&
             selection.tab === item.tab &&
-            selection.range === item.range;
+            selection.range === item.range &&
+            selection.chartGranularity === item.chartGranularity;
           return (
-            <li key={`${item.chart}-${item.tab ?? ""}-${item.range}`}>
+            <li
+              key={`${item.chart}-${item.tab ?? ""}-${item.range}-${item.chartGranularity ?? "dashboard"}`}
+            >
               <button
                 type="button"
                 aria-pressed={selected}
@@ -102,6 +99,8 @@ export function ChartPickerAlternatives({
                 </span>
                 <span className="text-text-secondary">
                   {DASHBOARD_RANGES.find((entry) => entry.id === item.range)?.label}
+                  {item.chart === "analysis" &&
+                    ` · ${ANALYSIS_GRANULARITY_OPTIONS.find(({ id }) => id === (item.chartGranularity ?? "dashboard"))?.label}`}
                   {item.confidence !== undefined &&
                     ` · ${Math.round(item.confidence * 100)}% confidence`}
                   {!available && " · Unavailable in this view"}
@@ -118,8 +117,9 @@ export function ChartPickerAlternatives({
 export function ChartPickerChoices({
   charts,
   addedCharts,
+  addedAnalysisAxes,
   ranges,
-  hasAgentData,
+  metadata,
   selection,
   onSelect,
   onApply,
@@ -127,18 +127,27 @@ export function ChartPickerChoices({
 }: {
   charts: DashboardChartId[];
   addedCharts: ReadonlySet<DashboardChartId>;
+  addedAnalysisAxes: ReadonlySet<AnalysisAxisId>;
   ranges: DashboardRangeId[];
-  hasAgentData: boolean;
+  metadata: AnalysisAvailability;
   selection: PickerSelection;
   onSelect: (selection: PickerSelection) => void;
   onApply: ApplyChart;
   preview: PreviewChart;
 }) {
-  const { chart, range } = selection;
-  const tab = selection.tab ?? defaultPickerTab(chart);
+  const { chart, range, chartGranularity } = selection;
+  const tab = selection.tab ?? defaultPickerTab(chart, metadata);
   const chartTabs = DASHBOARD_CHART_TABS[chart];
-  const available = isPickerSelectionAvailable({ chart, range, tab }, charts, ranges, hasAgentData);
-  const added = addedCharts.has(chart);
+  const available = isPickerSelectionAvailable(
+    { chart, range, tab, chartGranularity },
+    charts,
+    ranges,
+    metadata,
+  );
+  const added =
+    chart === "analysis"
+      ? tab !== undefined && addedAnalysisAxes.has(tab as AnalysisAxisId)
+      : addedCharts.has(chart);
 
   return (
     <div className="space-y-5 border-t border-border pt-5">
@@ -146,7 +155,7 @@ export function ChartPickerChoices({
         id="chart-picker-form"
         onSubmit={(event) => {
           event.preventDefault();
-          if (available) onApply(chart, range, tab);
+          if (available) onApply(chart, range, tab, chartGranularity);
         }}
         className="space-y-4"
       >
@@ -156,7 +165,8 @@ export function ChartPickerChoices({
             <div className="mt-2 space-y-2">
               {DASHBOARD_CHARTS.map((item) => {
                 const selectable = charts.includes(item.id);
-                const isAdded = addedCharts.has(item.id);
+                const isAdded =
+                  item.id === "analysis" ? addedAnalysisAxes.size > 0 : addedCharts.has(item.id);
                 return (
                   <label
                     key={item.id}
@@ -169,7 +179,11 @@ export function ChartPickerChoices({
                       checked={chart === item.id}
                       disabled={!selectable}
                       onChange={() =>
-                        onSelect({ chart: item.id, range, tab: defaultPickerTab(item.id) })
+                        onSelect({
+                          chart: item.id,
+                          range,
+                          tab: defaultPickerTab(item.id, metadata),
+                        })
                       }
                       className="mt-0.5 size-4 shrink-0 accent-accent"
                     />
@@ -206,7 +220,7 @@ export function ChartPickerChoices({
                       value={item.id}
                       checked={range === item.id}
                       disabled={!selectable}
-                      onChange={() => onSelect({ chart, tab, range: item.id })}
+                      onChange={() => onSelect({ ...selection, range: item.id })}
                       className="mt-0.5 size-4 shrink-0 accent-accent"
                     />
                     <span className="min-w-0">
@@ -229,11 +243,28 @@ export function ChartPickerChoices({
             <legend className="text-sm font-semibold">Tab</legend>
             <div className="mt-2 flex flex-wrap gap-2">
               {chartTabs.map((item) => {
+                const axis =
+                  chart === "analysis"
+                    ? ANALYSIS_AXIS_OPTIONS.find(({ id }) => id === item.id)
+                    : undefined;
                 const selectable =
-                  hasAgentData || (item.id !== "agent" && item.id !== "agentModel");
+                  chart === "analysis"
+                    ? axis !== undefined && isAnalysisAxisAvailable(axis.id, metadata)
+                    : metadata.hasAgentData || (item.id !== "agent" && item.id !== "agentModel");
+                const reason =
+                  axis && !selectable
+                    ? axis.dimension === "model"
+                      ? "No model data"
+                      : axis.dimension === "agent"
+                        ? "No agent data"
+                        : axis.dimension === "source"
+                          ? "Requires multiple sources"
+                          : "Unavailable for session or blocks reports"
+                    : undefined;
                 return (
                   <label
                     key={item.id}
+                    title={reason}
                     className={`rounded-md border px-2 py-1.5 text-xs ${tab === item.id ? "border-accent bg-accent/10" : "border-border"} ${selectable ? "cursor-pointer hover:bg-bg-secondary" : "cursor-not-allowed opacity-50"}`}
                   >
                     <input
@@ -242,10 +273,49 @@ export function ChartPickerChoices({
                       value={item.id}
                       checked={tab === item.id}
                       disabled={!selectable}
-                      onChange={() => onSelect({ chart, range, tab: item.id })}
+                      onChange={() => onSelect({ ...selection, tab: item.id })}
                       className="mr-1 accent-accent"
                     />
                     {item.label}
+                    {chart === "analysis" && addedAnalysisAxes.has(item.id as AnalysisAxisId) && (
+                      <span className="ml-1">(Added)</span>
+                    )}
+                    {reason && <span className="ml-1">({reason})</span>}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+        {chart === "analysis" && (
+          <fieldset>
+            <legend className="text-sm font-semibold">Time grouping</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {ANALYSIS_GRANULARITY_OPTIONS.map((item) => {
+                const selectable = availableAnalysisGranularities(metadata.reportType).includes(
+                  item.id,
+                );
+                return (
+                  <label
+                    key={item.id}
+                    className={`rounded-md border px-2 py-1.5 text-xs ${(chartGranularity ?? "dashboard") === item.id ? "border-accent bg-accent/10" : "border-border"} ${selectable ? "cursor-pointer hover:bg-bg-secondary" : "cursor-not-allowed opacity-50"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="chartGranularity"
+                      value={item.id}
+                      checked={(chartGranularity ?? "dashboard") === item.id}
+                      disabled={!selectable}
+                      onChange={() =>
+                        onSelect({
+                          ...selection,
+                          chartGranularity: item.id === "dashboard" ? undefined : item.id,
+                        })
+                      }
+                      className="mr-1 accent-accent"
+                    />
+                    {item.label}
+                    {!selectable && " (Unavailable for this report)"}
                   </label>
                 );
               })}
@@ -262,7 +332,7 @@ export function ChartPickerChoices({
           className={`rounded-lg border ${added ? "border-chart-green ring-2 ring-chart-green/20" : "border-border"}`}
         >
           {available ? (
-            preview(chart, range, tab)
+            preview(chart, range, tab, chartGranularity)
           ) : (
             <p className="p-4 text-sm text-text-secondary">
               This choice is unavailable for the current report or granularity.

@@ -1,7 +1,7 @@
 import type { ReportData, ReportType } from "../types";
 import { detectReportType } from "./detect";
 import { normalizeEntries, normalizeTotals, computeTotalsFromEntries } from "./normalize";
-import type { DashboardData } from "./normalize";
+import type { DashboardData, NormalizedSource } from "./normalize";
 import { mergeNormalizedEntries } from "./merge";
 
 export interface SourceInput {
@@ -69,27 +69,36 @@ export function parseInputs(inputs: SourceInput[]): {
 
   const reportType: ReportType = sources[0].report.type;
   const sourceLabels = sources.flatMap((s) => (s.label ? [s.label] : []));
+  const usedLabels = new Set<string>();
+  const normalizedSources: NormalizedSource[] = sources.map((source, index) => {
+    const baseLabel = source.label.trim() || `Source ${index + 1}`;
+    let label = baseLabel;
+    for (let suffix = 2; usedLabels.has(label); suffix++) label = `${baseLabel} (${suffix})`;
+    usedLabels.add(label);
+    return { label, entries: normalizeEntries(source.report) };
+  });
 
   if (sources.length === 1) {
     const report = sources[0].report;
     return {
       data: {
-        entries: normalizeEntries(report),
+        entries: normalizedSources[0].entries,
         totals: normalizeTotals(report),
         reportType,
         sourceLabels,
+        sources: normalizedSources,
       },
       error: null,
     };
   }
 
   // Normalize each, then merge
-  const allEntryArrays = sources.map((s) => normalizeEntries(s.report));
+  const allEntryArrays = normalizedSources.map((source) => source.entries);
   const entries = mergeNormalizedEntries(allEntryArrays);
   const totals = computeTotalsFromEntries(entries);
 
   return {
-    data: { entries, totals, reportType, sourceLabels },
+    data: { entries, totals, reportType, sourceLabels, sources: normalizedSources },
     error: null,
   };
 }
