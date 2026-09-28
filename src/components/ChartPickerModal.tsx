@@ -169,7 +169,7 @@ export function ChartPickerModal({
               }}
               rows={2}
               placeholder="Describe the chart you want…"
-              className="w-full rounded-md border border-border bg-bg-secondary p-3 text-base text-text-primary placeholder:text-text-secondary focus-visible:outline-2 focus-visible:outline-accent"
+              className="w-full rounded-md border border-border bg-bg-secondary p-3 text-base text-text-primary placeholder:text-text-secondary focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/30"
             />
             <button
               type="button"
