@@ -1,15 +1,26 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ReportType } from "../types";
-import type { SourceInput } from "../utils/inputs";
-import type { DashboardData } from "../utils/normalize";
+import type { DashboardData, NormalizedEntry } from "../utils/normalize";
 import type { TimeGranularity } from "../utils/projection";
+import {
+  DASHBOARD_CHARTS,
+  DASHBOARD_RANGES,
+  availableChartIds,
+  availableRangeIds,
+  type DashboardChartId,
+  type DashboardRangeId,
+} from "../utils/dashboardCatalog";
 import {
   aggregateToDaily,
   aggregateToMonthly,
   aggregateToWeekly,
   computeTotalsFromEntries,
 } from "../utils/normalize";
-import { ChartMarkdownContext, type RegisteredMarkdownSection } from "./ChartMarkdownContext";
+import {
+  ChartMarkdownContext,
+  type RegisterMarkdownSection,
+  type RegisteredMarkdownSection,
+} from "./ChartMarkdownContext";
 import { SummaryCards } from "./SummaryCards";
 import { CostChart } from "./CostChart";
 import { TokenChart } from "./TokenChart";
@@ -24,11 +35,10 @@ import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { breakdownHintCommand, HintedTab } from "./BreakdownHint";
 import { RangeSlider } from "./RangeSlider";
-import { AiChartLauncher } from "./AiChartLauncher";
+import { ChartPickerModal } from "./ChartPickerModal";
 
 interface Props {
   data: DashboardData;
-  inputs: SourceInput[];
 }
 
 const TYPE_LABELS: Record<ReportType, string> = {
@@ -61,7 +71,78 @@ interface SyncedChartHoverState {
   source: string | null;
 }
 
-export function Dashboard({ data, inputs }: Props) {
+interface ChartPanel {
+  key: string;
+  id: DashboardChartId;
+  range: DashboardRangeId;
+}
+
+function initialPanels(available: DashboardChartId[]): ChartPanel[] {
+  return available.map((id) => ({ key: id, id, range: "dashboard" }));
+}
+
+function PanelMarkdownProvider({
+  panelKey,
+  register,
+  children,
+}: {
+  panelKey: string;
+  register: RegisterMarkdownSection;
+  children: ReactNode;
+}) {
+  const registerPanel = useCallback(
+    (section: RegisteredMarkdownSection) =>
+      register({ ...section, id: `${panelKey}/${section.id}` }),
+    [panelKey, register],
+  );
+  return (
+    <ChartMarkdownContext.Provider value={registerPanel}>{children}</ChartMarkdownContext.Provider>
+  );
+}
+
+function dateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function filterCalendarRange(
+  entries: NormalizedEntry[],
+  range: DashboardRangeId,
+  today: Date,
+): NormalizedEntry[] {
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const end = new Date(start);
+  switch (range) {
+    case "last_7_days":
+      start.setDate(start.getDate() - 6);
+      break;
+    case "last_30_days":
+      start.setDate(start.getDate() - 29);
+      break;
+    case "last_90_days":
+      start.setDate(start.getDate() - 89);
+      break;
+    case "this_month":
+      start.setDate(1);
+      break;
+    case "last_month":
+      start.setMonth(start.getMonth() - 1, 1);
+      end.setDate(0);
+      break;
+    case "this_year":
+      start.setMonth(0, 1);
+      break;
+    default:
+      return entries;
+  }
+  const first = dateKey(start);
+  const last = dateKey(end);
+  return entries.filter((entry) => {
+    const day = entry.label.slice(0, 10);
+    return day >= first && day <= last;
+  });
+}
+
+export function Dashboard({ data }: Props) {
   const dashboardRef = useRef<HTMLDivElement>(null);
   const [markdownSectionsById, setMarkdownSectionsById] = useState<
     Record<string, RegisteredMarkdownSection>
@@ -125,11 +206,59 @@ export function Dashboard({ data, inputs }: Props) {
     [isFullRange, totals, filteredEntries],
   );
 
-  const showHeatmap = reportType === "daily" || reportType === "weekly" || reportType === "hourly";
-  const showDayOfWeek =
-    (reportType === "daily" && granularity === "daily") ||
-    (reportType === "hourly" && granularity !== "hourly");
-  const showHourOfDay = reportType === "hourly" && granularity === "hourly";
+  const availableCharts = availableChartIds(reportType, granularity, entries.length);
+  const availableRanges = availableRangeIds(reportType);
+  const panelKey = `${reportType}:${granularity}:${entries.length === 0}:${entries.length === 1}`;
+  const [previousPanelKey, setPreviousPanelKey] = useState(panelKey);
+  const [panels, setPanels] = useState<ChartPanel[]>(() => initialPanels(availableCharts));
+  const [picker, setPicker] = useState<{ mode: "add" | "replace"; target?: string } | null>(null);
+  if (previousPanelKey !== panelKey) {
+    setPreviousPanelKey(panelKey);
+    setPanels(initialPanels(availableCharts));
+    setPicker(null);
+  }
+  const pickerCharts = availableCharts;
+  const today = new Date();
+  function chartEntries(panel: ChartPanel): NormalizedEntry[] {
+    if (panel.range === "dashboard") {
+      if (panel.id === "activity") return dailyEntries;
+      if (panel.id === "day-of-week" && isHourly) return dailyEntries;
+      return filteredEntries;
+    }
+    if (panel.range === "all") {
+      if (panel.id === "activity" || panel.id === "day-of-week") return dailyEntries;
+      return entries;
+    }
+    const selected = filterCalendarRange(baseEntries, panel.range, today);
+    if (panel.id === "hour-of-day" || (panel.id !== "activity" && granularity === "hourly")) {
+      return selected;
+    }
+    const selectedDaily = isHourly ? aggregateToDaily(selected) : selected;
+    if (panel.id === "activity" || panel.id === "day-of-week" || !canToggleGranularity) {
+      return selectedDaily;
+    }
+    if (granularity === "weekly") return aggregateToWeekly(selectedDaily);
+    if (granularity === "monthly") return aggregateToMonthly(selectedDaily);
+    return selectedDaily;
+  }
+  function applyPanel(id: DashboardChartId, selectedRange: DashboardRangeId) {
+    if (!picker || !pickerCharts.includes(id) || !availableRanges.includes(selectedRange)) return;
+    setPanels((current) =>
+      picker.mode === "add"
+        ? [...current, { key: crypto.randomUUID(), id, range: selectedRange }]
+        : current.map((panel) =>
+            panel.key === picker.target ? { ...panel, id, range: selectedRange } : panel,
+          ),
+    );
+    setPicker(null);
+  }
+  function movePanel(index: number, offset: number) {
+    setPanels((current) => {
+      const next = [...current];
+      [next[index], next[index + offset]] = [next[index + offset], next[index]];
+      return next;
+    });
+  }
   const handleSyncedChartHoverIndexChange = useCallback(
     (nextIndex: number | null, source: string | null = null) => {
       setSyncedChartHoverState((current) =>
@@ -155,6 +284,72 @@ export function Dashboard({ data, inputs }: Props) {
         ? reportType
         : undefined;
 
+  function renderChart(panel: ChartPanel) {
+    const chartData = chartEntries(panel);
+    if (chartData.length === 0 || (panel.id === "statistics" && chartData.length < 2)) {
+      return (
+        <div className="rounded-lg border border-border bg-bg-card p-4 text-sm text-text-secondary">
+          {chartData.length === 0
+            ? "No data in this range"
+            : "Not enough data in this range for statistics"}
+        </div>
+      );
+    }
+    switch (panel.id) {
+      case "statistics":
+        return <StatisticsSummary entries={chartData} reportType={reportType} />;
+      case "activity":
+        return <ActivityHeatmap entries={chartData} />;
+      case "day-of-week":
+        return <DayOfWeekChart entries={chartData} reportType={reportType} />;
+      case "hour-of-day":
+        return <HourOfDayChart entries={chartData} reportType={reportType} />;
+      case "cost":
+        return (
+          <div onMouseLeave={handleSyncedChartGroupMouseLeave}>
+            <CostChart
+              entries={chartData}
+              reportType={reportType}
+              syncId={`${COST_TOKEN_CHART_SYNC_ID}-${panel.range}`}
+              timeGranularity={timeGranularity}
+              hoveredDataIndex={syncedChartHoverState.index}
+              hoveredSyncSource={syncedChartHoverState.source}
+              onHoverDataIndexChange={handleSyncedChartHoverIndexChange}
+            />
+          </div>
+        );
+      case "tokens":
+        return (
+          <div onMouseLeave={handleSyncedChartGroupMouseLeave}>
+            <TokenChart
+              entries={chartData}
+              reportType={reportType}
+              syncId={`${COST_TOKEN_CHART_SYNC_ID}-${panel.range}`}
+              timeGranularity={timeGranularity}
+              hoveredDataIndex={syncedChartHoverState.index}
+              hoveredSyncSource={syncedChartHoverState.source}
+              onHoverDataIndexChange={handleSyncedChartHoverIndexChange}
+            />
+          </div>
+        );
+      case "cache":
+        return (
+          <div onMouseLeave={handleSyncedChartGroupMouseLeave}>
+            <CacheEfficiencyChart
+              entries={chartData}
+              reportType={reportType}
+              syncId={`${COST_TOKEN_CHART_SYNC_ID}-${panel.range}`}
+              hoveredDataIndex={syncedChartHoverState.index}
+              hoveredSyncSource={syncedChartHoverState.source}
+              onHoverDataIndexChange={handleSyncedChartHoverIndexChange}
+            />
+          </div>
+        );
+      case "breakdown":
+        return <ModelBreakdown entries={chartData} reportType={reportType} />;
+    }
+  }
+
   const registerMarkdownSection = useCallback((section: RegisteredMarkdownSection) => {
     setMarkdownSectionsById((previous) => ({ ...previous, [section.id]: section }));
     return () => {
@@ -168,7 +363,13 @@ export function Dashboard({ data, inputs }: Props) {
   }, []);
 
   const getDashboardMarkdown = useCallback(() => {
-    const chartSections = Object.values(markdownSectionsById).toSorted((a, b) => a.order - b.order);
+    const chartOrder = new Map(panels.map((panel, index) => [panel.key, index]));
+    const chartSections = Object.values(markdownSectionsById)
+      .filter((section) => chartOrder.has(section.id.split("/")[0]))
+      .toSorted(
+        (a, b) =>
+          (chartOrder.get(a.id.split("/")[0]) ?? 0) - (chartOrder.get(b.id.split("/")[0]) ?? 0),
+      );
     const rangeLabel =
       filteredEntries.length > 0
         ? `${filteredEntries[0]?.label ?? ""} - ${
@@ -190,7 +391,7 @@ export function Dashboard({ data, inputs }: Props) {
         typeof section.markdown === "function" ? section.markdown() : section.markdown,
       )
       .join("\n\n")}`;
-  }, [displayLabel, filteredEntries, markdownSectionsById, sourceLabels]);
+  }, [displayLabel, filteredEntries, markdownSectionsById, panels, sourceLabels]);
 
   return (
     <div className="space-y-4">
@@ -241,60 +442,80 @@ export function Dashboard({ data, inputs }: Props) {
         />
       )}
 
-      <ChartMarkdownContext.Provider value={registerMarkdownSection}>
-        <AiChartLauncher inputs={inputs} />
-        <div ref={dashboardRef} className="space-y-4">
-          <SummaryCards totals={filteredTotals} entryCount={filteredEntries.length} />
-
-          {filteredEntries.length >= 2 && (
-            <StatisticsSummary entries={filteredEntries} reportType={reportType} />
-          )}
-
-          {filteredEntries.length > 0 && (
-            <>
-              {showHeatmap && <ActivityHeatmap entries={dailyEntries} />}
-              {showDayOfWeek && (
-                <DayOfWeekChart
-                  entries={reportType === "hourly" ? dailyEntries : filteredEntries}
-                  reportType={reportType}
-                />
-              )}
-              {showHourOfDay && (
-                <HourOfDayChart entries={filteredEntries} reportType={reportType} />
-              )}
-              <div className="space-y-4" onMouseLeave={handleSyncedChartGroupMouseLeave}>
-                <CostChart
-                  entries={filteredEntries}
-                  reportType={reportType}
-                  syncId={COST_TOKEN_CHART_SYNC_ID}
-                  timeGranularity={timeGranularity}
-                  hoveredDataIndex={syncedChartHoverState.index}
-                  hoveredSyncSource={syncedChartHoverState.source}
-                  onHoverDataIndexChange={handleSyncedChartHoverIndexChange}
-                />
-                <TokenChart
-                  entries={filteredEntries}
-                  reportType={reportType}
-                  syncId={COST_TOKEN_CHART_SYNC_ID}
-                  timeGranularity={timeGranularity}
-                  hoveredDataIndex={syncedChartHoverState.index}
-                  hoveredSyncSource={syncedChartHoverState.source}
-                  onHoverDataIndexChange={handleSyncedChartHoverIndexChange}
-                />
-                <CacheEfficiencyChart
-                  entries={filteredEntries}
-                  reportType={reportType}
-                  syncId={COST_TOKEN_CHART_SYNC_ID}
-                  hoveredDataIndex={syncedChartHoverState.index}
-                  hoveredSyncSource={syncedChartHoverState.source}
-                  onHoverDataIndexChange={handleSyncedChartHoverIndexChange}
-                />
+      <button
+        type="button"
+        disabled={!availableCharts.length}
+        onClick={() => setPicker({ mode: "add" })}
+        className="rounded-md border border-border bg-bg-card px-3 py-1.5 text-sm hover:bg-bg-secondary disabled:opacity-50"
+      >
+        Add chart
+      </button>
+      <div ref={dashboardRef} className="space-y-4">
+        <SummaryCards totals={filteredTotals} entryCount={filteredEntries.length} />
+        {panels.map((panel, index) => {
+          const label = DASHBOARD_CHARTS.find((item) => item.id === panel.id)?.label;
+          const rangeLabel = DASHBOARD_RANGES.find((item) => item.id === panel.range)?.label;
+          return (
+            <section key={panel.key} aria-label={`${label} chart`} className="space-y-1">
+              <div className="flex items-center justify-end gap-1 text-xs text-text-secondary">
+                {panel.range !== "dashboard" && <span className="mr-auto">{rangeLabel}</span>}
+                <button
+                  type="button"
+                  aria-label={`Move ${label} up`}
+                  disabled={index === 0}
+                  onClick={() => movePanel(index, -1)}
+                  className="rounded px-1.5 py-0.5 hover:bg-bg-secondary disabled:opacity-40"
+                >
+                  Up
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Move ${label} down`}
+                  disabled={index === panels.length - 1}
+                  onClick={() => movePanel(index, 1)}
+                  className="rounded px-1.5 py-0.5 hover:bg-bg-secondary disabled:opacity-40"
+                >
+                  Down
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Replace ${label}`}
+                  onClick={() => setPicker({ mode: "replace", target: panel.key })}
+                  className="rounded px-1.5 py-0.5 hover:bg-bg-secondary"
+                >
+                  Replace
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Remove ${label}`}
+                  onClick={() =>
+                    setPanels((current) => current.filter((item) => item.key !== panel.key))
+                  }
+                  className="rounded px-1.5 py-0.5 hover:bg-bg-secondary"
+                >
+                  Remove
+                </button>
               </div>
-              <ModelBreakdown entries={filteredEntries} reportType={reportType} />
-            </>
-          )}
-        </div>
-      </ChartMarkdownContext.Provider>
+              <PanelMarkdownProvider panelKey={panel.key} register={registerMarkdownSection}>
+                {renderChart(panel)}
+              </PanelMarkdownProvider>
+            </section>
+          );
+        })}
+      </div>
+      {picker && pickerCharts.length > 0 && (
+        <ChartPickerModal
+          key={`${picker.mode}-${picker.target ?? ""}`}
+          mode={picker.mode}
+          charts={pickerCharts}
+          ranges={availableRanges}
+          initialChart={panels.find((panel) => panel.key === picker.target)?.id}
+          initialRange={panels.find((panel) => panel.key === picker.target)?.range}
+          onApply={applyPanel}
+          onClose={() => setPicker(null)}
+          preview={(id, selectedRange) => renderChart({ key: "preview", id, range: selectedRange })}
+        />
+      )}
 
       {filteredEntries.length > 0 && <DataTable entries={filteredEntries} />}
     </div>

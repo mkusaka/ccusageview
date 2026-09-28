@@ -14,7 +14,7 @@ A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppi
 - **Shareable URLs** — data is compressed into the URL hash, or use short URLs via `/s/:id`
 - **Copy as image** — export individual charts or the entire dashboard to clipboard
 - **Dark mode** — respects system preference, toggleable
-- **Ask AI for charts** — describe an analysis; Chrome's on-device model selects and orders predefined local charts without generating SQL or changing the default dashboard
+- **Modular charts** — add, replace, remove, and reorder predefined dashboard charts; optionally ask Workers AI for a chart and range suggestion
 
 ## Quick start
 
@@ -50,17 +50,13 @@ npx ccusageview --label "Claude Code" --label "OpenCode" claude.json opencode.js
 
 Open https://ccusageview.polyfill.workers.dev/ and paste your ccusage JSON into the input area.
 
-### Ask AI for charts
+### Customize dashboard charts
 
-Load a report, click **Ask AI for charts**, and describe the views you want. Chrome's on-device model suggests requests in the same language as your input (English or Japanese); suggestions are optional. You can generate charts while suggestions are loading, which cancels the pending suggestion request. The default dashboard is unchanged.
+Load a report and use **Add chart** to choose one of the available predefined charts and a date-range preset. Each chart can be moved up or down, replaced, or removed. The initial dashboard layout is unchanged; chart availability depends on the report type and current time granularity. **Dashboard range** follows the main range slider; other presets apply only to that chart.
 
-The model chooses **which charts to show and in what order**, not how to calculate them. The browser aggregates the supplied data locally using fixed metrics (input, output, cache write/read, total tokens, and cost) and axes (period, model, agent, or input source). Supported views include time-series line charts and bar charts, with categorical doughnut charts where appropriate. A second, different dimension can split a chart into series. Where the input supports it, the model can select daily, weekly, or monthly aggregation and choose an available time scope or a specific date range. Calendar weeks start Monday. Weekly/monthly aggregate reports cannot be split back into daily rows; unavailable breakdowns are not inferred.
+In the add/replace dialog, enter a request such as “モデル別のコストの推移を見たい” and select **Suggest**. A Cloudflare Worker asks the [Jev model](https://developers.cloudflare.com/ai/models/typesafe/jev/) to select the closest **chart and range from the same fixed choices**. The dialog renders the suggested chart with your report data in a scrollable preview; review it before applying. Jev cannot create a new chart, generate SQL, or change the underlying data. Manual selection works without AI.
 
-Valibot validates the model's choices. Malformed responses may be retried with validation feedback; an empty response starts one fresh model session, while repeated invalid or empty responses stop. Click **Stop generation** to cancel. Unsupported combinations and ranges with no matching data are shown as errors rather than silently substituted with another view or period.
-
-This requires a [Chrome environment with the Prompt API available](https://developer.chrome.com/docs/ai/prompt-api); the on-device model may need to download on first use. Usage rows stay in your browser instead of being sent to an AI service. The model can still choose the wrong **valid** selection: check the metric, axes, and displayed range before relying on a chart.
-
-For diagnostics, filter DevTools Console for `[AI chart]`. Model responses can contain your request; redact them before sharing logs.
+The prompt and identifiers of the currently available choices are sent to Cloudflare Workers AI (Jev is a third-party model); report contents and computed usage rows stay in the browser. Suggestions require a configured Workers AI binding **and AI Gateway credits on the Cloudflare account**. They are unavailable when serving the frontend with plain `pnpm dev`. Use `pnpm cf:dev` to test the Worker locally; Workers AI requests can incur charges even in local development.
 
 ## CLI options
 

@@ -17,6 +17,17 @@ function createMockEnv() {
         Promise.resolve(new Response("<html>index</html>", { status: 200 })),
       ),
     },
+    AI_SUGGEST_LIMIT: {
+      limit: vi.fn().mockResolvedValue({ success: true }),
+    },
+    AI: {
+      run: vi.fn().mockResolvedValue({
+        answers: {
+          chart: { type: "choice", choice: "tokens" },
+          range: { type: "choice", choice: "last_7_days" },
+        },
+      }),
+    },
   };
 }
 
@@ -76,6 +87,133 @@ describe("POST /api/s", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body).toEqual({ error: "data is required" });
+  });
+});
+
+describe("POST /api/charts/suggest", () => {
+  const validRequest = {
+    prompt: "Show token usage for the past week",
+    charts: ["tokens", "cost"],
+    ranges: ["dashboard", "last_7_days"],
+  };
+  let env = createMockEnv();
+
+  beforeEach(() => {
+    env = createMockEnv();
+  });
+
+  function request(body: unknown) {
+    return app.request(
+      "/api/charts/suggest",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+      env,
+    );
+  }
+
+  it("suggests only the requested predefined chart and range, with only their criteria sent to Jev", async () => {
+    const res = await request(validRequest);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ chart: "tokens", range: "last_7_days" });
+    expect(env.AI.run).toHaveBeenCalledOnce();
+    expect(env.AI.run).toHaveBeenCalledWith("typesafe/jev", {
+      state: validRequest.prompt,
+      questions: {
+        chart: {
+          type: "choice",
+          instructions: expect.any(String),
+          criteria: {
+            cost: expect.stringContaining("Cost over time"),
+            tokens: expect.stringContaining("Token breakdown"),
+          },
+        },
+        range: {
+          type: "choice",
+          instructions: expect.any(String),
+          criteria: {
+            dashboard: expect.stringContaining("Dashboard range"),
+            last_7_days: expect.stringContaining("Last 7 days"),
+          },
+        },
+      },
+    });
+    expect(env.AI_SUGGEST_LIMIT.limit).toHaveBeenCalledWith({ key: "chart-suggest" });
+  });
+
+  it.each([
+    [{ ...validRequest, prompt: "" }],
+    [{ ...validRequest, prompt: "a".repeat(2001) }],
+    [{ ...validRequest, charts: [] }],
+    [{ ...validRequest, charts: ["tokens", "tokens"] }],
+    [{ ...validRequest, charts: ["tokens", "execute-query"] }],
+    [{ ...validRequest, ranges: ["yesterday"] }],
+    [{ ...validRequest, usage: [{ cost: 42 }] }],
+    [{ ...validRequest, prompt: { text: "tokens", data: [{ cost: 42 }] } }],
+  ])("rejects an invalid or data-bearing request without invoking Jev", async (body) => {
+    const res = await request(body);
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toHaveProperty("error");
+    expect(env.AI.run).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed JSON without invoking Jev", async () => {
+    const res = await app.request(
+      "/api/charts/suggest",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{",
+      },
+      env,
+    );
+
+    expect(res.status).toBe(400);
+    expect(env.AI.run).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ answers: { chart: { choice: "activity" }, range: { choice: "last_7_days" } } }],
+    [{ answers: { chart: { choice: "tokens" }, range: { choice: "this_year" } } }],
+    [{ answers: { chart: { choice: "custom" }, range: { choice: "last_7_days" } } }],
+    [{ answers: { chart: { choice: "tokens" } } }],
+  ])("does not return model choices outside the supplied options", async (answer) => {
+    env.AI.run.mockResolvedValueOnce(answer);
+    const res = await request(validRequest);
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toHaveProperty("error");
+  });
+
+  it("rate limits without invoking the paid model", async () => {
+    env.AI_SUGGEST_LIMIT.limit.mockResolvedValueOnce({ success: false });
+    const res = await request(validRequest);
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toHaveProperty("error");
+    expect(env.AI.run).not.toHaveBeenCalled();
+  });
+
+  it("reports provider failures instead of inventing a suggestion", async () => {
+    env.AI.run.mockRejectedValueOnce(new Error("AI unavailable"));
+    const res = await request(validRequest);
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "Chart suggestion provider failed" });
+  });
+
+  it("explains an account without credits rather than exposing the provider error", async () => {
+    env.AI.run.mockRejectedValueOnce(new Error("2021: Insufficient AI Gateway credits"));
+    const res = await request(validRequest);
+
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({
+      error: "Workers AI requires AI Gateway credits for Jev in this Cloudflare account.",
+    });
   });
 });
 

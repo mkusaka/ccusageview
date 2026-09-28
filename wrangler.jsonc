@@ -7,6 +7,16 @@
     "directory": "./dist",
     "binding": "ASSETS",
   },
+  "ai": {
+    "binding": "AI",
+  },
+  "ratelimits": [
+    {
+      "name": "AI_SUGGEST_LIMIT",
+      "namespace_id": "1892674301",
+      "simple": { "limit": 60, "period": 60 },
+    },
+  ],
   "kv_namespaces": [
     {
       "binding": "CCUSAGEVIEW_SHORT_URLS",
