@@ -617,6 +617,9 @@ export function Dashboard({ data }: Props) {
         <ChartPickerModal
           key={`${picker.mode}-${picker.target ?? ""}`}
           mode={picker.mode}
+          reportType={reportType}
+          granularity={granularity}
+          hasMultipleEntries={entries.length > 1}
           charts={pickerCharts}
           ranges={availableRanges}
           initialChart={

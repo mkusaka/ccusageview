@@ -22,9 +22,14 @@ function createMockEnv() {
     },
     AI: {
       run: vi.fn().mockResolvedValue({
-        answers: {
-          chart: { type: "choice", choice: "tokens" },
-          range: { type: "choice", choice: "last_7_days" },
+        state: "Completed",
+        result: {
+          model: "jev-1.13.0",
+          answers: {
+            chart: { type: "choice", choice: "tokens" },
+            range: { type: "choice", choice: "last_7_days" },
+          },
+          usage: {},
         },
       }),
     },
@@ -93,8 +98,9 @@ describe("POST /api/s", () => {
 describe("POST /api/charts/suggest", () => {
   const validRequest = {
     prompt: "Show token usage for the past week",
-    charts: ["tokens", "cost"],
-    ranges: ["dashboard", "last_7_days"],
+    reportType: "daily",
+    granularity: "daily",
+    hasMultipleEntries: true,
   };
   let env = createMockEnv();
 
@@ -117,10 +123,14 @@ describe("POST /api/charts/suggest", () => {
   it.each([
     [{ ...validRequest, prompt: "" }],
     [{ ...validRequest, prompt: "a".repeat(2001) }],
-    [{ ...validRequest, charts: [] }],
-    [{ ...validRequest, charts: ["tokens", "tokens"] }],
-    [{ ...validRequest, charts: ["tokens", "execute-query"] }],
-    [{ ...validRequest, ranges: ["yesterday"] }],
+    [{ ...validRequest, reportType: "unknown" }],
+    [{ ...validRequest, granularity: "yearly" }],
+    [{ ...validRequest, hasMultipleEntries: "true" }],
+    [{ ...validRequest, hasMultipleEntries: undefined }],
+    [{ ...validRequest, reportType: undefined }],
+    [{ ...validRequest, granularity: undefined }],
+    [{ ...validRequest, charts: ["tokens", "cost"] }],
+    [{ ...validRequest, ranges: ["dashboard", "last_7_days"] }],
     [{ ...validRequest, usage: [{ cost: 42 }] }],
     [{ ...validRequest, prompt: { text: "tokens", data: [{ cost: 42 }] } }],
   ])("rejects an invalid or data-bearing request without invoking Jev", async (body) => {
@@ -146,16 +156,75 @@ describe("POST /api/charts/suggest", () => {
     expect(env.AI.run).not.toHaveBeenCalled();
   });
 
+  it("accepts known choices from a completed Jev result", async () => {
+    const res = await request(validRequest);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ chart: "tokens", range: "last_7_days" });
+  });
+
   it.each([
-    [{ answers: { chart: { choice: "custom" }, range: { choice: "last_7_days" } } }],
-    [{ answers: { chart: { choice: "tokens" }, range: { choice: "last_decade" } } }],
-    [{ answers: { chart: { choice: "tokens" } } }],
-  ])("does not return model choices outside the fixed catalog", async (answer) => {
+    [
+      {
+        answers: {
+          chart: { type: "choice", choice: "tokens" },
+          range: { type: "choice", choice: "all" },
+        },
+      },
+    ],
+    [
+      {
+        state: "Failed",
+        result: {
+          answers: {
+            chart: { type: "choice", choice: "tokens" },
+            range: { type: "choice", choice: "all" },
+          },
+        },
+      },
+    ],
+    [
+      {
+        state: "Completed",
+        result: {
+          answers: {
+            chart: { type: "choice", choice: "custom" },
+            range: { type: "choice", choice: "all" },
+          },
+        },
+      },
+    ],
+    [
+      {
+        state: "Completed",
+        result: {
+          answers: {
+            chart: { type: "choice", choice: "tokens" },
+            range: { type: "choice", choice: "last_decade" },
+          },
+        },
+      },
+    ],
+    [
+      {
+        state: "Completed",
+        result: {
+          answers: {
+            chart: { type: "text", choice: "tokens" },
+            range: { type: "choice", choice: "all" },
+          },
+        },
+      },
+    ],
+    [{ state: "Completed", result: { answers: { chart: { type: "choice", choice: "tokens" } } } }],
+  ])("fails closed on malformed provider responses", async (answer) => {
     env.AI.run.mockResolvedValueOnce(answer);
     const res = await request(validRequest);
 
     expect(res.status).toBe(502);
-    expect(await res.json()).toHaveProperty("error");
+    expect(await res.json()).toEqual({
+      error: "Chart suggestion provider returned invalid choices",
+    });
   });
 
   it("rate limits without invoking the paid model", async () => {

@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { hc } from "hono/client";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import type { AppType } from "../worker";
+import type { ReportType } from "../types";
+import type { TimeGranularity } from "../utils/projection";
 import {
   DASHBOARD_CHARTS,
   DASHBOARD_RANGES,
@@ -11,6 +13,9 @@ import {
 
 interface Props {
   mode: "add" | "replace";
+  reportType: ReportType;
+  granularity: TimeGranularity;
+  hasMultipleEntries: boolean;
   charts: DashboardChartId[];
   ranges: DashboardRangeId[];
   initialChart?: DashboardChartId;
@@ -22,6 +27,9 @@ interface Props {
 
 export function ChartPickerModal({
   mode,
+  reportType,
+  granularity,
+  hasMultipleEntries,
   charts,
   ranges,
   initialChart,
@@ -53,7 +61,7 @@ export function ChartPickerModal({
     setLoading(true);
     try {
       const response = await hc<AppType>(window.location.origin).api.charts.suggest.$post(
-        { json: { prompt: prompt.trim(), charts, ranges } },
+        { json: { prompt: prompt.trim(), reportType, granularity, hasMultipleEntries } },
         { init: { signal: request.signal } },
       );
       const result = await response.json();
