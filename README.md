@@ -52,11 +52,13 @@ Open https://ccusageview.polyfill.workers.dev/ and paste your ccusage JSON into 
 
 ### Customize dashboard charts
 
-Load a report and use **Add chart** to choose one of the available predefined charts and a date-range preset. Each chart can be moved up or down, replaced, or removed. The initial dashboard layout is unchanged; chart availability depends on the report type and current time granularity. **Dashboard range** follows the main range slider; other presets apply only to that chart.
+Load a report and use **Add chart** to choose a predefined chart and date-range preset. Each chart also has an icon toolbar for moving, replacing, removing, or adding another chart **directly after it**; the toolbar labels appear on hover or keyboard focus. The dialog puts the request first, followed by **every chart and range from the start** in a scrollable list; options the current report or granularity cannot support remain visible but disabled. The initial dashboard layout is unchanged. **Dashboard range** follows the main range slider; other presets apply only to that chart.
 
-In the add/replace dialog, enter a request such as “モデル別のコストの推移を見たい” and select **Suggest**. A Cloudflare Worker asks the [Jev model](https://developers.cloudflare.com/ai/models/typesafe/jev/) to select the closest **chart and range from the same fixed choices**. The dialog renders the suggested chart with your report data in a scrollable preview; review it before applying. Jev cannot create a new chart, generate SQL, or change the underlying data. Manual selection works without AI.
+In the add/replace dialog, enter a request such as “モデル別のコストの推移を見たい” and select **Suggest**. A Cloudflare Worker gives the [Jev model](https://developers.cloudflare.com/ai/models/typesafe/jev/) the **full chart and range catalog**, marking options unavailable in the current view, and asks it to select the closest chart and range. Available suggestions render with your report data in a scrollable preview before you apply them. Unavailable suggestions stay visible with an explanation and cannot be applied. Jev cannot create a new chart, generate SQL, or change the underlying data. Manual selection works without AI.
 
-The prompt and identifiers of the currently available choices are sent to Cloudflare Workers AI (Jev is a third-party model); report contents and computed usage rows stay in the browser. Suggestions require a configured Workers AI binding **and AI Gateway credits on the Cloudflare account**. They are unavailable when serving the frontend with plain `pnpm dev`. Use `pnpm cf:dev` to test the Worker locally; Workers AI requests can incur charges even in local development.
+Only the prompt and IDs marking which fixed choices are usable in this view are sent to Cloudflare Workers AI (Jev is a third-party model); report contents and computed usage rows stay in the browser. Suggestions require a configured Workers AI binding **and AI Gateway credits on the Cloudflare account**. They are unavailable when serving the frontend with plain `pnpm dev`. Use `pnpm cf:dev` to test the Worker locally; Workers AI requests can incur charges even in local development.
+
+If Jev returns `Insufficient AI Gateway credits`, open [Cloudflare AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway), check **Credits Available**, then use **Manage → Top-up credits**. The AI binding does not need the model page's **Generate API Token**. Purchasing credits incurs charges; if routing through a configured gateway, set that gateway's **Workers AI Billing** to **Unified billing**.
 
 ## CLI options
 
@@ -96,6 +98,8 @@ Run `pnpm pricing:update` to refresh those filtered LiteLLM datasets.
 ```sh
 pnpm cf:dev       # Build frontend + start wrangler dev
 ```
+
+`wrangler.jsonc` enables Cloudflare Workers Observability, including logs and traces, for deployments. Inspect them in the Cloudflare dashboard after deployment.
 
 ### Deploy
 

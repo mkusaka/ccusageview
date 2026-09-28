@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { hc } from "hono/client";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import type { AppType } from "../worker";
 import {
   DASHBOARD_CHARTS,
@@ -39,16 +40,8 @@ export function ChartPickerModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const controller = useRef<AbortController | null>(null);
-  const dialog = useRef<HTMLDialogElement>(null);
 
-  useEffect(() => {
-    const element = dialog.current;
-    element?.showModal();
-    return () => {
-      controller.current?.abort();
-      element?.close();
-    };
-  }, []);
+  useEffect(() => () => controller.current?.abort(), []);
 
   async function suggest() {
     if (!prompt.trim() || loading || !charts.length) return;
@@ -69,12 +62,12 @@ export function ChartPickerModal({
       } else if (
         "chart" in result &&
         "range" in result &&
-        charts.includes(result.chart) &&
-        ranges.includes(result.range)
+        DASHBOARD_CHARTS.some((item) => item.id === result.chart) &&
+        DASHBOARD_RANGES.some((item) => item.id === result.range)
       ) {
         setSuggestion({ chart: result.chart, range: result.range });
       } else {
-        setError("Jev returned a chart or range that is not available.");
+        setError("Jev returned an unknown chart or date range.");
       }
     } catch (cause) {
       if (!request.signal.aborted)
@@ -88,131 +81,194 @@ export function ChartPickerModal({
   }
 
   return (
-    <dialog
-      ref={dialog}
-      aria-label={mode === "add" ? "Add chart" : "Replace chart"}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
       }}
-      className="max-h-[85vh] w-full max-w-4xl overflow-y-auto rounded-lg border border-border bg-bg-card p-5 text-text-primary shadow-xl backdrop:bg-black/50"
     >
-      <div className="flex items-center justify-between gap-3 mb-4">
-        <h2 className="text-lg font-semibold">{mode === "add" ? "Add chart" : "Replace chart"}</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close chart picker"
-          className="text-sm text-text-secondary hover:text-text-primary"
-        >
-          Close
-        </button>
-      </div>
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          onApply(chart, range);
-        }}
-        className="space-y-4"
-      >
-        <label className="block text-sm font-medium">
-          Chart
-          <select
-            value={chart}
-            onChange={(event) => setChart(event.target.value as DashboardChartId)}
-            className="mt-1 w-full rounded-md border border-border bg-bg-secondary p-2"
-          >
-            {DASHBOARD_CHARTS.filter((item) => charts.includes(item.id)).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label} — {item.description}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block text-sm font-medium">
-          Date range
-          <select
-            value={range}
-            onChange={(event) => setRange(event.target.value as DashboardRangeId)}
-            className="mt-1 w-full rounded-md border border-border bg-bg-secondary p-2"
-          >
-            {DASHBOARD_RANGES.filter((item) => ranges.includes(item.id)).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label} — {item.description}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="submit"
-          disabled={!charts.length}
-          className="rounded-md bg-accent px-3 py-1.5 text-sm text-white disabled:opacity-50"
-        >
-          {mode === "add" ? "Add chart" : "Apply chart"}
-        </button>
-      </form>
-      <div className="mt-5 border-t border-border pt-4 space-y-2">
-        <label htmlFor="chart-suggestion" className="block text-sm font-medium">
-          Ask Jev for a chart suggestion (optional)
-        </label>
-        <textarea
-          id="chart-suggestion"
-          value={prompt}
-          onChange={(event) => {
-            controller.current?.abort();
-            controller.current = null;
-            setLoading(false);
-            setPrompt(event.target.value);
-            setSuggestion(null);
-            setError("");
-          }}
-          rows={2}
-          placeholder="e.g. Show recent cost trends"
-          className="w-full rounded-md border border-border bg-bg-secondary p-2 text-sm"
-        />
-        <button
-          type="button"
-          onClick={suggest}
-          disabled={!prompt.trim() || loading || !charts.length}
-          className="rounded-md border border-border px-3 py-1.5 text-sm disabled:opacity-50"
-        >
-          {loading ? "Asking Jev…" : "Suggest"}
-        </button>
-        {error && (
-          <p role="alert" className="text-sm text-red-500">
-            {error}
-          </p>
-        )}
-        {suggestion && (
-          <div className="space-y-4">
-            <div className="rounded-md border border-border p-3 text-sm" role="status">
-              <p>
-                Jev suggests:{" "}
-                <strong>
-                  {DASHBOARD_CHARTS.find((item) => item.id === suggestion.chart)?.label}
-                </strong>{" "}
-                ·{" "}
-                <strong>
-                  {DASHBOARD_RANGES.find((item) => item.id === suggestion.range)?.label}
-                </strong>
+      <DialogContent>
+        <header className="mb-5 pr-10">
+          <DialogTitle className="text-xl font-semibold">
+            {mode === "add" ? "Add chart" : "Replace chart"}
+          </DialogTitle>
+          <DialogDescription className="sr-only">
+            Describe the chart you want or choose from the charts and date ranges below.
+          </DialogDescription>
+        </header>
+
+        <div className="min-h-0 space-y-6 overflow-y-auto pr-1">
+          <div className="space-y-3">
+            <textarea
+              aria-label="Chart request"
+              value={prompt}
+              onChange={(event) => {
+                controller.current?.abort();
+                controller.current = null;
+                setLoading(false);
+                setPrompt(event.target.value);
+                setSuggestion(null);
+                setError("");
+              }}
+              rows={2}
+              placeholder="Describe the chart you want…"
+              className="w-full rounded-md border border-border bg-bg-secondary p-3 text-base text-text-primary placeholder:text-text-secondary focus-visible:outline-2 focus-visible:outline-accent"
+            />
+            <button
+              type="button"
+              onClick={suggest}
+              disabled={!prompt.trim() || loading || !charts.length}
+              className="rounded-md border border-border px-3 py-2 text-sm font-medium hover:bg-bg-secondary focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
+            >
+              {loading ? "Suggesting…" : "Suggest"}
+            </button>
+            {error && (
+              <p role="alert" className="text-sm text-red-500">
+                {error}
               </p>
-              <button
-                type="button"
-                onClick={() => onApply(suggestion.chart, suggestion.range)}
-                className="mt-2 rounded-md bg-accent px-3 py-1.5 text-white"
-              >
-                Apply suggestion
-              </button>
-            </div>
-            <div className="space-y-2">
-              <h3 className="font-medium">Suggested chart preview</h3>
-              <div className="rounded-lg border border-border">
-                {preview(suggestion.chart, suggestion.range)}
+            )}
+            {suggestion && (
+              <div className="space-y-4">
+                <div
+                  className="rounded-md border border-border bg-bg-secondary p-4 text-sm"
+                  role="status"
+                >
+                  <p>
+                    <span className="sr-only">Suggested chart and range: </span>
+                    <strong>
+                      {DASHBOARD_CHARTS.find((item) => item.id === suggestion.chart)?.label}
+                    </strong>
+                    {" · "}
+                    <strong>
+                      {DASHBOARD_RANGES.find((item) => item.id === suggestion.range)?.label}
+                    </strong>
+                  </p>
+                  {charts.includes(suggestion.chart) && ranges.includes(suggestion.range) ? (
+                    <button
+                      type="button"
+                      onClick={() => onApply(suggestion.chart, suggestion.range)}
+                      className="mt-3 rounded-md bg-accent px-3 py-2 font-medium text-white hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-accent"
+                    >
+                      Apply suggestion
+                    </button>
+                  ) : (
+                    <p className="mt-2 text-text-secondary">
+                      This suggestion is unavailable for the current report or granularity.
+                    </p>
+                  )}
+                </div>
+                {charts.includes(suggestion.chart) && ranges.includes(suggestion.range) && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Preview</h3>
+                    <div className="rounded-lg border border-border">
+                      {preview(suggestion.chart, suggestion.range)}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </div>
-        )}
-      </div>
-    </dialog>
+
+          <form
+            id="chart-picker-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onApply(chart, range);
+            }}
+            className="grid gap-5 border-t border-border pt-5 md:grid-cols-2"
+          >
+            <fieldset className="min-w-0">
+              <legend className="text-sm font-semibold">Chart</legend>
+              <div className="mt-2 space-y-2">
+                {DASHBOARD_CHARTS.map((item) => {
+                  const available = charts.includes(item.id);
+                  return (
+                    <label
+                      key={item.id}
+                      className={`flex gap-3 rounded-md border p-3 ${chart === item.id ? "border-accent bg-accent/10" : "border-border"} ${available ? "cursor-pointer hover:bg-bg-secondary" : "cursor-not-allowed opacity-50"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="chart"
+                        value={item.id}
+                        checked={chart === item.id}
+                        disabled={!available}
+                        onChange={() => setChart(item.id)}
+                        className="mt-0.5 size-4 shrink-0 accent-accent"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium">{item.label}</span>
+                        <span className="block text-xs text-text-secondary">
+                          {item.description}
+                        </span>
+                        {!available && (
+                          <span className="block text-xs text-text-secondary">
+                            Unavailable for this report or granularity
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+            <fieldset className="min-w-0">
+              <legend className="text-sm font-semibold">Date range</legend>
+              <div className="mt-2 space-y-2">
+                {DASHBOARD_RANGES.map((item) => {
+                  const available = ranges.includes(item.id);
+                  return (
+                    <label
+                      key={item.id}
+                      className={`flex gap-3 rounded-md border p-3 ${range === item.id ? "border-accent bg-accent/10" : "border-border"} ${available ? "cursor-pointer hover:bg-bg-secondary" : "cursor-not-allowed opacity-50"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="range"
+                        value={item.id}
+                        checked={range === item.id}
+                        disabled={!available}
+                        onChange={() => setRange(item.id)}
+                        className="mt-0.5 size-4 shrink-0 accent-accent"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium">{item.label}</span>
+                        <span className="block text-xs text-text-secondary">
+                          {item.description}
+                        </span>
+                        {!available && (
+                          <span className="block text-xs text-text-secondary">
+                            Unavailable for this report type
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          </form>
+        </div>
+
+        <footer className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
+          <DialogClose asChild>
+            <button
+              type="button"
+              className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-bg-secondary focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              Cancel
+            </button>
+          </DialogClose>
+          <button
+            type="submit"
+            form="chart-picker-form"
+            disabled={!charts.length}
+            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
+          >
+            {mode === "add" ? "Add chart" : "Apply chart"}
+          </button>
+        </footer>
+      </DialogContent>
+    </Dialog>
   );
 }

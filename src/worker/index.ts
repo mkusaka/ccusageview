@@ -84,6 +84,8 @@ const api = new Hono<{ Bindings: Bindings }>()
       );
     }
     const { prompt, charts, ranges } = request.output;
+    const availableCharts = new Set(charts);
+    const availableRanges = new Set(ranges);
 
     let result: unknown;
     try {
@@ -96,21 +98,24 @@ const api = new Hono<{ Bindings: Bindings }>()
         questions: {
           chart: {
             type: "choice",
-            instructions: "Select the closest available dashboard chart to the user's request.",
+            instructions:
+              "Choose the closest chart for the request. All charts are shown; prefer one marked available for this dashboard.",
             criteria: Object.fromEntries(
-              DASHBOARD_CHARTS.filter(({ id }) => charts.includes(id)).map(
-                ({ id, label, description }) => [id, `${label}: ${description}`],
-              ),
+              DASHBOARD_CHARTS.map(({ id, label, description }) => [
+                id,
+                `${label}: ${description}${availableCharts.has(id) ? "" : " (unavailable in this dashboard)"}`,
+              ]),
             ),
           },
           range: {
             type: "choice",
             instructions:
-              "Select the closest available date range to the user's request. Use dashboard if no date range is specified.",
+              "Choose the closest date range for the request. Use dashboard when no range is specified; prefer an available range.",
             criteria: Object.fromEntries(
-              DASHBOARD_RANGES.filter(({ id }) => ranges.includes(id)).map(
-                ({ id, label, description }) => [id, `${label}: ${description}`],
-              ),
+              DASHBOARD_RANGES.map(({ id, label, description }) => [
+                id,
+                `${label}: ${description}${availableRanges.has(id) ? "" : " (unavailable in this dashboard)"}`,
+              ]),
             ),
           },
         },
@@ -128,12 +133,14 @@ const api = new Hono<{ Bindings: Bindings }>()
         answers: v.object({
           chart: v.object({
             choice: v.custom<(typeof DASHBOARD_CHARTS)[number]["id"]>(
-              (value) => typeof value === "string" && charts.some((id) => id === value),
+              (value) =>
+                typeof value === "string" && DASHBOARD_CHARTS.some(({ id }) => id === value),
             ),
           }),
           range: v.object({
             choice: v.custom<(typeof DASHBOARD_RANGES)[number]["id"]>(
-              (value) => typeof value === "string" && ranges.some((id) => id === value),
+              (value) =>
+                typeof value === "string" && DASHBOARD_RANGES.some(({ id }) => id === value),
             ),
           }),
         }),

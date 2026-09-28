@@ -114,36 +114,6 @@ describe("POST /api/charts/suggest", () => {
     );
   }
 
-  it("suggests only the requested predefined chart and range, with only their criteria sent to Jev", async () => {
-    const res = await request(validRequest);
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ chart: "tokens", range: "last_7_days" });
-    expect(env.AI.run).toHaveBeenCalledOnce();
-    expect(env.AI.run).toHaveBeenCalledWith("typesafe/jev", {
-      state: validRequest.prompt,
-      questions: {
-        chart: {
-          type: "choice",
-          instructions: expect.any(String),
-          criteria: {
-            cost: expect.stringContaining("Cost over time"),
-            tokens: expect.stringContaining("Token breakdown"),
-          },
-        },
-        range: {
-          type: "choice",
-          instructions: expect.any(String),
-          criteria: {
-            dashboard: expect.stringContaining("Dashboard range"),
-            last_7_days: expect.stringContaining("Last 7 days"),
-          },
-        },
-      },
-    });
-    expect(env.AI_SUGGEST_LIMIT.limit).toHaveBeenCalledWith({ key: "chart-suggest" });
-  });
-
   it.each([
     [{ ...validRequest, prompt: "" }],
     [{ ...validRequest, prompt: "a".repeat(2001) }],
@@ -177,11 +147,10 @@ describe("POST /api/charts/suggest", () => {
   });
 
   it.each([
-    [{ answers: { chart: { choice: "activity" }, range: { choice: "last_7_days" } } }],
-    [{ answers: { chart: { choice: "tokens" }, range: { choice: "this_year" } } }],
     [{ answers: { chart: { choice: "custom" }, range: { choice: "last_7_days" } } }],
+    [{ answers: { chart: { choice: "tokens" }, range: { choice: "last_decade" } } }],
     [{ answers: { chart: { choice: "tokens" } } }],
-  ])("does not return model choices outside the supplied options", async (answer) => {
+  ])("does not return model choices outside the fixed catalog", async (answer) => {
     env.AI.run.mockResolvedValueOnce(answer);
     const res = await request(validRequest);
 

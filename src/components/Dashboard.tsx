@@ -36,6 +36,7 @@ import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { breakdownHintCommand, HintedTab } from "./BreakdownHint";
 import { RangeSlider } from "./RangeSlider";
 import { ChartPickerModal } from "./ChartPickerModal";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface Props {
   data: DashboardData;
@@ -75,6 +76,109 @@ interface ChartPanel {
   key: string;
   id: DashboardChartId;
   range: DashboardRangeId;
+}
+
+type PanelActionName = "up" | "down" | "add" | "replace" | "remove";
+
+const PANEL_ACTION_ICONS: Record<PanelActionName, ReactNode> = {
+  up: (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-4"
+    >
+      <path d="m6 14 6-6 6 6" />
+    </svg>
+  ),
+  down: (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-4"
+    >
+      <path d="m6 10 6 6 6-6" />
+    </svg>
+  ),
+  add: (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      className="size-4"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  ),
+  replace: (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-4"
+    >
+      <path d="M4 7h16m0 0-4-4m4 4-4 4M20 17H4m0 0 4-4m-4 4 4 4" />
+    </svg>
+  ),
+  remove: (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-4"
+    >
+      <path d="M4 7h16m-10 0V4h4v3m-8 0 1 13h10l1-13M10 11v6m4-6v6" />
+    </svg>
+  ),
+};
+
+function PanelAction({
+  action,
+  label,
+  onClick,
+  disabled,
+}: {
+  action: PanelActionName;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          disabled={disabled}
+          onClick={onClick}
+          className="flex size-9 items-center justify-center rounded-md border border-transparent text-text-secondary hover:border-border hover:bg-bg-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
+        >
+          {PANEL_ACTION_ICONS[action]}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 function initialPanels(available: DashboardChartId[]): ChartPanel[] {
@@ -243,13 +347,23 @@ export function Dashboard({ data }: Props) {
   }
   function applyPanel(id: DashboardChartId, selectedRange: DashboardRangeId) {
     if (!picker || !pickerCharts.includes(id) || !availableRanges.includes(selectedRange)) return;
-    setPanels((current) =>
-      picker.mode === "add"
-        ? [...current, { key: crypto.randomUUID(), id, range: selectedRange }]
-        : current.map((panel) =>
-            panel.key === picker.target ? { ...panel, id, range: selectedRange } : panel,
-          ),
-    );
+    setPanels((current) => {
+      if (picker.mode === "replace") {
+        return current.map((panel) =>
+          panel.key === picker.target ? { ...panel, id, range: selectedRange } : panel,
+        );
+      }
+      const next = [...current];
+      const targetIndex = picker.target
+        ? current.findIndex((panel) => panel.key === picker.target)
+        : -1;
+      next.splice(targetIndex < 0 ? next.length : targetIndex + 1, 0, {
+        key: crypto.randomUUID(),
+        id,
+        range: selectedRange,
+      });
+      return next;
+    });
     setPicker(null);
   }
   function movePanel(index: number, offset: number) {
@@ -446,8 +560,9 @@ export function Dashboard({ data }: Props) {
         type="button"
         disabled={!availableCharts.length}
         onClick={() => setPicker({ mode: "add" })}
-        className="rounded-md border border-border bg-bg-card px-3 py-1.5 text-sm hover:bg-bg-secondary disabled:opacity-50"
+        className="inline-flex items-center gap-2 rounded-md border border-border bg-bg-card px-3 py-1.5 text-sm hover:bg-bg-secondary disabled:opacity-50"
       >
+        {PANEL_ACTION_ICONS.add}
         Add chart
       </button>
       <div ref={dashboardRef} className="space-y-4">
@@ -457,44 +572,39 @@ export function Dashboard({ data }: Props) {
           const rangeLabel = DASHBOARD_RANGES.find((item) => item.id === panel.range)?.label;
           return (
             <section key={panel.key} aria-label={`${label} chart`} className="space-y-1">
-              <div className="flex items-center justify-end gap-1 text-xs text-text-secondary">
-                {panel.range !== "dashboard" && <span className="mr-auto">{rangeLabel}</span>}
-                <button
-                  type="button"
-                  aria-label={`Move ${label} up`}
+              <div className="flex items-center justify-end gap-1">
+                {panel.range !== "dashboard" && (
+                  <span className="mr-auto text-xs text-text-secondary">{rangeLabel}</span>
+                )}
+                <PanelAction
+                  action="up"
+                  label={`Move ${label} up`}
                   disabled={index === 0}
                   onClick={() => movePanel(index, -1)}
-                  className="rounded px-1.5 py-0.5 hover:bg-bg-secondary disabled:opacity-40"
-                >
-                  Up
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Move ${label} down`}
+                />
+                <PanelAction
+                  action="down"
+                  label={`Move ${label} down`}
                   disabled={index === panels.length - 1}
                   onClick={() => movePanel(index, 1)}
-                  className="rounded px-1.5 py-0.5 hover:bg-bg-secondary disabled:opacity-40"
-                >
-                  Down
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Replace ${label}`}
+                />
+                <PanelAction
+                  action="add"
+                  label={`Add chart after ${label}`}
+                  onClick={() => setPicker({ mode: "add", target: panel.key })}
+                />
+                <PanelAction
+                  action="replace"
+                  label={`Replace ${label}`}
                   onClick={() => setPicker({ mode: "replace", target: panel.key })}
-                  className="rounded px-1.5 py-0.5 hover:bg-bg-secondary"
-                >
-                  Replace
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Remove ${label}`}
+                />
+                <PanelAction
+                  action="remove"
+                  label={`Remove ${label}`}
                   onClick={() =>
                     setPanels((current) => current.filter((item) => item.key !== panel.key))
                   }
-                  className="rounded px-1.5 py-0.5 hover:bg-bg-secondary"
-                >
-                  Remove
-                </button>
+                />
               </div>
               <PanelMarkdownProvider panelKey={panel.key} register={registerMarkdownSection}>
                 {renderChart(panel)}
@@ -509,8 +619,16 @@ export function Dashboard({ data }: Props) {
           mode={picker.mode}
           charts={pickerCharts}
           ranges={availableRanges}
-          initialChart={panels.find((panel) => panel.key === picker.target)?.id}
-          initialRange={panels.find((panel) => panel.key === picker.target)?.range}
+          initialChart={
+            picker.mode === "replace"
+              ? panels.find((panel) => panel.key === picker.target)?.id
+              : undefined
+          }
+          initialRange={
+            picker.mode === "replace"
+              ? panels.find((panel) => panel.key === picker.target)?.range
+              : undefined
+          }
           onApply={applyPanel}
           onClose={() => setPicker(null)}
           preview={(id, selectedRange) => renderChart({ key: "preview", id, range: selectedRange })}
