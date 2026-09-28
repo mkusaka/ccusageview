@@ -34,6 +34,19 @@ button[aria-disabled="true"] {
   --color-border: oklch(0.3 0.01 260);
 }
 
+/* The dashboard supplies the card frame; individual charts keep theirs in previews. */
+.dashboard-panel-chart > .border,
+.dashboard-panel-chart > div > .border {
+  border: 0;
+  border-radius: 0;
+}
+
+@media (hover: none) {
+  .dashboard-panel-insert > span:last-child {
+    opacity: 1;
+  }
+}
+
 /* Range slider */
 .range-slider input[type="range"] {
   -webkit-appearance: none;

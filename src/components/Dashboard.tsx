@@ -632,48 +632,66 @@ export function Dashboard({ data }: Props) {
           const rangeLabel = DASHBOARD_RANGES.find((item) => item.id === panel.range)?.label;
           return (
             <section key={panel.key} aria-label={`${label} chart`}>
-              <div className="flex items-center justify-end gap-1">
-                {panel.range !== "dashboard" && (
-                  <span className="mr-auto text-xs text-text-secondary">{rangeLabel}</span>
-                )}
-                <PanelAction
-                  action="up"
-                  label={`Move ${label} up`}
-                  disabled={index === 0}
-                  onClick={() => movePanel(index, -1)}
-                />
-                <PanelAction
-                  action="down"
-                  label={`Move ${label} down`}
-                  disabled={index === panels.length - 1}
-                  onClick={() => movePanel(index, 1)}
-                />
-                <PanelAction
-                  action="add"
-                  label={`Add chart after ${label}`}
+              <div className="rounded-lg border border-border bg-bg-card">
+                <div className="flex min-h-10 items-center justify-end gap-1 px-2 pt-1">
+                  {panel.range !== "dashboard" && (
+                    <span className="mr-auto text-xs text-text-secondary">{rangeLabel}</span>
+                  )}
+                  <PanelAction
+                    action="up"
+                    label={`Move ${label} up`}
+                    disabled={index === 0}
+                    onClick={() => movePanel(index, -1)}
+                  />
+                  <PanelAction
+                    action="down"
+                    label={`Move ${label} down`}
+                    disabled={index === panels.length - 1}
+                    onClick={() => movePanel(index, 1)}
+                  />
+                  <PanelAction
+                    action="replace"
+                    label={`Replace ${label}`}
+                    onClick={(event) =>
+                      openPicker({ mode: "replace", target: panel.key }, event.currentTarget)
+                    }
+                  />
+                  <PanelAction
+                    action="remove"
+                    label={`Remove ${label}`}
+                    onClick={(event) => {
+                      removalTrigger.current = event.currentTarget;
+                      setRemoval({ key: panel.key, label: label ?? panel.id });
+                    }}
+                  />
+                </div>
+                <div className="dashboard-panel-chart">
+                  <PanelMarkdownProvider panelKey={panel.key} register={registerMarkdownSection}>
+                    {renderChart(panel)}
+                  </PanelMarkdownProvider>
+                </div>
+              </div>
+              {index < panels.length - 1 && (
+                <button
+                  type="button"
+                  aria-label={`Add chart after ${label}`}
                   onClick={(event) =>
                     openPicker({ mode: "add", target: panel.key }, event.currentTarget)
                   }
-                />
-                <PanelAction
-                  action="replace"
-                  label={`Replace ${label}`}
-                  onClick={(event) =>
-                    openPicker({ mode: "replace", target: panel.key }, event.currentTarget)
-                  }
-                />
-                <PanelAction
-                  action="remove"
-                  label={`Remove ${label}`}
-                  onClick={(event) => {
-                    removalTrigger.current = event.currentTarget;
-                    setRemoval({ key: panel.key, label: label ?? panel.id });
-                  }}
-                />
-              </div>
-              <PanelMarkdownProvider panelKey={panel.key} register={registerMarkdownSection}>
-                {renderChart(panel)}
-              </PanelMarkdownProvider>
+                  className="dashboard-panel-insert group relative mt-2 flex h-6 w-full items-center justify-center focus-visible:outline-none"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-0 h-px bg-border transition-[height,background-color] group-hover:h-0.5 group-hover:bg-accent group-focus-visible:h-0.5 group-focus-visible:bg-accent"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="relative flex size-6 items-center justify-center rounded-full border border-border bg-bg-card text-text-secondary opacity-0 transition-opacity group-hover:border-accent group-hover:bg-accent group-hover:text-white group-hover:opacity-100 group-focus-visible:border-accent group-focus-visible:bg-accent group-focus-visible:text-white group-focus-visible:opacity-100"
+                  >
+                    {PANEL_ACTION_ICONS.add}
+                  </span>
+                </button>
+              )}
             </section>
           );
         })}
