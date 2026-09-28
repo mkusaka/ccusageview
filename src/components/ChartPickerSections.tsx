@@ -44,8 +44,17 @@ type PreviewChart = (
   tab?: DashboardChartTabId,
 ) => ReactNode;
 
+function AddedBadge() {
+  return (
+    <span className="shrink-0 rounded-full border border-chart-green/70 bg-chart-green/10 px-2 py-0.5 text-[11px] font-semibold text-text-primary">
+      Added
+    </span>
+  );
+}
+
 export function ChartPickerAlternatives({
   picks,
+  addedCharts,
   title,
   selection,
   charts,
@@ -54,6 +63,7 @@ export function ChartPickerAlternatives({
   onSelect,
 }: {
   picks: (PickerSelection & { confidence?: number })[];
+  addedCharts: ReadonlySet<DashboardChartId>;
   title: string;
   selection: PickerSelection;
   charts: DashboardChartId[];
@@ -68,23 +78,27 @@ export function ChartPickerAlternatives({
       <ul className="grid gap-2 md:grid-cols-2">
         {picks.map((item) => {
           const available = isPickerSelectionAvailable(item, charts, ranges, hasAgentData);
+          const added = addedCharts.has(item.chart);
+          const selected =
+            selection.chart === item.chart &&
+            selection.tab === item.tab &&
+            selection.range === item.range;
           return (
             <li key={`${item.chart}-${item.tab ?? ""}-${item.range}`}>
               <button
                 type="button"
-                aria-pressed={
-                  selection.chart === item.chart &&
-                  selection.tab === item.tab &&
-                  selection.range === item.range
-                }
+                aria-pressed={selected}
                 disabled={!available}
                 onClick={() => onSelect(item)}
-                className="h-full w-full rounded-md border border-border p-2 text-left text-xs hover:bg-bg-secondary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+                className={`h-full w-full rounded-md border p-2 text-left text-xs hover:bg-bg-secondary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50 ${selected ? "border-accent bg-accent/10" : added ? "border-chart-green/70 bg-chart-green/10" : "border-border"}`}
               >
-                <span className="block font-medium">
-                  {DASHBOARD_CHARTS.find((entry) => entry.id === item.chart)?.label}
-                  {item.tab &&
-                    ` · ${DASHBOARD_CHART_TABS[item.chart].find((entry) => entry.id === item.tab)?.label}`}
+                <span className="flex items-center justify-between gap-2 font-medium">
+                  <span>
+                    {DASHBOARD_CHARTS.find((entry) => entry.id === item.chart)?.label}
+                    {item.tab &&
+                      ` · ${DASHBOARD_CHART_TABS[item.chart].find((entry) => entry.id === item.tab)?.label}`}
+                  </span>
+                  {added && <AddedBadge />}
                 </span>
                 <span className="text-text-secondary">
                   {DASHBOARD_RANGES.find((entry) => entry.id === item.range)?.label}
@@ -103,6 +117,7 @@ export function ChartPickerAlternatives({
 
 export function ChartPickerChoices({
   charts,
+  addedCharts,
   ranges,
   hasAgentData,
   selection,
@@ -111,6 +126,7 @@ export function ChartPickerChoices({
   preview,
 }: {
   charts: DashboardChartId[];
+  addedCharts: ReadonlySet<DashboardChartId>;
   ranges: DashboardRangeId[];
   hasAgentData: boolean;
   selection: PickerSelection;
@@ -122,6 +138,7 @@ export function ChartPickerChoices({
   const tab = selection.tab ?? defaultPickerTab(chart);
   const chartTabs = DASHBOARD_CHART_TABS[chart];
   const available = isPickerSelectionAvailable({ chart, range, tab }, charts, ranges, hasAgentData);
+  const added = addedCharts.has(chart);
 
   return (
     <div className="space-y-5 border-t border-border pt-5">
@@ -139,10 +156,11 @@ export function ChartPickerChoices({
             <div className="mt-2 space-y-2">
               {DASHBOARD_CHARTS.map((item) => {
                 const selectable = charts.includes(item.id);
+                const isAdded = addedCharts.has(item.id);
                 return (
                   <label
                     key={item.id}
-                    className={`flex gap-3 rounded-md border p-3 ${chart === item.id ? "border-accent bg-accent/10" : "border-border"} ${selectable ? "cursor-pointer hover:bg-bg-secondary" : "cursor-not-allowed opacity-50"}`}
+                    className={`flex gap-3 rounded-md border p-3 ${chart === item.id ? "border-accent bg-accent/10" : isAdded ? "border-chart-green/70 bg-chart-green/10" : "border-border"} ${selectable ? "cursor-pointer hover:bg-bg-secondary" : "cursor-not-allowed opacity-50"}`}
                   >
                     <input
                       type="radio"
@@ -155,8 +173,11 @@ export function ChartPickerChoices({
                       }
                       className="mt-0.5 size-4 shrink-0 accent-accent"
                     />
-                    <span className="min-w-0">
-                      <span className="block text-sm font-medium">{item.label}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium">{item.label}</span>
+                        {isAdded && <AddedBadge />}
+                      </span>
                       <span className="block text-xs text-text-secondary">{item.description}</span>
                       {!selectable && (
                         <span className="block text-xs text-text-secondary">
@@ -233,8 +254,13 @@ export function ChartPickerChoices({
         )}
       </form>
       <div className="space-y-2">
-        <h3 className="text-sm font-medium">Preview</h3>
-        <div className="rounded-lg border border-border">
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium">Preview</h3>
+          {added && <AddedBadge />}
+        </div>
+        <div
+          className={`rounded-lg border ${added ? "border-chart-green ring-2 ring-chart-green/20" : "border-border"}`}
+        >
           {available ? (
             preview(chart, range, tab)
           ) : (

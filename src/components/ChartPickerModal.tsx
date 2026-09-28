@@ -27,6 +27,7 @@ interface Props {
   hasMultipleEntries: boolean;
   hasAgentData: boolean;
   charts: DashboardChartId[];
+  addedCharts: ReadonlySet<DashboardChartId>;
   ranges: DashboardRangeId[];
   initialChart?: DashboardChartId;
   initialTab?: DashboardChartTabId;
@@ -47,6 +48,7 @@ export function ChartPickerModal({
   hasMultipleEntries,
   hasAgentData,
   charts,
+  addedCharts,
   ranges,
   initialChart,
   initialTab,
@@ -208,6 +210,7 @@ export function ChartPickerModal({
           </div>
 
           <ChartPickerChoices
+            addedCharts={addedCharts}
             charts={charts}
             ranges={ranges}
             hasAgentData={hasAgentData}
@@ -223,6 +226,7 @@ export function ChartPickerModal({
                 : "Quick picks (fixed presets, not AI-ranked)"
             }
             picks={suggestions.length ? suggestions.slice(1) : quickPicks}
+            addedCharts={addedCharts}
             selection={selection}
             charts={charts}
             ranges={ranges}

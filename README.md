@@ -52,7 +52,7 @@ Open https://ccusageview.polyfill.workers.dev/ and paste your ccusage JSON into 
 
 ### Customize dashboard charts
 
-Use **Add chart** to add a predefined chart, tab, and date range. Use the controls inside each chart to move, replace, or remove it; use the divider between charts to insert one there. The default dashboard stays unchanged. **Dashboard range** follows the main range slider; other ranges apply only to the selected chart.
+Use the dividers below and between charts to add a predefined chart, tab, and date range; controls inside a chart move, replace, or remove it. The picker marks chart types already on the dashboard as **Added**, but keeps them selectable. The default dashboard stays unchanged. **Dashboard range** follows the main range slider; other ranges apply only to the selected chart.
 
 In the add/replace dialog, enter a request such as “show model usage by agent” and select **Suggest**. A Cloudflare Worker asks [Jev](https://developers.cloudflare.com/ai/models/typesafe/jev/) to rank predefined chart/tab options and choose a date range. The top suggestion updates the selection and preview; other suggestions remain selectable. Unavailable options cannot be applied. Jev cannot create charts, generate SQL, or change the data. Manual selection works without AI.
 

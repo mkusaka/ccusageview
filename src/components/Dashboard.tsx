@@ -1,4 +1,12 @@
-import { useCallback, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+  type Ref,
+} from "react";
 import type { ReportType } from "../types";
 import type { DashboardData, NormalizedEntry } from "../utils/normalize";
 import type { TimeGranularity } from "../utils/projection";
@@ -185,6 +193,47 @@ function PanelAction({
   );
 }
 
+function InsertChartButton({
+  label,
+  onClick,
+  disabled,
+  buttonRef,
+  className,
+}: {
+  label: string;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
+  disabled?: boolean;
+  buttonRef?: Ref<HTMLButtonElement>;
+  className?: string;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          ref={buttonRef}
+          type="button"
+          aria-label={label}
+          disabled={disabled}
+          onClick={onClick}
+          className={`dashboard-panel-insert group relative flex h-6 w-full items-center justify-center focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40 ${className ?? ""}`}
+        >
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-0 h-px bg-border transition-[height,background-color] group-hover:h-0.5 group-hover:bg-accent group-focus-visible:h-0.5 group-focus-visible:bg-accent"
+          />
+          <span
+            aria-hidden="true"
+            className="relative flex size-6 items-center justify-center rounded-full border border-border bg-bg-card text-text-secondary opacity-0 transition-opacity group-hover:border-accent group-hover:bg-accent group-hover:text-white group-hover:opacity-100 group-focus-visible:border-accent group-focus-visible:bg-accent group-focus-visible:text-white group-focus-visible:opacity-100"
+          >
+            {PANEL_ACTION_ICONS.add}
+          </span>
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 function initialPanels(available: DashboardChartId[]): ChartPanel[] {
   return available.map((id) => ({ key: id, id, range: "dashboard" }));
 }
@@ -319,6 +368,11 @@ export function Dashboard({ data }: Props) {
   const panelKey = `${reportType}:${granularity}:${entries.length === 0}:${entries.length === 1}`;
   const [previousPanelKey, setPreviousPanelKey] = useState(panelKey);
   const [panels, setPanels] = useState<ChartPanel[]>(() => initialPanels(availableCharts));
+  const addedChartIds = useMemo(() => {
+    const ids = new Set<DashboardChartId>();
+    for (const panel of panels) ids.add(panel.id);
+    return ids;
+  }, [panels]);
   const [picker, setPicker] = useState<{ mode: "add" | "replace"; target?: string } | null>(null);
   const [removal, setRemoval] = useState<{ key: string; label: string } | null>(null);
   const removalTrigger = useRef<HTMLButtonElement | null>(null);
@@ -672,50 +726,24 @@ export function Dashboard({ data }: Props) {
                 </div>
               </div>
               {index < panels.length - 1 && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      aria-label={`Add chart after ${label}`}
-                      onClick={(event) =>
-                        openPicker({ mode: "add", target: panel.key }, event.currentTarget)
-                      }
-                      className="dashboard-panel-insert group relative mt-2 flex h-6 w-full items-center justify-center focus-visible:outline-none"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="absolute inset-x-0 h-px bg-border transition-[height,background-color] group-hover:h-0.5 group-hover:bg-accent group-focus-visible:h-0.5 group-focus-visible:bg-accent"
-                      />
-                      <span
-                        aria-hidden="true"
-                        className="relative flex size-6 items-center justify-center rounded-full border border-border bg-bg-card text-text-secondary opacity-0 transition-opacity group-hover:border-accent group-hover:bg-accent group-hover:text-white group-hover:opacity-100 group-focus-visible:border-accent group-focus-visible:bg-accent group-focus-visible:text-white group-focus-visible:opacity-100"
-                      >
-                        {PANEL_ACTION_ICONS.add}
-                      </span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Add chart after {label}</TooltipContent>
-                </Tooltip>
+                <InsertChartButton
+                  label={`Add chart after ${label}`}
+                  onClick={(event) =>
+                    openPicker({ mode: "add", target: panel.key }, event.currentTarget)
+                  }
+                  className="mt-2"
+                />
               )}
             </section>
           );
         })}
       </div>
-      <button
-        ref={addChartTrigger}
-        type="button"
+      <InsertChartButton
+        buttonRef={addChartTrigger}
+        label="Add chart"
         disabled={!availableCharts.length}
         onClick={(event) => openPicker({ mode: "add" }, event.currentTarget)}
-        className="group flex min-h-16 w-full items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-bg-card px-4 py-4 text-sm font-medium text-text-secondary hover:border-accent hover:bg-bg-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <span
-          aria-hidden="true"
-          className="flex size-8 items-center justify-center rounded-full border border-border bg-bg-secondary group-hover:border-accent"
-        >
-          {PANEL_ACTION_ICONS.add}
-        </span>
-        Add chart
-      </button>
+      />
       {picker && pickerCharts.length > 0 && (
         <ChartPickerModal
           key={`${picker.mode}-${picker.target ?? ""}`}
@@ -723,6 +751,7 @@ export function Dashboard({ data }: Props) {
           reportType={reportType}
           granularity={granularity}
           hasMultipleEntries={entries.length > 1}
+          addedCharts={addedChartIds}
           charts={pickerCharts}
           hasAgentData={entries.some((entry) => !!entry.agentBreakdowns?.length)}
           ranges={availableRanges}
