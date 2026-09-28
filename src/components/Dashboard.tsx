@@ -672,25 +672,30 @@ export function Dashboard({ data }: Props) {
                 </div>
               </div>
               {index < panels.length - 1 && (
-                <button
-                  type="button"
-                  aria-label={`Add chart after ${label}`}
-                  onClick={(event) =>
-                    openPicker({ mode: "add", target: panel.key }, event.currentTarget)
-                  }
-                  className="dashboard-panel-insert group relative mt-2 flex h-6 w-full items-center justify-center focus-visible:outline-none"
-                >
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-x-0 h-px bg-border transition-[height,background-color] group-hover:h-0.5 group-hover:bg-accent group-focus-visible:h-0.5 group-focus-visible:bg-accent"
-                  />
-                  <span
-                    aria-hidden="true"
-                    className="relative flex size-6 items-center justify-center rounded-full border border-border bg-bg-card text-text-secondary opacity-0 transition-opacity group-hover:border-accent group-hover:bg-accent group-hover:text-white group-hover:opacity-100 group-focus-visible:border-accent group-focus-visible:bg-accent group-focus-visible:text-white group-focus-visible:opacity-100"
-                  >
-                    {PANEL_ACTION_ICONS.add}
-                  </span>
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={`Add chart after ${label}`}
+                      onClick={(event) =>
+                        openPicker({ mode: "add", target: panel.key }, event.currentTarget)
+                      }
+                      className="dashboard-panel-insert group relative mt-2 flex h-6 w-full items-center justify-center focus-visible:outline-none"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-x-0 h-px bg-border transition-[height,background-color] group-hover:h-0.5 group-hover:bg-accent group-focus-visible:h-0.5 group-focus-visible:bg-accent"
+                      />
+                      <span
+                        aria-hidden="true"
+                        className="relative flex size-6 items-center justify-center rounded-full border border-border bg-bg-card text-text-secondary opacity-0 transition-opacity group-hover:border-accent group-hover:bg-accent group-hover:text-white group-hover:opacity-100 group-focus-visible:border-accent group-focus-visible:bg-accent group-focus-visible:text-white group-focus-visible:opacity-100"
+                      >
+                        {PANEL_ACTION_ICONS.add}
+                      </span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Add chart after {label}</TooltipContent>
+                </Tooltip>
               )}
             </section>
           );
