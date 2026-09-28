@@ -115,7 +115,7 @@ const api = new Hono<{ Bindings: Bindings }>()
             chart: {
               type: "choice",
               instructions:
-                "Choose the closest chart and tab for the request. Distinguish time trends from shares of total usage, and models across all agents from models within each agent or harness. The analysis options offer token mix, effective cost per million tokens, and cache read rate by fixed dimensions. Prefer options marked available for this dashboard.",
+                "Choose the closest chart and tab for the request. For a daily activity calendar heatmap, choose Total Tokens for token activity and Cost only for cost activity; preserve specific input, output, or cache token metrics when requested. Distinguish time trends from shares of total usage, and models across all agents from models within each agent or harness. The analysis options offer token mix, effective cost per million tokens, and cache read rate by fixed dimensions. Prefer options marked available for this dashboard.",
               criteria: Object.fromEntries(
                 DASHBOARD_CHART_OPTIONS.map(({ id, chart, tab, label, description }) => {
                   const available =

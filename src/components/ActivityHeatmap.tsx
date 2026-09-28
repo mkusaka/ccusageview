@@ -1,5 +1,6 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import type { NormalizedEntry } from "../utils/normalize";
+import type { DASHBOARD_CHART_TABS } from "../utils/dashboardCatalog";
 import { buildMarkdownSection, pickDataKeys } from "../utils/chartData";
 import { formatCost, formatTokens } from "../utils/format";
 import { useRegisterChartMarkdown } from "./ChartMarkdownContext";
@@ -8,6 +9,7 @@ import { CopyMarkdownButton } from "./CopyMarkdownButton";
 
 interface Props {
   entries: NormalizedEntry[];
+  initialMetric?: Metric;
 }
 
 // All metrics stored per day so we can switch without recomputing the grid
@@ -21,7 +23,7 @@ interface DayData {
   totalTokens: number;
 }
 
-type Metric = keyof typeof METRICS;
+type Metric = (typeof DASHBOARD_CHART_TABS.activity)[number]["id"];
 
 const METRICS = {
   cost: { label: "Cost", format: (v: number) => formatCost(v) },
@@ -36,7 +38,7 @@ const METRICS = {
     format: (v: number) => formatTokens(v),
   },
   totalTokens: { label: "Total Tokens", format: (v: number) => formatTokens(v) },
-} as const;
+} as const satisfies Record<Metric, { label: string; format: (value: number) => string }>;
 
 // Build a map of date -> aggregated values from normalized entries
 function buildDayMap(entries: NormalizedEntry[]): Map<string, DayData> {
@@ -153,7 +155,7 @@ function buildGrid(
 
 const DAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
 
-export function ActivityHeatmap({ entries }: Props) {
+export function ActivityHeatmap({ entries, initialMetric = "cost" }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
@@ -162,7 +164,7 @@ export function ActivityHeatmap({ entries }: Props) {
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const tooltipHideTimeoutRef = useRef(0);
   const tooltipShowFrameRef = useRef(0);
-  const [metric, setMetric] = useState<Metric>("cost");
+  const [metric, setMetric] = useState<Metric>(initialMetric);
 
   const dayMap = useMemo(() => buildDayMap(entries), [entries]);
 

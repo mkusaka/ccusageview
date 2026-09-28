@@ -667,7 +667,13 @@ export function Dashboard({ data }: Props) {
           />
         );
       case "activity":
-        return <ActivityHeatmap entries={chartData} />;
+        return (
+          <ActivityHeatmap
+            key={panel.tab}
+            entries={chartData}
+            initialMetric={DASHBOARD_CHART_TABS.activity.find((item) => item.id === panel.tab)?.id}
+          />
+        );
       case "day-of-week":
         return (
           <DayOfWeekChart

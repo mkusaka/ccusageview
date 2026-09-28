@@ -34,7 +34,7 @@ function createMockEnv() {
                 "tokens.type": 0.6,
                 "breakdown.agentModel": 0.3,
                 "cost.agent": 0.1,
-                activity: 0,
+                "activity.cost": 0,
               },
             },
             range: { type: "choice", choice: "last_7_days" },
@@ -196,7 +196,9 @@ describe("POST /api/charts/suggest", () => {
               "breakdown.agentModel": expect.stringContaining("model within each agent or harness"),
               "cost.agentModel": expect.stringContaining("Cost over time"),
               "tokens.model": expect.stringContaining("model across all agents"),
-              activity: expect.stringContaining("Daily activity heatmap"),
+              "activity.totalTokens": expect.stringContaining(
+                "Daily token activity calendar heatmap",
+              ),
             }),
           }),
         }),
@@ -243,7 +245,7 @@ describe("POST /api/charts/suggest", () => {
       state: "Completed",
       result: {
         answers: {
-          chart: { type: "choice", choice: "activity", confidence: 0.7 },
+          chart: { type: "choice", choice: "activity.cost", confidence: 0.7 },
           range: { type: "choice", choice: "dashboard" },
           granularity: { type: "choice", choice: "dashboard" },
         },
@@ -253,8 +255,33 @@ describe("POST /api/charts/suggest", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
-      suggestions: [{ chart: "activity", range: "dashboard", confidence: 0.7 }],
+      suggestions: [{ chart: "activity", tab: "cost", range: "dashboard", confidence: 0.7 }],
     });
+  });
+
+  it("returns a total-token heatmap for a this-year token activity selection", async () => {
+    env.AI.run.mockResolvedValueOnce({
+      state: "Completed",
+      result: {
+        answers: {
+          chart: { type: "choice", choice: "activity.totalTokens", confidence: 0.85 },
+          range: { type: "choice", choice: "this_year" },
+          granularity: { type: "choice", choice: "dashboard" },
+        },
+      },
+    });
+    const res = await request({ ...validRequest, prompt: "ことしのtokenアクティビティ" });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      suggestions: [
+        { chart: "activity", tab: "totalTokens", range: "this_year", confidence: 0.85 },
+      ],
+    });
+    const [, input] = env.AI.run.mock.calls[0];
+    expect(input.questions.chart.criteria["activity.totalTokens"]).toContain(
+      "Daily token activity calendar heatmap of total tokens, not cost",
+    );
   });
 
   it("marks agent tabs unavailable when agent metadata says none exist", async () => {

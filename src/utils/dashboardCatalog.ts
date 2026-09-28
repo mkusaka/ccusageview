@@ -137,7 +137,34 @@ export const DASHBOARD_CHART_TABS = {
     { id: "provider", label: "By Provider", description: "Usage statistics grouped by provider" },
     { id: "agent", label: "By Agent", description: "Usage statistics grouped by agent or harness" },
   ],
-  activity: [],
+  activity: [
+    { id: "cost", label: "Cost", description: "Daily cost activity calendar heatmap in USD" },
+    {
+      id: "totalTokens",
+      label: "Total Tokens",
+      description: "Daily token activity calendar heatmap of total tokens, not cost",
+    },
+    {
+      id: "inputTokens",
+      label: "Input",
+      description: "Daily input token activity calendar heatmap, not cost",
+    },
+    {
+      id: "outputTokens",
+      label: "Output",
+      description: "Daily output token activity calendar heatmap, not cost",
+    },
+    {
+      id: "cacheCreationTokens",
+      label: "Cache Write",
+      description: "Daily cache write token activity calendar heatmap, not cost",
+    },
+    {
+      id: "cacheReadTokens",
+      label: "Cache Read",
+      description: "Daily cache read token activity calendar heatmap, not cost",
+    },
+  ],
   "day-of-week": [
     { id: "total", label: "Total", description: "Overall usage by weekday" },
     { id: "model", label: "By Model", description: "Weekday usage grouped by model" },
