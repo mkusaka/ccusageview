@@ -29,7 +29,7 @@ export function DialogContent({
       >
         {children}
         <DialogClosePrimitive
-          aria-label="Close chart picker"
+          aria-label="Close dialog"
           className="absolute right-4 top-4 flex size-9 items-center justify-center rounded-md text-text-secondary hover:bg-bg-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent"
         >
           <svg

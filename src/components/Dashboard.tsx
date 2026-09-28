@@ -38,6 +38,7 @@ import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { breakdownHintCommand, HintedTab } from "./BreakdownHint";
 import { RangeSlider } from "./RangeSlider";
 import { ChartPickerModal } from "./ChartPickerModal";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 interface Props {
@@ -319,6 +320,11 @@ export function Dashboard({ data }: Props) {
   const [previousPanelKey, setPreviousPanelKey] = useState(panelKey);
   const [panels, setPanels] = useState<ChartPanel[]>(() => initialPanels(availableCharts));
   const [picker, setPicker] = useState<{ mode: "add" | "replace"; target?: string } | null>(null);
+  const [removal, setRemoval] = useState<{ key: string; label: string } | null>(null);
+  const removalTrigger = useRef<HTMLButtonElement | null>(null);
+  const addChartTrigger = useRef<HTMLButtonElement | null>(null);
+  const removalTitle = useRef<HTMLHeadingElement | null>(null);
+  const confirmedRemoval = useRef(false);
   const pickerTrigger = useRef<HTMLButtonElement | null>(null);
   function openPicker(
     next: { mode: "add" | "replace"; target?: string },
@@ -336,6 +342,7 @@ export function Dashboard({ data }: Props) {
     setPreviousPanelKey(panelKey);
     setPanels(initialPanels(availableCharts));
     setPicker(null);
+    setRemoval(null);
   }
   const pickerCharts = availableCharts;
   const today = new Date();
@@ -618,6 +625,7 @@ export function Dashboard({ data }: Props) {
       )}
 
       <button
+        ref={addChartTrigger}
         type="button"
         disabled={!availableCharts.length}
         onClick={(event) => openPicker({ mode: "add" }, event.currentTarget)}
@@ -666,9 +674,10 @@ export function Dashboard({ data }: Props) {
                 <PanelAction
                   action="remove"
                   label={`Remove ${label}`}
-                  onClick={() =>
-                    setPanels((current) => current.filter((item) => item.key !== panel.key))
-                  }
+                  onClick={(event) => {
+                    removalTrigger.current = event.currentTarget;
+                    setRemoval({ key: panel.key, label: label ?? panel.id });
+                  }}
                 />
               </div>
               <PanelMarkdownProvider panelKey={panel.key} register={registerMarkdownSection}>
@@ -709,6 +718,53 @@ export function Dashboard({ data }: Props) {
             renderChart({ key: "preview", id, range: selectedRange, tab })
           }
         />
+      )}
+      {removal && (
+        <Dialog open onOpenChange={(open) => !open && setRemoval(null)}>
+          <DialogContent
+            className="sm:max-w-md"
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              removalTitle.current?.focus();
+            }}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              const target = confirmedRemoval.current
+                ? addChartTrigger.current
+                : removalTrigger.current;
+              confirmedRemoval.current = false;
+              requestAnimationFrame(() => target?.focus());
+            }}
+          >
+            <DialogTitle ref={removalTitle} tabIndex={-1} className="pr-10 text-lg font-semibold">
+              Remove {removal.label} chart?
+            </DialogTitle>
+            <DialogDescription className="mt-2 text-sm text-text-secondary">
+              This chart will be removed from the dashboard. You can add it again later.
+            </DialogDescription>
+            <div className="mt-6 flex justify-end gap-2">
+              <DialogClose asChild>
+                <button
+                  type="button"
+                  className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-bg-secondary focus-visible:outline-2 focus-visible:outline-accent"
+                >
+                  Cancel
+                </button>
+              </DialogClose>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmedRemoval.current = true;
+                  setPanels((current) => current.filter((item) => item.key !== removal.key));
+                  setRemoval(null);
+                }}
+                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 focus-visible:outline-2 focus-visible:outline-red-500"
+              >
+                Remove chart
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {filteredEntries.length > 0 && <DataTable entries={filteredEntries} />}
