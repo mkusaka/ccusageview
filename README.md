@@ -107,7 +107,6 @@ pnpm cf:dev       # Build frontend + start wrangler dev
 pnpm cf:deploy    # Build frontend + deploy to Cloudflare Workers
 ```
 
-
 ## License
 
 MIT
