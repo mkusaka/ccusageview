@@ -14,7 +14,7 @@ A web dashboard and CLI tool for visualizing [ccusage](https://github.com/ryoppi
 - **Shareable URLs** — data is compressed into the URL hash, or use short URLs via `/s/:id`
 - **Copy as image** — export individual charts or the entire dashboard to clipboard
 - **Dark mode** — respects system preference, toggleable
-- **Ask AI for a chart** — describe a chart in natural language; Chrome's on-device model selects a chart plan, and the browser builds a local DuckDB query for a line or bar chart
+- **Ask AI for charts** — describe an analysis; Chrome's on-device model selects and orders predefined local charts without generating SQL or changing the default dashboard
 
 ## Quick start
 
@@ -50,19 +50,17 @@ npx ccusageview --label "Claude Code" --label "OpenCode" claude.json opencode.js
 
 Open https://ccusageview.polyfill.workers.dev/ and paste your ccusage JSON into the input area.
 
-### Ask AI for a chart
+### Ask AI for charts
 
-Load a report, click **Ask AI for a chart**, and describe an analysis. Chrome's on-device model suggests requests in the same language as your input (English or Japanese); suggestions are optional. You can click **Generate chart** while suggestions are loading, which cancels the pending suggestion request.
+Load a report, click **Ask AI for charts**, and describe the views you want. Chrome's on-device model suggests requests in the same language as your input (English or Japanese); suggestions are optional. You can generate charts while suggestions are loading, which cancels the pending suggestion request. The default dashboard is unchanged.
 
-The model selects a **chart plan**, not SQL. Supported plans sum `input_tokens`, `output_tokens`, `cache_creation_tokens`, `cache_read_tokens`, `total_tokens`, or `cost` by period, model, agent, or input source, with an optional different series dimension. Available time scopes are all data, today, yesterday, through today, this or last week/month/quarter/year, and the rolling last 7/30/90/365 days. Weeks start Monday; "this" covers the calendar period through today, "last" means the previous complete calendar period, and rolling windows include today. For example, 「今月のモデル別推移」 selects the first of this month through today. Weekly and monthly aggregate reports cannot use date filters. The model is instructed to mark requests outside these metrics and dimensions (such as averages, percentiles, or arbitrary date ranges) as unsupported rather than choosing a different chart.
+The model chooses **which charts to show and in what order**, not how to calculate them. The browser aggregates the supplied data locally using fixed metrics (input, output, cache write/read, total tokens, and cost) and axes (period, model, agent, or input source). Supported views include time-series line charts and bar charts, with categorical doughnut charts where appropriate. A second, different dimension can split a chart into series. Where the input supports it, the model can select daily, weekly, or monthly aggregation and choose an available time scope or a specific date range. Calendar weeks start Monday. Weekly/monthly aggregate reports cannot be split back into daily rows; unavailable breakdowns are not inferred.
 
-The browser compiles the plan into a DuckDB-Wasm `SELECT` query using the appropriate source-aware usage table. Model and agent breakdowns are only charted when the supplied report contains those rows; metrics are summed at the selected breakdown's grain, so joining cannot multiply entry totals. Date filters use the browser's local calendar date and the original report period; no model-generated SQL or external files are executed. A query returning more than 500 rows is rejected instead of silently truncated. Inspect the app-built query under **Generated SQL**.
+Valibot validates the model's choices. Malformed responses may be retried with validation feedback; an empty response starts one fresh model session, while repeated invalid or empty responses stop. Click **Stop generation** to cancel. Unsupported combinations and ranges with no matching data are shown as errors rather than silently substituted with another view or period.
 
-Valibot validates the model's plan. Malformed responses may be retried with validation feedback; an empty response starts one fresh model session, while repeated invalid or empty responses stop. Click **Stop generation** to cancel. Unsupported plans, missing breakdowns, and DuckDB errors are shown rather than asking the model to rewrite SQL. If a valid query has no rows, the error shows the selected time scope and the dates actually available for that chart's breakdown; it does not substitute older data or another time range.
+This requires a [Chrome environment with the Prompt API available](https://developer.chrome.com/docs/ai/prompt-api); the on-device model may need to download on first use. Usage rows stay in your browser instead of being sent to an AI service. The model can still choose the wrong **valid** selection: check the metric, axes, and displayed range before relying on a chart.
 
-This requires a [Chrome environment with the Prompt API available](https://developer.chrome.com/docs/ai/prompt-api); the on-device model may need to download on first use. Usage rows stay in your browser instead of being sent to an AI service. The model can still choose the wrong **valid** plan: check the selected metric and dimensions against your request before relying on the chart.
-
-For diagnostics, filter DevTools Console for `[AI chart]`. Logs show the model response, selected plan, session lifecycle, and the complete app-compiled SQL before execution. Responses or SQL may contain your request or usage data; redact them before sharing logs.
+For diagnostics, filter DevTools Console for `[AI chart]`. Model responses can contain your request; redact them before sharing logs.
 
 ## CLI options
 
@@ -109,9 +107,6 @@ pnpm cf:dev       # Build frontend + start wrangler dev
 pnpm cf:deploy    # Build frontend + deploy to Cloudflare Workers
 ```
 
-The build compresses DuckDB's Wasm files into self-hosted `.wasm.gz` assets because
-the uncompressed files exceed Cloudflare Workers' 25 MiB per-asset limit.
-The browser decompresses only the selected DuckDB variant when opening an AI chart.
 
 ## License
 

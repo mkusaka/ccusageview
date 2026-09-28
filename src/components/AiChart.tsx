@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "chart.js/auto";
-import { Bar, Line } from "react-chartjs-2";
+import { Bar, Doughnut, Line } from "react-chartjs-2";
 import type { SourceInput } from "../utils/inputs";
-import { createAiChartDatabase, type AiChartDatabase } from "../utils/aiChartDatabase";
+import { buildAiChartData } from "../utils/aiChartData";
 import {
   browserLanguageModel,
-  generateAiChart,
+  generateAiCharts,
   MODEL_OPTIONS,
   type GeneratedChart,
   type PromptSession,
@@ -20,14 +20,15 @@ interface Props {
 type GenerationState =
   | { status: "idle" }
   | { status: "loading"; attempt: number; lastError?: string }
-  | { status: "ready"; chart: GeneratedChart }
+  | { status: "ready"; charts: GeneratedChart[] }
   | { status: "error"; message: string };
 
 export function AiChart({ inputs }: Props) {
   const [generation, setGeneration] = useState<GenerationState>({ status: "idle" });
   const busy = generation.status === "loading";
-  const chart = generation.status === "ready" ? generation.chart : null;
+  const charts = generation.status === "ready" ? generation.charts : null;
   const error = generation.status === "error" ? generation.message : "";
+  const data = useMemo(() => buildAiChartData(inputs), [inputs]);
   const {
     prompt,
     onPromptChange,
@@ -37,37 +38,24 @@ export function AiChart({ inputs }: Props) {
     download,
     setDownload,
     cancelSuggestions,
-  } = useAiChartSuggestions(inputs, busy);
-  const database = useRef<Promise<AiChartDatabase> | null>(null);
+  } = useAiChartSuggestions(data.context, busy);
   const generationAbort = useRef<AbortController | null>(null);
   const runId = useRef(0);
-
-  const closeDatabase = useCallback(() => {
-    const pending = database.current;
-    database.current = null;
-    if (pending)
-      void pending.then(
-        (db) => db.close(),
-        () => {},
-      );
-  }, []);
 
   const invalidate = useCallback(() => {
     runId.current++;
     generationAbort.current?.abort();
     generationAbort.current = null;
-    closeDatabase();
     cancelSuggestions();
-  }, [closeDatabase, cancelSuggestions]);
+  }, [cancelSuggestions]);
 
   const stopGeneration = useCallback(() => {
     generationAbort.current?.abort();
     generationAbort.current = null;
     runId.current++;
-    closeDatabase();
     setDownload("");
     setGeneration({ status: "idle" });
-  }, [closeDatabase, setDownload]);
+  }, [setDownload]);
 
   useEffect(() => {
     setGeneration({ status: "idle" });
@@ -104,9 +92,7 @@ export function AiChart({ inputs }: Props) {
       console.log("[AI chart] model session created", { run: currentRun, session: sessionNumber });
       try {
         controller.signal.throwIfAborted();
-        if (!database.current) database.current = createAiChartDatabase(inputs);
-        const db = await database.current;
-        const nextChart = await generateAiChart(session, prompt.trim(), db.query, db.chartContext, {
+        const nextCharts = await generateAiCharts(session, prompt.trim(), data, {
           signal: controller.signal,
           onRetry(attempt, lastError) {
             if (currentRun === runId.current) {
@@ -130,7 +116,7 @@ export function AiChart({ inputs }: Props) {
             return session;
           },
         });
-        if (currentRun === runId.current) setGeneration({ status: "ready", chart: nextChart });
+        if (currentRun === runId.current) setGeneration({ status: "ready", charts: nextCharts });
       } finally {
         if (session) {
           session.destroy();
@@ -147,8 +133,6 @@ export function AiChart({ inputs }: Props) {
           status: "error",
           message: cause instanceof Error ? cause.message : String(cause),
         });
-        // An import error must not leave a rejected promise cached for the next attempt.
-        closeDatabase();
       }
     } finally {
       if (generationAbort.current === controller) generationAbort.current = null;
@@ -158,34 +142,17 @@ export function AiChart({ inputs }: Props) {
 
   const model = browserLanguageModel();
   const canGenerate = !!model && availability !== "unavailable";
-  const chartData = chart && {
-    labels: chart.labels,
-    datasets: chart.datasets.map((series, index) => ({
-      label: series.label,
-      data: series.values,
-      borderColor: getChartJsColor(index),
-      backgroundColor: getChartJsColor(index),
-      tension: 0.2,
-    })),
-  };
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    scales: {
-      x: { stacked: chart?.stacked ?? false },
-      y: { stacked: chart?.stacked ?? false, beginAtZero: true },
-    },
-  };
 
   return (
     <section
       className="bg-bg-card border border-border rounded-lg p-4 space-y-3"
-      aria-label="Ask AI for a chart"
+      aria-label="Ask AI for charts"
     >
       <div>
-        <h3 className="text-sm font-medium">Ask AI for a chart</h3>
+        <h3 className="text-sm font-medium">Ask AI for charts</h3>
         <p className="text-xs text-text-secondary">
-          Chrome's on-device AI selects an analysis; your browser builds and runs the query locally.
+          Chrome's on-device AI selects charts from your request; your browser calculates them
+          locally.
         </p>
       </div>
       {!model ? (
@@ -203,7 +170,7 @@ export function AiChart({ inputs }: Props) {
           className="flex flex-wrap gap-2"
         >
           <label htmlFor="ai-chart-prompt" className="sr-only">
-            Describe a chart
+            Describe charts or an analysis
           </label>
           <input
             id="ai-chart-prompt"
@@ -213,7 +180,7 @@ export function AiChart({ inputs }: Props) {
               onPromptChange(event.target.value);
               setGeneration({ status: "idle" });
             }}
-            placeholder="e.g. Show weekly cost by model"
+            placeholder="e.g. Show daily cost by model, then weekly tokens by agent for the last 30 days"
             className="flex-1 min-w-52 rounded-md border border-border bg-bg-primary px-3 py-2 text-sm text-text-primary"
           />
           <button
@@ -227,7 +194,7 @@ export function AiChart({ inputs }: Props) {
             }
             className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
-            {busy ? "Generating…" : "Generate chart"}
+            {busy ? "Generating…" : "Generate charts"}
           </button>
           {busy && (
             <button
@@ -292,22 +259,53 @@ export function AiChart({ inputs }: Props) {
           {error}
         </p>
       )}
-      {chart && chartData && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium">{chart.title}</h4>
-          <div className="h-72" role="img" aria-label={chart.title}>
-            {chart.type === "line" ? (
-              <Line data={chartData} options={options} />
-            ) : (
-              <Bar data={chartData} options={options} />
-            )}
-          </div>
-          <details className="text-xs text-text-secondary">
-            <summary className="cursor-pointer">Generated SQL</summary>
-            <pre className="mt-2 overflow-auto whitespace-pre-wrap">{chart.sql}</pre>
-          </details>
+      {charts && (
+        <div className="space-y-4">
+          {charts.map((chart, index) => (
+            <ChartCard key={index} chart={chart} />
+          ))}
         </div>
       )}
     </section>
+  );
+}
+
+function ChartCard({ chart }: { chart: GeneratedChart }) {
+  const chartData = {
+    labels: chart.labels,
+    datasets: chart.datasets.map((series, index) => ({
+      label: series.label,
+      data: series.values,
+      borderColor: getChartJsColor(index),
+      backgroundColor:
+        chart.type === "doughnut"
+          ? chart.labels.map((_, labelIndex) => getChartJsColor(labelIndex))
+          : getChartJsColor(index),
+      tension: 0.2,
+    })),
+  };
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: { stacked: chart.stacked },
+      y: { stacked: chart.stacked, beginAtZero: true },
+    },
+  };
+
+  return (
+    <article className="space-y-2 rounded-md border border-border p-3">
+      <h4 className="text-sm font-medium">{chart.title}</h4>
+      <p className="text-xs text-text-secondary">{chart.subtitle}</p>
+      <div className="h-72" role="img" aria-label={chart.title}>
+        {chart.type === "line" ? (
+          <Line data={chartData} options={options} />
+        ) : chart.type === "bar" ? (
+          <Bar data={chartData} options={options} />
+        ) : (
+          <Doughnut data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
+        )}
+      </div>
+    </article>
   );
 }

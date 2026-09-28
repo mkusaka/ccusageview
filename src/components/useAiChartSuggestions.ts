@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { SourceInput } from "../utils/inputs";
-import { buildAiChartRows } from "../utils/aiChartDatabase";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ChartContext } from "../utils/aiChartPlan";
 import {
   browserLanguageModel,
   MODEL_OPTIONS,
@@ -15,7 +14,7 @@ type SuggestionState =
 
 type Availability = "checking" | "available" | "downloadable" | "downloading" | "unavailable";
 
-export function useAiChartSuggestions(inputs: SourceInput[], busy: boolean) {
+export function useAiChartSuggestions(context: ChartContext, busy: boolean) {
   const [prompt, setPrompt] = useState("");
   const [availability, setAvailability] = useState<Availability>("checking");
   const [suggestions, setSuggestions] = useState<SuggestionState>({ status: "idle" });
@@ -23,16 +22,7 @@ export function useAiChartSuggestions(inputs: SourceInput[], busy: boolean) {
   const suggestionAbort = useRef<AbortController | null>(null);
   const modelDownload = useRef<AbortController | null>(null);
   const lastSuggested = useRef("");
-  const lastInputs = useRef(inputs);
-  const schema = useMemo(() => {
-    const tables = buildAiChartRows(inputs);
-    return {
-      availableTables: Object.entries(tables)
-        .filter(([, rows]) => rows.length > 0)
-        .map(([name]) => name),
-      reportType: String(tables.entries[0]?.report_type ?? "unknown"),
-    };
-  }, [inputs]);
+  const lastContext = useRef(context);
 
   const cancelSuggestions = useCallback(() => {
     suggestionAbort.current?.abort();
@@ -86,13 +76,7 @@ export function useAiChartSuggestions(inputs: SourceInput[], busy: boolean) {
           },
         });
         try {
-          const items = await suggestAiChartPrompts(
-            session,
-            text,
-            schema.availableTables,
-            schema.reportType,
-            controller.signal,
-          );
+          const items = await suggestAiChartPrompts(session, text, context, controller.signal);
           if (!controller.signal.aborted) setSuggestions({ status: "ready", prompt: text, items });
         } finally {
           session.destroy();
@@ -112,13 +96,13 @@ export function useAiChartSuggestions(inputs: SourceInput[], busy: boolean) {
         }
       }
     },
-    [schema, cancelSuggestions],
+    [context, cancelSuggestions],
   );
 
   useEffect(() => {
     const text = prompt.trim();
-    if (lastInputs.current !== inputs) {
-      lastInputs.current = inputs;
+    if (lastContext.current !== context) {
+      lastContext.current = context;
       lastSuggested.current = "";
     }
     if (!text || availability !== "available" || busy || lastSuggested.current === text) return;
@@ -131,7 +115,7 @@ export function useAiChartSuggestions(inputs: SourceInput[], busy: boolean) {
       clearTimeout(timer);
       cancelSuggestions();
     };
-  }, [prompt, availability, busy, inputs, requestSuggestions, cancelSuggestions]);
+  }, [prompt, availability, busy, context, requestSuggestions, cancelSuggestions]);
 
   function onPromptChange(value: string) {
     cancelSuggestions();

@@ -82,7 +82,6 @@ out
 .nuxt
 dist
 dist-cli
-src/utils/generated-duckdb/
 
 # Gatsby files
 .cache/

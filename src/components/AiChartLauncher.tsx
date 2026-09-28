@@ -12,10 +12,10 @@ export function AiChartLauncher({ inputs }: { inputs: SourceInput[] }) {
         onClick={() => setOpen((previous) => !previous)}
         className="rounded-md border border-border bg-bg-card px-3 py-1.5 text-sm hover:bg-bg-secondary"
       >
-        {open ? "Hide AI chart" : "Ask AI for a chart"}
+        {open ? "Hide AI charts" : "Ask AI for charts"}
       </button>
       {open && (
-        <Suspense fallback={<p className="text-sm text-text-secondary">Loading AI chart…</p>}>
+        <Suspense fallback={<p className="text-sm text-text-secondary">Loading AI charts…</p>}>
           <AiChart inputs={inputs} />
         </Suspense>
       )}

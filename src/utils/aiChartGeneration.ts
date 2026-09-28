@@ -1,12 +1,12 @@
 import * as v from "valibot";
-import { AI_CHART_SCHEMA } from "./aiChartDatabase";
+import { AI_CHART_SCHEMA, type AiChartData, type EntryRow, type UsageRow } from "./aiChartData";
 import {
   CHART_PLAN_CONSTRAINT,
   CHART_PLAN_SCHEMA,
   CHART_TIME_SCOPES,
   compileAiChartPlan,
-  type CompiledAiChart,
   type ChartContext,
+  type CompiledAiChart,
 } from "./aiChartPlan";
 
 export interface PromptSession {
@@ -44,13 +44,7 @@ export function browserLanguageModel(): BrowserLanguageModel | undefined {
 
 const SUGGESTION_CONSTRAINT = {
   type: "object",
-  properties: {
-    suggestions: {
-      type: "array",
-      maxItems: 3,
-      items: { type: "string" },
-    },
-  },
+  properties: { suggestions: { type: "array", maxItems: 3, items: { type: "string" } } },
   required: ["suggestions"],
   additionalProperties: false,
 };
@@ -83,8 +77,7 @@ function parseSuggestions(response: string, request: string): string[] {
 export async function suggestAiChartPrompts(
   session: PromptSession,
   request: string,
-  availableTables: string[],
-  reportType: string,
+  context: ChartContext,
   signal?: AbortSignal,
 ): Promise<string[]> {
   const language = request.search(JAPANESE_CHARACTERS) === -1 ? "en" : "ja";
@@ -93,12 +86,11 @@ export async function suggestAiChartPrompts(
       ? "候補文はすべて自然な日本語で書いてください。英語の文にしないでください。"
       : "Write every suggestion in natural English, not Japanese.";
   const response = await session.prompt(
-    `${languageRule}\nSuggest up to 3 distinct, useful chart requests refining this user's intent: ${request}\n\n${AI_CHART_SCHEMA}\n\nCurrent report type: ${reportType}. Available tables with data: ${availableTables.join(", ")}. The optional series breakdown can be model, agent, or source, never the same as the axis. Combining model and agent requires agent_model_usage. Source means a distinct input source, not an arbitrary label. The only time scopes are ${CHART_TIME_SCOPES.join(", ")}. This week starts Monday; this week/month/quarter/year end today, last week/month/quarter/year mean the previous complete calendar period, and last N days include today. Do not suggest date filtering for weekly or monthly reports. Do not suggest comparisons, extrema, weekday breakdowns, averages, percentages, derived metrics, other filters, or analyses the available tables cannot represent. Suggestions must be natural-language requests, not SQL or explanations.`,
+    `${languageRule}\nSuggest up to 3 distinct useful chart requests refining this user's intent: ${request}\n\n${AI_CHART_SCHEMA}\nReport types: ${context.reportTypes.join(", ")}. Available tables with data: ${context.availableTables.join(", ")}. Available granularities: ${context.granularities.join(", ")}. One request may ask for several charts in a specified order, mixing line, bar and categorical doughnut charts. Date ranges can specify inclusive YYYY-MM-DD bounds for daily-resolution reports. Never suggest a model, agent, or combined breakdown that is absent. Never suggest date filtering for weekly or monthly aggregate reports. Only suggest sums of available metrics by permitted dimensions and scopes (${CHART_TIME_SCOPES.join(", ")}); do not invent derived metrics, SQL or calculations. Return only JSON suggestions.`,
     { responseConstraint: SUGGESTION_CONSTRAINT, signal },
   );
   const suggestions = parseSuggestions(response, request);
   if (suggestions.every((item) => matchesSuggestionLanguage(item, language))) return suggestions;
-
   signal?.throwIfAborted();
   const rewritten = await session.prompt(
     `${languageRule}\nRewrite these chart requests in the language of the original request without changing their meaning. Original request: ${request}\nChart requests: ${JSON.stringify(suggestions)}\nReturn only JSON with the rewritten suggestions.`,
@@ -107,77 +99,107 @@ export async function suggestAiChartPrompts(
   const matching = parseSuggestions(rewritten, request).filter((item) =>
     matchesSuggestionLanguage(item, language),
   );
-  if (!matching.length) {
+  if (!matching.length)
     throw new Error("The model could not provide chart suggestions in the input language.");
-  }
   return matching;
 }
 
 export interface GeneratedChart {
-  sql: string;
-  type: "line" | "bar";
+  type: "line" | "bar" | "doughnut";
   title: string;
   stacked: boolean;
   labels: string[];
   datasets: { label: string; values: (number | null)[] }[];
+  subtitle: string;
 }
 
-function chartFromRows(spec: CompiledAiChart, rows: Record<string, unknown>[]): GeneratedChart {
-  const { sql, chart } = spec;
-  const { type, title, series, stacked } = chart;
-  if (!rows.length) throw new Error("The query returned no rows.");
+function periodLabel(period: string, granularity: CompiledAiChart["granularity"]): string {
+  if (granularity === "monthly") return period.slice(0, 7);
+  const date = period.slice(0, 10);
+  if (granularity === "daily" || period.length === 7) return date;
+  const utc = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(utc.getTime())) throw new Error("The report contains an invalid period date.");
+  utc.setUTCDate(utc.getUTCDate() - ((utc.getUTCDay() + 6) % 7));
+  return utc.toISOString().slice(0, 10);
+}
 
-  const xValues = new Map<string, Map<string, number>>();
+function label(
+  dimension: CompiledAiChart["x"] | CompiledAiChart["series"],
+  entry: EntryRow,
+  row: UsageRow,
+): string {
+  switch (dimension) {
+    case "source":
+      return `${entry.source_label} (${entry.source_id})`;
+    case "model":
+      return "model" in row ? String(row.model) : "";
+    case "agent":
+      return "agent" in row ? String(row.agent) : "";
+    default:
+      return "";
+  }
+}
+
+function aggregateChart(
+  spec: CompiledAiChart,
+  data: AiChartData,
+  entries: Map<number, EntryRow>,
+): GeneratedChart {
+  const buckets = new Map<string, Map<string, number>>();
   const seriesNames = new Set<string>();
-  for (const row of rows) {
-    const xValue = row.x;
-    const yValue = row.y;
-    const seriesValue = series ? row.series : title;
-    if (
-      (typeof xValue !== "string" && typeof xValue !== "number") ||
-      (typeof yValue !== "number" && typeof yValue !== "bigint") ||
-      !Number.isFinite(Number(yValue)) ||
-      (typeof seriesValue !== "string" && typeof seriesValue !== "number")
-    ) {
+  let firstDate: string | undefined;
+  let lastDate: string | undefined;
+  for (const row of data.rows[spec.table]) {
+    const entry = spec.table === "entries" ? (row as EntryRow) : entries.get(row.entry_id);
+    if (!entry) continue;
+    const date = entry.period.slice(0, 10);
+    if (!firstDate || date < firstDate) firstDate = date;
+    if (!lastDate || date > lastDate) lastDate = date;
+    if ((spec.start && date < spec.start) || (spec.end && date > spec.end)) continue;
+    const axis =
+      spec.x === "period" ? periodLabel(entry.period, spec.granularity) : label(spec.x, entry, row);
+    const series = spec.series === "none" ? spec.chart.title : label(spec.series, entry, row);
+    const metric = row[spec.metric];
+    if (!Number.isFinite(metric)) throw new Error("The report contains a non-finite chart metric.");
+    const values = buckets.get(axis) ?? new Map<string, number>();
+    values.set(series, (values.get(series) ?? 0) + metric);
+    buckets.set(axis, values);
+    seriesNames.add(series);
+    if (buckets.size > 120 || seriesNames.size > 20 || buckets.size * seriesNames.size > 1200) {
       throw new Error(
-        `Expected x and ${series || "no series"} to be labels and y to be numeric. Available result columns: ${Object.keys(row).join(", ")}.`,
+        "The requested chart has too many labels or series. Narrow the date range or breakdown.",
       );
     }
-    const label = String(xValue);
-    const seriesLabel = String(seriesValue);
-    const values = xValues.get(label) ?? new Map<string, number>();
-    if (values.has(seriesLabel)) {
-      throw new Error("Chart data contains a duplicate x/series pair.");
-    }
-    values.set(seriesLabel, Number(yValue));
-    xValues.set(label, values);
-    seriesNames.add(seriesLabel);
   }
-  const labels = [...xValues.keys()];
+  if (!buckets.size) {
+    const coverage =
+      firstDate && lastDate
+        ? `Available dates: ${firstDate} to ${lastDate}.`
+        : "No breakdown dates are available in this report.";
+    throw new Error(`No chart rows match ${spec.subtitle}. ${coverage}`);
+  }
+  const labels = [...buckets.keys()].sort();
   return {
-    sql,
-    type,
-    title,
-    stacked,
+    ...spec.chart,
+    subtitle: spec.subtitle,
     labels,
-    datasets: [...seriesNames].map((label) => ({
-      label,
-      values: labels.map((xLabel) => xValues.get(xLabel)?.get(label) ?? null),
+    datasets: [...seriesNames].sort().map((series) => ({
+      label: series,
+      values: labels.map((axis) => buckets.get(axis)?.get(series) ?? null),
     })),
   };
 }
 
-export async function generateAiChart(
+export async function generateAiCharts(
   session: PromptSession,
   request: string,
-  query: (sql: string) => Promise<Record<string, unknown>[]>,
-  context: ChartContext,
+  data: AiChartData,
   options: {
     signal?: AbortSignal;
     onRetry?: (attempt: number, error: string) => void;
     restartSession?: () => Promise<PromptSession>;
   } = {},
-): Promise<GeneratedChart> {
+): Promise<GeneratedChart[]> {
   let feedback = "";
   let attempt = 1;
   let consecutiveEmptyResponses = 0;
@@ -186,24 +208,10 @@ export async function generateAiChart(
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   while (true) {
     options.signal?.throwIfAborted();
-    let response: string;
-    try {
-      response = await session.prompt(
-        `Select a chart plan for this request: ${request}\nToday's local calendar date: ${today}.\nAvailable tables with data: ${context.availableTables.join(", ")}.\nReport types: ${context.reportTypes.join(", ")}.\nReturn only a JSON chart plan with metric (input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost, or unsupported), x (period, model, agent, or source), series (none, model, agent, or source), time (${CHART_TIME_SCOPES.join(", ")}), chart (type: line or bar, title: text, stacked: boolean), and reason (explain only when unsupported; otherwise empty string). For 今月 / this month choose this_month (first day of the current month through today), not today or through_today. This week starts Monday; this week/month/quarter/year end today, last week/month/quarter/year mean the previous complete calendar period, and last N days include today. Metrics are sums, not averages or percentages. Model and agent dimensions need populated breakdown tables; combining both needs agent_model_usage. Do not select the same x and series. Weekly and monthly reports cannot use date filtering. If the request cannot be faithfully expressed by these fields and available data, choose metric "unsupported" and explain why in reason. Do not invent a different analysis. Do not generate SQL or add any fields.${feedback ? `\n\n${feedback}` : ""}`,
-        { responseConstraint: CHART_PLAN_CONSTRAINT, signal: options.signal },
-      );
-    } catch (error) {
-      if (!options.signal?.aborted)
-        console.error("[AI chart] model prompt failed", { attempt, error });
-      throw error;
-    }
-    console.log("[AI chart] model response", {
-      attempt,
-      responseLength: response.length,
-      response,
-      contextUsage: session.contextUsage ?? null,
-      contextWindow: session.contextWindow ?? null,
-    });
+    const response = await session.prompt(
+      `Select 1 to 4 charts in exactly the requested order for: ${request}\nToday's local calendar date: ${today}.\n${AI_CHART_SCHEMA}\nAvailable tables with data: ${data.context.availableTables.join(", ")}. Report types: ${data.context.reportTypes.join(", ")}. Available granularities: ${data.context.granularities.join(", ")}. Return only JSON {"charts":[...]} with each chart specifying metric (input_tokens, output_tokens, cache_creation_tokens, cache_read_tokens, total_tokens, cost, unsupported), x (period, model, agent, source), series (none, model, agent, source), time (${CHART_TIME_SCOPES.join(", ")}), granularity (daily, weekly, monthly), optional start_date/end_date (inclusive YYYY-MM-DD with time all), chart (type line, bar, or doughnut; title; stacked), and reason (only for unsupported, otherwise empty). If the user's request cannot be represented by these sums and breakdowns, select unsupported and explain why; never substitute a different metric or analysis. Do not invent unavailable breakdowns. Model+agent requires agent_model_usage. x and series must differ. Line needs period x; doughnut needs categorical x and no series or stacking. Only bar with series can be stacked. For 今月 / this month choose this_month; week starts Monday; current scopes end today. Weekly/monthly source reports cannot filter dates or be subdivided. Never generate code or SQL. ${feedback}`,
+      { responseConstraint: CHART_PLAN_CONSTRAINT, signal: options.signal },
+    );
     options.signal?.throwIfAborted();
     if (!response.trim()) {
       if (!options.restartSession || consecutiveEmptyResponses) {
@@ -214,16 +222,15 @@ export async function generateAiChart(
         );
       }
       consecutiveEmptyResponses++;
-      console.warn("[AI chart] restarting model session after empty output", { attempt });
       options.onRetry?.(++attempt, "Empty model response; restarting the model session.");
       options.signal?.throwIfAborted();
       session = await options.restartSession();
       continue;
     }
     consecutiveEmptyResponses = 0;
-    let plan;
+    let plans: v.InferOutput<typeof CHART_PLAN_SCHEMA>;
     try {
-      plan = v.parse(CHART_PLAN_SCHEMA, JSON.parse(response));
+      plans = v.parse(CHART_PLAN_SCHEMA, JSON.parse(response));
     } catch (error) {
       options.signal?.throwIfAborted();
       const message =
@@ -236,59 +243,18 @@ export async function generateAiChart(
         throw new Error(`The on-device model repeated an invalid chart plan: ${message}`);
       }
       failedResponses.add(response);
-      console.warn("[AI chart] invalid chart plan", { attempt, error: message });
-      feedback = `The previous JSON chart plan was invalid: ${message}. Return a valid chart plan without changing the user's request. Never generate SQL.`;
+      feedback = `The previous JSON chart plan was invalid: ${message}. Return a valid plan without changing the request.`;
       options.onRetry?.(++attempt, message);
       await new Promise<void>((resolve) => setTimeout(resolve, 0));
       continue;
     }
-    console.log("[AI chart] selected plan", plan);
-    const spec = compileAiChartPlan(plan, context, now);
-    console.log(`[AI chart] compiled SQL (attempt ${attempt}):\n${spec.sql}`);
-    const rows = await query(spec.sql);
-    options.signal?.throwIfAborted();
-    if (!rows.length) {
-      const coverage = await query(
-        `SELECT MIN(substr(e.period, 1, 10)) AS first, MAX(substr(e.period, 1, 10)) AS last\nFROM ${spec.from}`,
-      );
-      options.signal?.throwIfAborted();
-      const model = plan.x === "model" || plan.series === "model";
-      const agent = plan.x === "agent" || plan.series === "agent";
-      const breakdown = model
-        ? agent
-          ? "model/agent breakdown"
-          : "model breakdown"
-        : agent
-          ? "agent breakdown"
-          : "usage";
-      const scope = {
-        all: "all dates",
-        today: `today (${today})`,
-        through_today: `through today (${today})`,
-        last_7_days: `the last 7 days (through ${today})`,
-        last_30_days: `the last 30 days (through ${today})`,
-        yesterday: "yesterday",
-        this_week: "this week (through today)",
-        last_week: "last week",
-        this_month: "this month (through today)",
-        last_month: "last month",
-        this_quarter: "this quarter (through today)",
-        last_quarter: "last quarter",
-        this_year: "this year (through today)",
-        last_year: "last year",
-        last_90_days: "the last 90 days (through today)",
-        last_365_days: "the last 365 days (through today)",
-      }[plan.time];
-      const first = coverage[0]?.first;
-      const last = coverage[0]?.last;
-      throw new Error(
-        `No ${breakdown} rows match ${scope}. ${
-          typeof first === "string" && typeof last === "string"
-            ? `Available ${breakdown} dates: ${first} to ${last}.`
-            : `No ${breakdown} dates are available in this report.`
-        }`,
-      );
+    const specs = plans.charts.map((plan) => compileAiChartPlan(plan, data.context, now));
+    const entries = new Map<number, EntryRow>();
+    if (specs.some((spec) => spec.table !== "entries")) {
+      for (const entry of data.rows.entries) entries.set(entry.entry_id, entry);
     }
-    return chartFromRows(spec, rows);
+    const result = specs.map((spec) => aggregateChart(spec, data, entries));
+    options.signal?.throwIfAborted();
+    return result;
   }
 }
