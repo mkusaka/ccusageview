@@ -92,8 +92,8 @@ describe("formatStatValue", () => {
   });
 
   it("formats decimals with specified precision", () => {
-    expect(formatStatValue(3.14159, 2)).toBe("3.14");
-    expect(formatStatValue(3.14159, 4)).toBe("3.1416");
+    expect(formatStatValue(Math.PI, 2)).toBe("3.14");
+    expect(formatStatValue(Math.PI, 4)).toBe("3.1416");
   });
 
   it("handles zero", () => {

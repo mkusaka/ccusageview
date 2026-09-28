@@ -106,7 +106,7 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
           const project = e.projectPath !== "Unknown Project" ? e.projectPath : "";
           const shortId = e.sessionId.slice(-20);
           const agentBreakdowns = toAgentBreakdowns(e.agents);
-          return {
+          const entry: NormalizedEntry = {
             label: project || shortId,
             inputTokens: e.inputTokens,
             outputTokens: e.outputTokens,
@@ -116,8 +116,9 @@ export function normalizeEntries(report: ReportData): NormalizedEntry[] {
             cost: e.totalCost,
             models: e.modelsUsed,
             modelBreakdowns: e.modelBreakdowns,
-            ...(agentBreakdowns ? { agentBreakdowns } : {}),
           };
+          if (agentBreakdowns) entry.agentBreakdowns = agentBreakdowns;
+          return entry;
         });
 
     case "blocks":

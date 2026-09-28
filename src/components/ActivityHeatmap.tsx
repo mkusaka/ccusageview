@@ -212,8 +212,10 @@ export function ActivityHeatmap({ entries }: Props) {
     return max;
   }, [dayMap, metric]);
 
-  // Auto-scroll to the right (most recent) on mount
+  // Scroll when the grid first appears (including after an initially empty render)
+  // and whenever its data changes.
   useEffect(() => {
+    if (weeks.length === 0) return;
     const el = scrollRef.current;
     if (el) el.scrollLeft = el.scrollWidth;
   }, [weeks]);

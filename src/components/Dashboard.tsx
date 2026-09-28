@@ -175,7 +175,7 @@ function PanelAction({
           aria-label={label}
           disabled={disabled}
           onClick={onClick}
-          className="flex size-9 items-center justify-center rounded-md border border-transparent text-text-secondary hover:border-border hover:bg-bg-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
+          className="flex size-8 items-center justify-center rounded-md border border-transparent text-text-secondary hover:border-border hover:bg-bg-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-40"
         >
           {PANEL_ACTION_ICONS[action]}
         </button>
@@ -322,6 +322,7 @@ export function Dashboard({ data }: Props) {
   const [picker, setPicker] = useState<{ mode: "add" | "replace"; target?: string } | null>(null);
   const [removal, setRemoval] = useState<{ key: string; label: string } | null>(null);
   const removalTrigger = useRef<HTMLButtonElement | null>(null);
+  const removalSuccessFocus = useRef<HTMLButtonElement | null>(null);
   const addChartTrigger = useRef<HTMLButtonElement | null>(null);
   const removalTitle = useRef<HTMLHeadingElement | null>(null);
   const confirmedRemoval = useRef(false);
@@ -624,23 +625,13 @@ export function Dashboard({ data }: Props) {
         />
       )}
 
-      <button
-        ref={addChartTrigger}
-        type="button"
-        disabled={!availableCharts.length}
-        onClick={(event) => openPicker({ mode: "add" }, event.currentTarget)}
-        className="inline-flex items-center gap-2 rounded-md border border-border bg-bg-card px-3 py-1.5 text-sm hover:bg-bg-secondary disabled:opacity-50"
-      >
-        {PANEL_ACTION_ICONS.add}
-        Add chart
-      </button>
-      <div ref={dashboardRef} className="space-y-4">
+      <div ref={dashboardRef} className="space-y-2">
         <SummaryCards totals={filteredTotals} entryCount={filteredEntries.length} />
         {panels.map((panel, index) => {
           const label = DASHBOARD_CHARTS.find((item) => item.id === panel.id)?.label;
           const rangeLabel = DASHBOARD_RANGES.find((item) => item.id === panel.range)?.label;
           return (
-            <section key={panel.key} aria-label={`${label} chart`} className="space-y-1">
+            <section key={panel.key} aria-label={`${label} chart`}>
               <div className="flex items-center justify-end gap-1">
                 {panel.range !== "dashboard" && (
                   <span className="mr-auto text-xs text-text-secondary">{rangeLabel}</span>
@@ -687,6 +678,21 @@ export function Dashboard({ data }: Props) {
           );
         })}
       </div>
+      <button
+        ref={addChartTrigger}
+        type="button"
+        disabled={!availableCharts.length}
+        onClick={(event) => openPicker({ mode: "add" }, event.currentTarget)}
+        className="group flex min-h-16 w-full items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-bg-card px-4 py-4 text-sm font-medium text-text-secondary hover:border-accent hover:bg-bg-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span
+          aria-hidden="true"
+          className="flex size-8 items-center justify-center rounded-full border border-border bg-bg-secondary group-hover:border-accent"
+        >
+          {PANEL_ACTION_ICONS.add}
+        </span>
+        Add chart
+      </button>
       {picker && pickerCharts.length > 0 && (
         <ChartPickerModal
           key={`${picker.mode}-${picker.target ?? ""}`}
@@ -730,9 +736,10 @@ export function Dashboard({ data }: Props) {
             onCloseAutoFocus={(event) => {
               event.preventDefault();
               const target = confirmedRemoval.current
-                ? addChartTrigger.current
+                ? removalSuccessFocus.current
                 : removalTrigger.current;
               confirmedRemoval.current = false;
+              removalSuccessFocus.current = null;
               requestAnimationFrame(() => target?.focus());
             }}
           >
@@ -754,6 +761,15 @@ export function Dashboard({ data }: Props) {
               <button
                 type="button"
                 onClick={() => {
+                  const section = removalTrigger.current?.closest("section");
+                  removalSuccessFocus.current =
+                    section?.nextElementSibling?.querySelector<HTMLButtonElement>(
+                      'button[aria-label^="Remove "]',
+                    ) ??
+                    section?.previousElementSibling?.querySelector<HTMLButtonElement>(
+                      'button[aria-label^="Remove "]',
+                    ) ??
+                    addChartTrigger.current;
                   confirmedRemoval.current = true;
                   setPanels((current) => current.filter((item) => item.key !== removal.key));
                   setRemoval(null);
