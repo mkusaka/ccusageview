@@ -10,6 +10,7 @@ import type {
 import { Bar } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { ReportType } from "../types";
+import type { DashboardChartTabId } from "../utils/dashboardCatalog";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatCost, formatCostAxis, formatTokens } from "../utils/format";
 import { collectModels, buildModelSeries, shortenModelName, MODEL_COLORS } from "../utils/chart";
@@ -41,6 +42,7 @@ import {
 interface Props {
   entries: NormalizedEntry[];
   reportType?: ReportType;
+  initialTab?: DashboardChartTabId;
 }
 
 type ViewMode = "total" | "model" | "provider" | "agent";
@@ -130,11 +132,16 @@ function getVisibleChartSeries(
   return visible;
 }
 
-export function DayOfWeekChart({ entries, reportType }: Props) {
+export function DayOfWeekChart({ entries, reportType, initialTab }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [{ metric, aggregation, viewMode, showPercent, hiddenSeries }, dispatch] = useReducer(
     dayOfWeekReducer,
-    INITIAL_DAY_OF_WEEK_STATE,
+    initialTab,
+    (tab): DayOfWeekState => ({
+      ...INITIAL_DAY_OF_WEEK_STATE,
+      viewMode:
+        tab === "total" || tab === "model" || tab === "provider" || tab === "agent" ? tab : "total",
+    }),
   );
   const breakdownMode: BreakdownMode = viewMode === "total" ? "model" : viewMode;
 

@@ -11,6 +11,7 @@ import type {
 import { Chart as ReactChart } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { ReportType } from "../types";
+import type { DashboardChartTabId } from "../utils/dashboardCatalog";
 import type { BreakdownMode } from "../utils/breakdown";
 import {
   buildCacheEfficiencyChartData,
@@ -47,6 +48,7 @@ import {
 interface Props {
   entries: NormalizedEntry[];
   reportType?: ReportType;
+  initialTab?: DashboardChartTabId;
   syncId?: string;
   hoveredDataIndex?: number | null;
   hoveredSyncSource?: string | null;
@@ -302,6 +304,7 @@ function buildChartJsOptions(
 
 export function CacheEfficiencyChart({
   entries,
+  initialTab,
   reportType,
   syncId,
   hoveredDataIndex = null,
@@ -320,7 +323,14 @@ export function CacheEfficiencyChart({
   // every hover, since Chart.js repaints on its own animation frames rather than
   // waiting for React effects.
   hoveredDataIndexRef.current = hoveredDataIndex;
-  const [viewMode, setViewMode] = useState<ViewMode>("total");
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    initialTab === "total" ||
+    initialTab === "model" ||
+    initialTab === "provider" ||
+    initialTab === "agent"
+      ? initialTab
+      : "total",
+  );
   const [hiddenBreakdowns, setHiddenBreakdowns] = useState<Set<string>>(new Set());
   const {
     models: agentModels,

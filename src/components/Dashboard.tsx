@@ -1,13 +1,15 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import type { ReportType } from "../types";
 import type { DashboardData, NormalizedEntry } from "../utils/normalize";
 import type { TimeGranularity } from "../utils/projection";
 import {
   DASHBOARD_CHARTS,
+  DASHBOARD_CHART_TABS,
   DASHBOARD_RANGES,
   availableChartIds,
   availableRangeIds,
   type DashboardChartId,
+  type DashboardChartTabId,
   type DashboardRangeId,
 } from "../utils/dashboardCatalog";
 import {
@@ -76,6 +78,7 @@ interface ChartPanel {
   key: string;
   id: DashboardChartId;
   range: DashboardRangeId;
+  tab?: DashboardChartTabId;
 }
 
 type PanelActionName = "up" | "down" | "add" | "replace" | "remove";
@@ -160,7 +163,7 @@ function PanelAction({
 }: {
   action: PanelActionName;
   label: string;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
 }) {
   return (
@@ -316,6 +319,19 @@ export function Dashboard({ data }: Props) {
   const [previousPanelKey, setPreviousPanelKey] = useState(panelKey);
   const [panels, setPanels] = useState<ChartPanel[]>(() => initialPanels(availableCharts));
   const [picker, setPicker] = useState<{ mode: "add" | "replace"; target?: string } | null>(null);
+  const pickerTrigger = useRef<HTMLButtonElement | null>(null);
+  function openPicker(
+    next: { mode: "add" | "replace"; target?: string },
+    trigger: HTMLButtonElement,
+  ) {
+    pickerTrigger.current = trigger;
+    setPicker(next);
+  }
+  function closePicker() {
+    const trigger = pickerTrigger.current;
+    setPicker(null);
+    requestAnimationFrame(() => trigger?.focus());
+  }
   if (previousPanelKey !== panelKey) {
     setPreviousPanelKey(panelKey);
     setPanels(initialPanels(availableCharts));
@@ -345,12 +361,22 @@ export function Dashboard({ data }: Props) {
     if (granularity === "monthly") return aggregateToMonthly(selectedDaily);
     return selectedDaily;
   }
-  function applyPanel(id: DashboardChartId, selectedRange: DashboardRangeId) {
-    if (!picker || !pickerCharts.includes(id) || !availableRanges.includes(selectedRange)) return;
+  function applyPanel(
+    id: DashboardChartId,
+    selectedRange: DashboardRangeId,
+    tab?: DashboardChartTabId,
+  ) {
+    if (
+      !picker ||
+      !pickerCharts.includes(id) ||
+      !availableRanges.includes(selectedRange) ||
+      (tab !== undefined && !DASHBOARD_CHART_TABS[id].some((item) => item.id === tab))
+    )
+      return;
     setPanels((current) => {
       if (picker.mode === "replace") {
         return current.map((panel) =>
-          panel.key === picker.target ? { ...panel, id, range: selectedRange } : panel,
+          panel.key === picker.target ? { ...panel, id, range: selectedRange, tab } : panel,
         );
       }
       const next = [...current];
@@ -361,10 +387,11 @@ export function Dashboard({ data }: Props) {
         key: crypto.randomUUID(),
         id,
         range: selectedRange,
+        tab,
       });
       return next;
     });
-    setPicker(null);
+    closePicker();
   }
   function movePanel(index: number, offset: number) {
     setPanels((current) => {
@@ -411,18 +438,41 @@ export function Dashboard({ data }: Props) {
     }
     switch (panel.id) {
       case "statistics":
-        return <StatisticsSummary entries={chartData} reportType={reportType} />;
+        return (
+          <StatisticsSummary
+            key={panel.tab}
+            entries={chartData}
+            reportType={reportType}
+            initialTab={panel.tab}
+          />
+        );
       case "activity":
         return <ActivityHeatmap entries={chartData} />;
       case "day-of-week":
-        return <DayOfWeekChart entries={chartData} reportType={reportType} />;
+        return (
+          <DayOfWeekChart
+            key={panel.tab}
+            entries={chartData}
+            reportType={reportType}
+            initialTab={panel.tab}
+          />
+        );
       case "hour-of-day":
-        return <HourOfDayChart entries={chartData} reportType={reportType} />;
+        return (
+          <HourOfDayChart
+            key={panel.tab}
+            entries={chartData}
+            reportType={reportType}
+            initialTab={panel.tab}
+          />
+        );
       case "cost":
         return (
           <div onMouseLeave={handleSyncedChartGroupMouseLeave}>
             <CostChart
               entries={chartData}
+              key={panel.tab}
+              initialTab={panel.tab}
               reportType={reportType}
               syncId={`${COST_TOKEN_CHART_SYNC_ID}-${panel.range}`}
               timeGranularity={timeGranularity}
@@ -437,6 +487,8 @@ export function Dashboard({ data }: Props) {
           <div onMouseLeave={handleSyncedChartGroupMouseLeave}>
             <TokenChart
               entries={chartData}
+              key={panel.tab}
+              initialTab={panel.tab}
               reportType={reportType}
               syncId={`${COST_TOKEN_CHART_SYNC_ID}-${panel.range}`}
               timeGranularity={timeGranularity}
@@ -450,6 +502,8 @@ export function Dashboard({ data }: Props) {
         return (
           <div onMouseLeave={handleSyncedChartGroupMouseLeave}>
             <CacheEfficiencyChart
+              key={panel.tab}
+              initialTab={panel.tab}
               entries={chartData}
               reportType={reportType}
               syncId={`${COST_TOKEN_CHART_SYNC_ID}-${panel.range}`}
@@ -460,7 +514,14 @@ export function Dashboard({ data }: Props) {
           </div>
         );
       case "breakdown":
-        return <ModelBreakdown entries={chartData} reportType={reportType} />;
+        return (
+          <ModelBreakdown
+            key={panel.tab}
+            entries={chartData}
+            reportType={reportType}
+            initialTab={panel.tab}
+          />
+        );
     }
   }
 
@@ -559,7 +620,7 @@ export function Dashboard({ data }: Props) {
       <button
         type="button"
         disabled={!availableCharts.length}
-        onClick={() => setPicker({ mode: "add" })}
+        onClick={(event) => openPicker({ mode: "add" }, event.currentTarget)}
         className="inline-flex items-center gap-2 rounded-md border border-border bg-bg-card px-3 py-1.5 text-sm hover:bg-bg-secondary disabled:opacity-50"
       >
         {PANEL_ACTION_ICONS.add}
@@ -591,12 +652,16 @@ export function Dashboard({ data }: Props) {
                 <PanelAction
                   action="add"
                   label={`Add chart after ${label}`}
-                  onClick={() => setPicker({ mode: "add", target: panel.key })}
+                  onClick={(event) =>
+                    openPicker({ mode: "add", target: panel.key }, event.currentTarget)
+                  }
                 />
                 <PanelAction
                   action="replace"
                   label={`Replace ${label}`}
-                  onClick={() => setPicker({ mode: "replace", target: panel.key })}
+                  onClick={(event) =>
+                    openPicker({ mode: "replace", target: panel.key }, event.currentTarget)
+                  }
                 />
                 <PanelAction
                   action="remove"
@@ -621,6 +686,7 @@ export function Dashboard({ data }: Props) {
           granularity={granularity}
           hasMultipleEntries={entries.length > 1}
           charts={pickerCharts}
+          hasAgentData={entries.some((entry) => !!entry.agentBreakdowns?.length)}
           ranges={availableRanges}
           initialChart={
             picker.mode === "replace"
@@ -632,9 +698,16 @@ export function Dashboard({ data }: Props) {
               ? panels.find((panel) => panel.key === picker.target)?.range
               : undefined
           }
+          initialTab={
+            picker.mode === "replace"
+              ? panels.find((panel) => panel.key === picker.target)?.tab
+              : undefined
+          }
           onApply={applyPanel}
-          onClose={() => setPicker(null)}
-          preview={(id, selectedRange) => renderChart({ key: "preview", id, range: selectedRange })}
+          onClose={closePicker}
+          preview={(id, selectedRange, tab) =>
+            renderChart({ key: "preview", id, range: selectedRange, tab })
+          }
         />
       )}
 

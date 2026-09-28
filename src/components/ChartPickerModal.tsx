@@ -5,23 +5,38 @@ import type { AppType } from "../worker";
 import type { ReportType } from "../types";
 import type { TimeGranularity } from "../utils/projection";
 import {
-  DASHBOARD_CHARTS,
+  DASHBOARD_CHART_OPTIONS,
   DASHBOARD_RANGES,
   type DashboardChartId,
+  type DashboardChartTabId,
   type DashboardRangeId,
 } from "../utils/dashboardCatalog";
+import {
+  ChartPickerAlternatives,
+  ChartPickerChoices,
+  defaultPickerTab,
+  isPickerSelectionAvailable,
+  type PickerSelection,
+  type PickerSuggestion,
+} from "./ChartPickerSections";
 
 interface Props {
   mode: "add" | "replace";
   reportType: ReportType;
   granularity: TimeGranularity;
   hasMultipleEntries: boolean;
+  hasAgentData: boolean;
   charts: DashboardChartId[];
   ranges: DashboardRangeId[];
   initialChart?: DashboardChartId;
+  initialTab?: DashboardChartTabId;
   initialRange?: DashboardRangeId;
-  onApply: (chart: DashboardChartId, range: DashboardRangeId) => void;
-  preview: (chart: DashboardChartId, range: DashboardRangeId) => ReactNode;
+  onApply: (chart: DashboardChartId, range: DashboardRangeId, tab?: DashboardChartTabId) => void;
+  preview: (
+    chart: DashboardChartId,
+    range: DashboardRangeId,
+    tab?: DashboardChartTabId,
+  ) => ReactNode;
   onClose: () => void;
 }
 
@@ -30,24 +45,33 @@ export function ChartPickerModal({
   reportType,
   granularity,
   hasMultipleEntries,
+  hasAgentData,
   charts,
   ranges,
   initialChart,
+  initialTab,
   initialRange,
   onApply,
   onClose,
   preview,
 }: Props) {
-  const [chart, setChart] = useState<DashboardChartId>(initialChart ?? charts[0]);
-  const [range, setRange] = useState<DashboardRangeId>(initialRange ?? ranges[0]);
   const [prompt, setPrompt] = useState("");
-  const [suggestion, setSuggestion] = useState<{
-    chart: DashboardChartId;
-    range: DashboardRangeId;
-  } | null>(null);
+  const [selection, setSelection] = useState<PickerSelection>(() => {
+    const chart = initialChart ?? charts[0];
+    return { chart, range: initialRange ?? ranges[0], tab: initialTab ?? defaultPickerTab(chart) };
+  });
+  const [suggestions, setSuggestions] = useState<PickerSuggestion[]>([]);
+  const quickPicks: PickerSelection[] = charts.slice(0, 4).map((chart) => ({
+    chart,
+    tab: defaultPickerTab(chart),
+    range: "dashboard",
+  }));
+  const topSuggestion = suggestions[0];
+  const selectionAvailable = isPickerSelectionAvailable(selection, charts, ranges, hasAgentData);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const controller = useRef<AbortController | null>(null);
+  const titleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => () => controller.current?.abort(), []);
 
@@ -56,26 +80,46 @@ export function ChartPickerModal({
     controller.current?.abort();
     const request = new AbortController();
     controller.current = request;
-    setSuggestion(null);
+    setSuggestions([]);
     setError("");
     setLoading(true);
     try {
       const response = await hc<AppType>(window.location.origin).api.charts.suggest.$post(
-        { json: { prompt: prompt.trim(), reportType, granularity, hasMultipleEntries } },
+        {
+          json: {
+            prompt: prompt.trim(),
+            reportType,
+            granularity,
+            hasMultipleEntries,
+            hasAgentData,
+          },
+        },
         { init: { signal: request.signal } },
       );
       const result = await response.json();
       if (!response.ok) {
         setError("error" in result ? result.error : "Jev could not suggest a chart.");
       } else if (
-        "chart" in result &&
-        "range" in result &&
-        DASHBOARD_CHARTS.some((item) => item.id === result.chart) &&
-        DASHBOARD_RANGES.some((item) => item.id === result.range)
+        "suggestions" in result &&
+        Array.isArray(result.suggestions) &&
+        result.suggestions.length > 0 &&
+        result.suggestions.every(
+          (item) =>
+            DASHBOARD_CHART_OPTIONS.some(
+              (option) => option.chart === item.chart && option.tab === item.tab,
+            ) &&
+            DASHBOARD_RANGES.some((itemRange) => itemRange.id === item.range) &&
+            typeof item.confidence === "number" &&
+            Number.isFinite(item.confidence) &&
+            item.confidence >= 0 &&
+            item.confidence <= 1,
+        )
       ) {
-        setSuggestion({ chart: result.chart, range: result.range });
+        setSuggestions(result.suggestions);
+        const top = result.suggestions[0];
+        setSelection({ chart: top.chart, tab: top.tab, range: top.range });
       } else {
-        setError("Jev returned an unknown chart or date range.");
+        setError("Jev returned an unknown chart, tab, or date range.");
       }
     } catch (cause) {
       if (!request.signal.aborted)
@@ -95,9 +139,14 @@ export function ChartPickerModal({
         if (!open) onClose();
       }}
     >
-      <DialogContent>
+      <DialogContent
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          titleRef.current?.focus();
+        }}
+      >
         <header className="mb-5 pr-10">
-          <DialogTitle className="text-xl font-semibold">
+          <DialogTitle ref={titleRef} tabIndex={-1} className="text-xl font-semibold">
             {mode === "add" ? "Add chart" : "Replace chart"}
           </DialogTitle>
           <DialogDescription className="sr-only">
@@ -115,7 +164,7 @@ export function ChartPickerModal({
                 controller.current = null;
                 setLoading(false);
                 setPrompt(event.target.value);
-                setSuggestion(null);
+                setSuggestions([]);
                 setError("");
               }}
               rows={2}
@@ -135,127 +184,51 @@ export function ChartPickerModal({
                 {error}
               </p>
             )}
-            {suggestion && (
-              <div className="space-y-4">
-                <div
-                  className="rounded-md border border-border bg-bg-secondary p-4 text-sm"
-                  role="status"
-                >
-                  <p>
-                    <span className="sr-only">Suggested chart and range: </span>
-                    <strong>
-                      {DASHBOARD_CHARTS.find((item) => item.id === suggestion.chart)?.label}
-                    </strong>
-                    {" · "}
-                    <strong>
-                      {DASHBOARD_RANGES.find((item) => item.id === suggestion.range)?.label}
-                    </strong>
-                  </p>
-                  {charts.includes(suggestion.chart) && ranges.includes(suggestion.range) ? (
-                    <button
-                      type="button"
-                      onClick={() => onApply(suggestion.chart, suggestion.range)}
-                      className="mt-3 rounded-md bg-accent px-3 py-2 font-medium text-white hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-accent"
-                    >
-                      Apply suggestion
-                    </button>
-                  ) : (
-                    <p className="mt-2 text-text-secondary">
-                      This suggestion is unavailable for the current report or granularity.
-                    </p>
-                  )}
-                </div>
-                {charts.includes(suggestion.chart) && ranges.includes(suggestion.range) && (
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium">Preview</h3>
-                    <div className="rounded-lg border border-border">
-                      {preview(suggestion.chart, suggestion.range)}
-                    </div>
-                  </div>
-                )}
-              </div>
+            {topSuggestion && (
+              <button
+                type="button"
+                onClick={() =>
+                  setSelection({
+                    chart: topSuggestion.chart,
+                    tab: topSuggestion.tab,
+                    range: topSuggestion.range,
+                  })
+                }
+                className="block text-left text-sm text-text-secondary hover:text-text-primary focus-visible:outline-2 focus-visible:outline-accent"
+              >
+                Top AI match:{" "}
+                {
+                  DASHBOARD_CHART_OPTIONS.find(
+                    (item) => item.chart === topSuggestion.chart && item.tab === topSuggestion.tab,
+                  )?.label
+                }{" "}
+                · {Math.round(topSuggestion.confidence * 100)}% confidence
+              </button>
             )}
           </div>
 
-          <form
-            id="chart-picker-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              onApply(chart, range);
-            }}
-            className="grid gap-5 border-t border-border pt-5 md:grid-cols-2"
-          >
-            <fieldset className="min-w-0">
-              <legend className="text-sm font-semibold">Chart</legend>
-              <div className="mt-2 space-y-2">
-                {DASHBOARD_CHARTS.map((item) => {
-                  const available = charts.includes(item.id);
-                  return (
-                    <label
-                      key={item.id}
-                      className={`flex gap-3 rounded-md border p-3 ${chart === item.id ? "border-accent bg-accent/10" : "border-border"} ${available ? "cursor-pointer hover:bg-bg-secondary" : "cursor-not-allowed opacity-50"}`}
-                    >
-                      <input
-                        type="radio"
-                        name="chart"
-                        value={item.id}
-                        checked={chart === item.id}
-                        disabled={!available}
-                        onChange={() => setChart(item.id)}
-                        className="mt-0.5 size-4 shrink-0 accent-accent"
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium">{item.label}</span>
-                        <span className="block text-xs text-text-secondary">
-                          {item.description}
-                        </span>
-                        {!available && (
-                          <span className="block text-xs text-text-secondary">
-                            Unavailable for this report or granularity
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </fieldset>
-            <fieldset className="min-w-0">
-              <legend className="text-sm font-semibold">Date range</legend>
-              <div className="mt-2 space-y-2">
-                {DASHBOARD_RANGES.map((item) => {
-                  const available = ranges.includes(item.id);
-                  return (
-                    <label
-                      key={item.id}
-                      className={`flex gap-3 rounded-md border p-3 ${range === item.id ? "border-accent bg-accent/10" : "border-border"} ${available ? "cursor-pointer hover:bg-bg-secondary" : "cursor-not-allowed opacity-50"}`}
-                    >
-                      <input
-                        type="radio"
-                        name="range"
-                        value={item.id}
-                        checked={range === item.id}
-                        disabled={!available}
-                        onChange={() => setRange(item.id)}
-                        className="mt-0.5 size-4 shrink-0 accent-accent"
-                      />
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium">{item.label}</span>
-                        <span className="block text-xs text-text-secondary">
-                          {item.description}
-                        </span>
-                        {!available && (
-                          <span className="block text-xs text-text-secondary">
-                            Unavailable for this report type
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  );
-                })}
-              </div>
-            </fieldset>
-          </form>
+          <ChartPickerChoices
+            charts={charts}
+            ranges={ranges}
+            hasAgentData={hasAgentData}
+            selection={selection}
+            onSelect={setSelection}
+            onApply={onApply}
+            preview={preview}
+          />
+          <ChartPickerAlternatives
+            title={
+              suggestions.length
+                ? "Other suggestions"
+                : "Quick picks (fixed presets, not AI-ranked)"
+            }
+            picks={suggestions.length ? suggestions.slice(1) : quickPicks}
+            selection={selection}
+            charts={charts}
+            ranges={ranges}
+            hasAgentData={hasAgentData}
+            onSelect={setSelection}
+          />
         </div>
 
         <footer className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
@@ -270,7 +243,7 @@ export function ChartPickerModal({
           <button
             type="submit"
             form="chart-picker-form"
-            disabled={!charts.length}
+            disabled={!selectionAvailable}
             className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
           >
             {mode === "add" ? "Add chart" : "Apply chart"}

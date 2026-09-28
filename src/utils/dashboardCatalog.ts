@@ -5,47 +5,161 @@ export const DASHBOARD_CHARTS = [
   {
     id: "statistics",
     label: "Statistics",
-    description: "Usage distribution and summary statistics / 統計・分布",
+    description: "Usage distribution and summary statistics",
   },
-  {
-    id: "activity",
-    label: "Activity",
-    description: "Daily activity heatmap / 日別の活動ヒートマップ",
-  },
-  {
-    id: "day-of-week",
-    label: "Day of week",
-    description: "Usage grouped by weekday / 曜日別の利用",
-  },
-  {
-    id: "hour-of-day",
-    label: "Hour of day",
-    description: "Usage grouped by hour / 時間帯別の利用",
-  },
+  { id: "activity", label: "Activity", description: "Daily activity heatmap" },
+  { id: "day-of-week", label: "Day of week", description: "Usage grouped by weekday" },
+  { id: "hour-of-day", label: "Hour of day", description: "Usage grouped by hour" },
   {
     id: "cost",
     label: "Cost over time",
-    description:
-      "Cost trend and model, provider, or agent breakdown / コスト推移、モデル別・プロバイダ別・エージェント別コスト",
+    description: "Cost trends over time, including model, provider, and agent breakdowns",
   },
   {
     id: "tokens",
     label: "Token breakdown",
-    description: "Input, output, cache, and total token usage / 入力・出力・キャッシュ・総トークン",
+    description: "Input, output, cache, and total token usage",
   },
-  {
-    id: "cache",
-    label: "Cache efficiency",
-    description: "Cache read rate and cache usage / キャッシュ効率と読み取り率",
-  },
+  { id: "cache", label: "Cache efficiency", description: "Cache read rate and cache usage" },
   {
     id: "breakdown",
     label: "Breakdown",
-    description: "Model, provider, and agent shares / モデル・プロバイダ・エージェントの内訳・割合",
+    description: "Shares of total usage by model, provider, or agent, not a time trend",
   },
 ] as const;
 
 export type DashboardChartId = (typeof DASHBOARD_CHARTS)[number]["id"];
+
+export const DASHBOARD_CHART_TABS = {
+  statistics: [
+    { id: "total", label: "Total", description: "Overall usage distribution and summary" },
+    { id: "model", label: "By Model", description: "Usage statistics grouped by model" },
+    { id: "provider", label: "By Provider", description: "Usage statistics grouped by provider" },
+    { id: "agent", label: "By Agent", description: "Usage statistics grouped by agent or harness" },
+  ],
+  activity: [],
+  "day-of-week": [
+    { id: "total", label: "Total", description: "Overall usage by weekday" },
+    { id: "model", label: "By Model", description: "Weekday usage grouped by model" },
+    { id: "provider", label: "By Provider", description: "Weekday usage grouped by provider" },
+    { id: "agent", label: "By Agent", description: "Weekday usage grouped by agent or harness" },
+  ],
+  "hour-of-day": [
+    { id: "total", label: "Total", description: "Overall usage by hour" },
+    { id: "model", label: "By Model", description: "Hourly usage grouped by model" },
+    { id: "provider", label: "By Provider", description: "Hourly usage grouped by provider" },
+    { id: "agent", label: "By Agent", description: "Hourly usage grouped by agent or harness" },
+  ],
+  cost: [
+    { id: "total", label: "Total", description: "Total cost over time" },
+    { id: "model", label: "By Model", description: "Cost over time by model across all agents" },
+    { id: "provider", label: "By Provider", description: "Cost over time by provider" },
+    {
+      id: "providerModel",
+      label: "By Model (Provider)",
+      description: "Cost over time by model within each provider",
+    },
+    { id: "agent", label: "By Agent", description: "Cost over time by agent or harness" },
+    {
+      id: "agentModel",
+      label: "By Model (Agent)",
+      description: "Cost over time by model within each agent or harness",
+    },
+    {
+      id: "tokenType",
+      label: "By Token Type",
+      description: "Cost over time by input, output, and cache token type",
+    },
+  ],
+  tokens: [
+    {
+      id: "type",
+      label: "By Type",
+      description: "Token usage by input, output, and cache type over time",
+    },
+    {
+      id: "model",
+      label: "By Model",
+      description: "Token usage over time by model across all agents",
+    },
+    { id: "provider", label: "By Provider", description: "Token usage over time by provider" },
+    {
+      id: "providerModel",
+      label: "By Model (Provider)",
+      description: "Token usage over time by model within each provider",
+    },
+    { id: "agent", label: "By Agent", description: "Token usage over time by agent or harness" },
+    {
+      id: "agentModel",
+      label: "By Model (Agent)",
+      description: "Token usage over time by model within each agent or harness",
+    },
+  ],
+  cache: [
+    { id: "total", label: "Total", description: "Overall cache efficiency over time" },
+    { id: "model", label: "By Model", description: "Cache efficiency by model" },
+    { id: "provider", label: "By Provider", description: "Cache efficiency by provider" },
+    { id: "agent", label: "By Agent", description: "Cache efficiency by agent or harness" },
+  ],
+  breakdown: [
+    {
+      id: "model",
+      label: "By Model",
+      description: "Share of total usage by model across all agents; not a time trend",
+    },
+    {
+      id: "provider",
+      label: "By Provider",
+      description: "Share of total usage by provider; not a time trend",
+    },
+    {
+      id: "providerModel",
+      label: "By Model (Provider)",
+      description: "Share of total usage by model within each provider; not a time trend",
+    },
+    {
+      id: "agent",
+      label: "By Agent",
+      description: "Share of total usage by agent or harness; not a time trend",
+    },
+    {
+      id: "agentModel",
+      label: "By Model (Agent)",
+      description: "Share of total usage by model within each agent or harness; not a time trend",
+    },
+  ],
+} as const satisfies Record<
+  DashboardChartId,
+  readonly { id: string; label: string; description: string }[]
+>;
+
+export type DashboardChartTabId = {
+  [Chart in DashboardChartId]: (typeof DASHBOARD_CHART_TABS)[Chart][number]["id"];
+}[DashboardChartId];
+
+type ChartOption = {
+  id: string;
+  chart: DashboardChartId;
+  tab?: DashboardChartTabId;
+  label: string;
+  description: string;
+};
+
+export const DASHBOARD_CHART_OPTIONS: ChartOption[] = DASHBOARD_CHARTS.flatMap<ChartOption>(
+  ({ id: chart, label, description }) => {
+    const tabs: readonly { id: DashboardChartTabId; label: string; description: string }[] =
+      DASHBOARD_CHART_TABS[chart];
+    return tabs.length
+      ? tabs.map(({ id: tab, label: tabLabel, description: tabDescription }) => ({
+          id: `${chart}.${tab}`,
+          chart,
+          tab,
+          label: `${label} — ${tabLabel}`,
+          description: `${description}. ${tabDescription}`,
+        }))
+      : [{ id: chart, chart, label, description }];
+  },
+);
 
 export const DASHBOARD_RANGES = [
   {

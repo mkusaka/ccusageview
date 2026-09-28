@@ -10,6 +10,7 @@ import type {
 import { Line } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { ReportType } from "../types";
+import type { DashboardChartTabId } from "../utils/dashboardCatalog";
 import type { TimeGranularity } from "../utils/projection";
 import { formatProjectionMetadata, getProjectionMetrics } from "../utils/projection";
 import { formatCost, formatCostAxis } from "../utils/format";
@@ -45,6 +46,7 @@ import { AgentModelFilter, useAgentModelSelection } from "./AgentModelFilter";
 interface Props {
   entries: NormalizedEntry[];
   reportType?: ReportType;
+  initialTab?: DashboardChartTabId;
   syncId?: string;
   timeGranularity?: TimeGranularity;
   hoveredDataIndex?: number | null;
@@ -117,6 +119,7 @@ function buildProjectionTableRows(
 
 export function CostChart({
   entries,
+  initialTab,
   reportType,
   syncId,
   timeGranularity,
@@ -125,7 +128,17 @@ export function CostChart({
   onHoverDataIndexChange,
 }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("total");
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    initialTab === "total" ||
+    initialTab === "model" ||
+    initialTab === "provider" ||
+    initialTab === "providerModel" ||
+    initialTab === "agent" ||
+    initialTab === "agentModel" ||
+    initialTab === "tokenType"
+      ? initialTab
+      : "total",
+  );
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
   const breakdownMode: BreakdownMode =

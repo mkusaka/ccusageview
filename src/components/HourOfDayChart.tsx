@@ -10,6 +10,7 @@ import type {
 import { Bar } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { ReportType } from "../types";
+import type { DashboardChartTabId } from "../utils/dashboardCatalog";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatCost, formatCostAxis, formatTokens } from "../utils/format";
 import { collectModels, buildModelSeries, shortenModelName, MODEL_COLORS } from "../utils/chart";
@@ -41,6 +42,7 @@ import {
 interface Props {
   entries: NormalizedEntry[];
   reportType?: ReportType;
+  initialTab?: DashboardChartTabId;
 }
 
 type ViewMode = "total" | "model" | "provider" | "agent";
@@ -130,11 +132,16 @@ function getVisibleChartSeries(
   return visible;
 }
 
-export function HourOfDayChart({ entries, reportType }: Props) {
+export function HourOfDayChart({ entries, reportType, initialTab }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [{ metric, aggregation, viewMode, showPercent, hiddenSeries }, dispatch] = useReducer(
     hourOfDayReducer,
-    INITIAL_HOUR_OF_DAY_STATE,
+    initialTab,
+    (tab): HourOfDayState => ({
+      ...INITIAL_HOUR_OF_DAY_STATE,
+      viewMode:
+        tab === "total" || tab === "model" || tab === "provider" || tab === "agent" ? tab : "total",
+    }),
   );
   const breakdownMode: BreakdownMode = viewMode === "total" ? "model" : viewMode;
 
@@ -559,7 +566,7 @@ function renderHourOfDayTooltip(
       hideExternalTooltip(tooltipEl);
       return;
     }
-    appendTooltipLine(tooltipEl, `${bucket.hour}:00`, true);
+    appendTooltipLine(tooltipEl, `${bucket.hour}:00 · ${metricConfig.label}`, true);
     appendTooltipLine(
       tooltipEl,
       `${AGGREGATION_LABELS[aggregation]}: ${metricConfig.format(bucket[aggregation])}`,
@@ -571,7 +578,7 @@ function renderHourOfDayTooltip(
         `${AGGREGATION_LABELS[key]}: ${metricConfig.format(bucket[key])}`,
       );
     }
-    appendTooltipLine(tooltipEl, `${bucket.count} hours`);
+    appendTooltipLine(tooltipEl, `${bucket.count} ${bucket.count === 1 ? "hour" : "hours"}`);
     positionExternalTooltip(chart, tooltip, tooltipEl);
     return;
   }
@@ -584,7 +591,7 @@ function renderHourOfDayTooltip(
     hideExternalTooltip(tooltipEl);
     return;
   }
-  appendTooltipLine(tooltipEl, tooltip.title.join(" "), true);
+  appendTooltipLine(tooltipEl, `${tooltip.title[0] ?? ""}:00 · ${metricConfig.label}`, true);
   const row = sourceData[items[0]?.dataIndex ?? 0] as Record<string, unknown> | undefined;
   const total = row ? visibleKeys.reduce((sum, key) => sum + (asNumber(row[key]) ?? 0), 0) : 0;
   for (const item of items) {

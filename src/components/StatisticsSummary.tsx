@@ -4,6 +4,7 @@ import type { Chart as ChartJsInstance, ChartData, ChartOptions, Plugin } from "
 import { Line } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { ReportType } from "../types";
+import type { DashboardChartTabId } from "../utils/dashboardCatalog";
 import type { BreakdownMode } from "../utils/breakdown";
 import {
   computeAllStats,
@@ -37,6 +38,7 @@ import {
 interface Props {
   entries: NormalizedEntry[];
   reportType?: ReportType;
+  initialTab?: DashboardChartTabId;
 }
 
 interface MetricConfig {
@@ -154,10 +156,17 @@ const STAT_HIGHLIGHT_TARGET: Partial<Record<string, HighlightedStat>> = {
   P99: 99,
 };
 
-export function StatisticsSummary({ entries, reportType }: Props) {
+export function StatisticsSummary({ entries, reportType, initialTab }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [metric, setMetric] = useState<StatMetricKey>("cost");
-  const [breakdownMode, setBreakdownMode] = useState<StatisticsBreakdownMode>("total");
+  const [breakdownMode, setBreakdownMode] = useState<StatisticsBreakdownMode>(() =>
+    initialTab === "total" ||
+    initialTab === "model" ||
+    initialTab === "provider" ||
+    initialTab === "agent"
+      ? initialTab
+      : "total",
+  );
   const [hiddenBreakdowns, setHiddenBreakdowns] = useState<Set<string>>(new Set());
   const [highlightedStat, setHighlightedStat] = useState<HighlightedStat>(null);
 

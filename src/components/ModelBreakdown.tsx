@@ -4,6 +4,7 @@ import type { ChartData, ChartOptions } from "chart.js";
 import { Doughnut } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { ReportType } from "../types";
+import type { DashboardChartTabId } from "../utils/dashboardCatalog";
 import { aggregateBreakdowns, type AggregatedBreakdown } from "../utils/aggregate";
 import type { BreakdownMode } from "../utils/breakdown";
 import { formatCacheReadRate, getCacheReadRate } from "../utils/cacheEfficiency";
@@ -32,6 +33,7 @@ import { BreakdownHint, breakdownHintCommand, HintedTab } from "./BreakdownHint"
 interface Props {
   entries: NormalizedEntry[];
   reportType?: ReportType;
+  initialTab?: DashboardChartTabId;
 }
 
 const METRICS = {
@@ -112,9 +114,17 @@ interface PieDataItem {
   value: number;
 }
 
-export function ModelBreakdown({ entries, reportType }: Props) {
+export function ModelBreakdown({ entries, reportType, initialTab }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("model");
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    initialTab === "model" ||
+    initialTab === "provider" ||
+    initialTab === "providerModel" ||
+    initialTab === "agent" ||
+    initialTab === "agentModel"
+      ? initialTab
+      : "model",
+  );
   const [sortState, setSortState] = useState(() => createInitialModelBreakdownSortState());
 
   const isProviderModelView = viewMode === "providerModel";

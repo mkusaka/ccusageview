@@ -10,6 +10,7 @@ import type {
 import { Bar } from "react-chartjs-2";
 import type { NormalizedEntry } from "../utils/normalize";
 import type { ReportType } from "../types";
+import type { DashboardChartTabId } from "../utils/dashboardCatalog";
 import type { TimeGranularity } from "../utils/projection";
 import { formatProjectionMetadata, getProjectionMetrics } from "../utils/projection";
 import type { BreakdownMode } from "../utils/breakdown";
@@ -52,6 +53,7 @@ import { AgentModelFilter, useAgentModelSelection } from "./AgentModelFilter";
 interface Props {
   entries: NormalizedEntry[];
   reportType?: ReportType;
+  initialTab?: DashboardChartTabId;
   syncId?: string;
   timeGranularity?: TimeGranularity;
   hoveredDataIndex?: number | null;
@@ -157,6 +159,7 @@ function buildProjectionTableRows(
 
 export function TokenChart({
   entries,
+  initialTab,
   reportType,
   syncId,
   timeGranularity,
@@ -165,7 +168,16 @@ export function TokenChart({
   onHoverDataIndexChange,
 }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("type");
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    initialTab === "type" ||
+    initialTab === "model" ||
+    initialTab === "provider" ||
+    initialTab === "providerModel" ||
+    initialTab === "agent" ||
+    initialTab === "agentModel"
+      ? initialTab
+      : "type",
+  );
   const [breakdownTokenType, setBreakdownTokenType] = useState<BreakdownTokenType>("totalTokens");
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());

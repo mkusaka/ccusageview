@@ -1,6 +1,6 @@
 import type { ReportType } from "../types";
 import {
-  DASHBOARD_CHARTS,
+  DASHBOARD_CHART_OPTIONS,
   DASHBOARD_RANGES,
   availableChartIds,
   availableRangeIds,
@@ -44,6 +44,7 @@ const suggestionRequest = v.strictObject({
     "monthly",
   ] as const satisfies readonly TimeGranularity[]),
   hasMultipleEntries: v.boolean(),
+  hasAgentData: v.boolean(),
 });
 
 type Bindings = {
@@ -81,7 +82,8 @@ const api = new Hono<{ Bindings: Bindings }>()
       return request.output;
     }),
     async (c) => {
-      const { prompt, reportType, granularity, hasMultipleEntries } = c.req.valid("json");
+      const { prompt, reportType, granularity, hasMultipleEntries, hasAgentData } =
+        c.req.valid("json");
       const availableCharts = new Set(
         availableChartIds(reportType, granularity, hasMultipleEntries ? 2 : 1),
       );
@@ -98,11 +100,11 @@ const api = new Hono<{ Bindings: Bindings }>()
             chart: {
               type: "choice",
               instructions:
-                "Choose the closest chart for the request. All charts are shown; prefer one marked available for this dashboard.",
+                "Choose the closest chart and tab for the request. Distinguish time trends from shares of total usage, and models across all agents from models within each agent or harness. Prefer options marked available for this dashboard.",
               criteria: Object.fromEntries(
-                DASHBOARD_CHARTS.map(({ id, label, description }) => [
+                DASHBOARD_CHART_OPTIONS.map(({ id, chart, tab, label, description }) => [
                   id,
-                  `${label}: ${description}${availableCharts.has(id) ? "" : " (unavailable in this dashboard)"}`,
+                  `${label}: ${description}${availableCharts.has(chart) && ((tab !== "agent" && tab !== "agentModel") || hasAgentData) ? "" : " (unavailable in this dashboard)"}`,
                 ]),
               ),
             },
@@ -134,9 +136,23 @@ const api = new Hono<{ Bindings: Bindings }>()
             answers: v.object({
               chart: v.object({
                 type: v.literal("choice"),
-                choice: v.custom<(typeof DASHBOARD_CHARTS)[number]["id"]>(
+                choice: v.custom<string>(
                   (value) =>
-                    typeof value === "string" && DASHBOARD_CHARTS.some(({ id }) => id === value),
+                    typeof value === "string" &&
+                    DASHBOARD_CHART_OPTIONS.some(({ id }) => id === value),
+                ),
+                confidence: v.optional(
+                  v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(1)),
+                ),
+                probabilities: v.optional(
+                  v.record(
+                    v.custom<string>(
+                      (value) =>
+                        typeof value === "string" &&
+                        DASHBOARD_CHART_OPTIONS.some(({ id }) => id === value),
+                    ),
+                    v.pipe(v.number(), v.finite(), v.minValue(0), v.maxValue(1)),
+                  ),
                 ),
               }),
               range: v.object({
@@ -154,9 +170,28 @@ const api = new Hono<{ Bindings: Bindings }>()
       if (!suggestion.success) {
         return c.json({ error: "Chart suggestion provider returned invalid choices" }, 502);
       }
+      const chartAnswer = suggestion.output.result.answers.chart;
+      const ranked = chartAnswer.probabilities
+        ? Object.entries(chartAnswer.probabilities)
+            .filter(([, probability]) => probability > 0)
+            .toSorted((a, b) => b[1] - a[1])
+            .slice(0, 3)
+        : chartAnswer.confidence === undefined
+          ? []
+          : [[chartAnswer.choice, chartAnswer.confidence] as const];
+      if (!ranked.length) {
+        return c.json({ error: "Chart suggestion provider returned invalid choices" }, 502);
+      }
       return c.json({
-        chart: suggestion.output.result.answers.chart.choice,
-        range: suggestion.output.result.answers.range.choice,
+        suggestions: ranked.map(([id, confidence]) => {
+          const { chart, tab } = DASHBOARD_CHART_OPTIONS.find((option) => option.id === id)!;
+          return {
+            chart,
+            tab,
+            range: suggestion.output.result.answers.range.choice,
+            confidence,
+          };
+        }),
       });
     },
   );

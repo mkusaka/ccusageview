@@ -26,7 +26,17 @@ function createMockEnv() {
         result: {
           model: "jev-1.13.0",
           answers: {
-            chart: { type: "choice", choice: "tokens" },
+            chart: {
+              type: "choice",
+              choice: "tokens.type",
+              confidence: 0.91,
+              probabilities: {
+                "tokens.type": 0.6,
+                "breakdown.agentModel": 0.3,
+                "cost.agent": 0.1,
+                activity: 0,
+              },
+            },
             range: { type: "choice", choice: "last_7_days" },
           },
           usage: {},
@@ -101,6 +111,7 @@ describe("POST /api/charts/suggest", () => {
     reportType: "daily",
     granularity: "daily",
     hasMultipleEntries: true,
+    hasAgentData: true,
   };
   let env = createMockEnv();
 
@@ -126,6 +137,8 @@ describe("POST /api/charts/suggest", () => {
     [{ ...validRequest, reportType: "unknown" }],
     [{ ...validRequest, granularity: "yearly" }],
     [{ ...validRequest, hasMultipleEntries: "true" }],
+    [{ ...validRequest, hasAgentData: "true" }],
+    [{ ...validRequest, hasAgentData: undefined }],
     [{ ...validRequest, hasMultipleEntries: undefined }],
     [{ ...validRequest, reportType: undefined }],
     [{ ...validRequest, granularity: undefined }],
@@ -156,18 +169,73 @@ describe("POST /api/charts/suggest", () => {
     expect(env.AI.run).not.toHaveBeenCalled();
   });
 
-  it("accepts known choices from a completed Jev result", async () => {
+  it("returns ranked chart-and-tab choices from Jev probabilities", async () => {
     const res = await request(validRequest);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ chart: "tokens", range: "last_7_days" });
+    expect(await res.json()).toEqual({
+      suggestions: [
+        { chart: "tokens", tab: "type", range: "last_7_days", confidence: 0.6 },
+        { chart: "breakdown", tab: "agentModel", range: "last_7_days", confidence: 0.3 },
+        { chart: "cost", tab: "agent", range: "last_7_days", confidence: 0.1 },
+      ],
+    });
+    expect(env.AI.run).toHaveBeenCalledWith(
+      "typesafe/jev",
+      expect.objectContaining({
+        questions: expect.objectContaining({
+          chart: expect.objectContaining({
+            criteria: expect.objectContaining({
+              "breakdown.agentModel": expect.stringContaining("model within each agent or harness"),
+              "cost.agentModel": expect.stringContaining("Cost over time"),
+              "tokens.model": expect.stringContaining("model across all agents"),
+              activity: expect.stringContaining("Daily activity heatmap"),
+            }),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("returns a single candidate if Jev supplies confidence without probabilities", async () => {
+    env.AI.run.mockResolvedValueOnce({
+      state: "Completed",
+      result: {
+        answers: {
+          chart: { type: "choice", choice: "activity", confidence: 0.7 },
+          range: { type: "choice", choice: "dashboard" },
+        },
+      },
+    });
+    const res = await request(validRequest);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      suggestions: [{ chart: "activity", range: "dashboard", confidence: 0.7 }],
+    });
+  });
+
+  it("marks agent tabs unavailable when agent metadata says none exist", async () => {
+    const res = await request({ ...validRequest, hasAgentData: false });
+
+    expect(res.status).toBe(200);
+    const [, input] = env.AI.run.mock.calls[0];
+    expect(input.questions.chart.criteria["breakdown.agentModel"]).toContain(
+      "(unavailable in this dashboard)",
+    );
+    expect(input.questions.chart.criteria["cost.agent"]).toContain(
+      "(unavailable in this dashboard)",
+    );
+    expect(input.questions.chart.criteria["breakdown.model"]).not.toContain(
+      "(unavailable in this dashboard)",
+    );
   });
 
   it.each([
     [
       {
         answers: {
-          chart: { type: "choice", choice: "tokens" },
+          chart: { type: "choice", choice: "tokens.type", confidence: 0.7 },
           range: { type: "choice", choice: "all" },
         },
       },
@@ -177,7 +245,7 @@ describe("POST /api/charts/suggest", () => {
         state: "Failed",
         result: {
           answers: {
-            chart: { type: "choice", choice: "tokens" },
+            chart: { type: "choice", choice: "tokens.type", confidence: 0.7 },
             range: { type: "choice", choice: "all" },
           },
         },
@@ -199,7 +267,7 @@ describe("POST /api/charts/suggest", () => {
         state: "Completed",
         result: {
           answers: {
-            chart: { type: "choice", choice: "tokens" },
+            chart: { type: "choice", choice: "tokens.type", confidence: 0.7 },
             range: { type: "choice", choice: "last_decade" },
           },
         },
@@ -210,13 +278,67 @@ describe("POST /api/charts/suggest", () => {
         state: "Completed",
         result: {
           answers: {
-            chart: { type: "text", choice: "tokens" },
+            chart: { type: "text", choice: "tokens.type", confidence: 0.7 },
             range: { type: "choice", choice: "all" },
           },
         },
       },
     ],
-    [{ state: "Completed", result: { answers: { chart: { type: "choice", choice: "tokens" } } } }],
+    [
+      {
+        state: "Completed",
+        result: { answers: { chart: { type: "choice", choice: "tokens.type", confidence: 0.7 } } },
+      },
+    ],
+    [
+      {
+        state: "Completed",
+        result: {
+          answers: {
+            chart: { type: "choice", choice: "tokens", confidence: 0.7 },
+            range: { type: "choice", choice: "all" },
+          },
+        },
+      },
+    ],
+    [
+      {
+        state: "Completed",
+        result: {
+          answers: {
+            chart: { type: "choice", choice: "tokens.type" },
+            range: { type: "choice", choice: "all" },
+          },
+        },
+      },
+    ],
+    [
+      {
+        state: "Completed",
+        result: {
+          answers: {
+            chart: {
+              type: "choice",
+              choice: "tokens.type",
+              confidence: 0.7,
+              probabilities: { "tokens.type": 0.6, "custom.tab": 0.4 },
+            },
+            range: { type: "choice", choice: "all" },
+          },
+        },
+      },
+    ],
+    [
+      {
+        state: "Completed",
+        result: {
+          answers: {
+            chart: { type: "choice", choice: "tokens.type", probabilities: { "tokens.type": 1.1 } },
+            range: { type: "choice", choice: "all" },
+          },
+        },
+      },
+    ],
   ])("fails closed on malformed provider responses", async (answer) => {
     env.AI.run.mockResolvedValueOnce(answer);
     const res = await request(validRequest);
