@@ -166,7 +166,7 @@ export function TokenChart({
 }: Props) {
   const chartRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("type");
-  const [breakdownTokenType, setBreakdownTokenType] = useState<BreakdownTokenType>("inputTokens");
+  const [breakdownTokenType, setBreakdownTokenType] = useState<BreakdownTokenType>("totalTokens");
   const [showPercent, setShowPercent] = useState(false);
   const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(new Set());
   const breakdownMode: BreakdownMode =
