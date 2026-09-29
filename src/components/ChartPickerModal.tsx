@@ -318,7 +318,7 @@ export function ChartPickerModal({
           />
         </div>
 
-        <footer className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
+        <footer className="mt-5 flex flex-wrap justify-end gap-2 border-t border-border pt-4">
           <DialogClose asChild>
             <button
               type="button"
@@ -331,7 +331,7 @@ export function ChartPickerModal({
             <button
               type="button"
               onClick={() => onApplySuggestions(rankedAvailable)}
-              className="rounded-md border border-accent px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent"
+              className="order-first w-full rounded-md border border-accent px-4 py-2 text-sm font-medium text-accent hover:bg-accent/10 focus-visible:outline-2 focus-visible:outline-accent sm:order-none sm:w-auto"
             >
               Add suggested charts in order
             </button>

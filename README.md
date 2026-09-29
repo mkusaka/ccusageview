@@ -54,6 +54,8 @@ Open https://ccusageview.polyfill.workers.dev/ and paste your ccusage JSON into 
 
 Use the dividers below and between charts to add a predefined chart, tab, and date range; controls inside a chart move, replace, or remove it. The default dashboard stays unchanged. **Dashboard range** follows the main range slider; other ranges apply only to the selected chart.
 
+On mobile, the add/replace dialog stays within the screen, with chart and date-range choices stacked vertically.
+
 For **Activity**, choose **Cost**, **Total Tokens**, **Input**, **Output**, **Cache Write**, or **Cache Read** in the chart picker. The original Activity card still starts on Cost. A request such as “ことしのtokenアクティビティ” can select the Total Tokens heatmap and This year range together.
 
 Choose **Presentation** in the add/replace dialog to change how an eligible chart is drawn. Time-series cost and token breakdowns support independent lines, stacked lines, filled stacked areas, side-by-side bars, and stacked bars; single-metric time series offer lines or bars. Token mix by model, agent, or source offers stacked or side-by-side horizontal bars. Cost-per-million and cache-rate breakdowns are ratios, so they cannot be stacked; unordered model/agent/source categories do not offer lines. **Default** retains each chart's existing appearance.

@@ -24,7 +24,7 @@ export function DialogContent({
     <DialogPortalPrimitive>
       <DialogOverlayPrimitive className="fixed inset-0 z-50 bg-black/60" />
       <DialogContentPrimitive
-        className={`fixed left-1/2 top-1/2 z-50 flex max-h-[85dvh] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border bg-bg-card p-5 text-text-primary shadow-2xl focus-visible:outline-2 focus-visible:outline-accent sm:p-6 ${className ?? ""}`}
+        className={`fixed left-1/2 top-1/2 z-50 flex max-h-[85dvh] w-[calc(100%-3rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border bg-bg-card p-5 text-text-primary shadow-2xl focus-visible:outline-2 focus-visible:outline-accent sm:p-6 md:w-[calc(100%-2rem)] md:max-w-3xl ${className ?? ""}`}
         {...props}
       >
         {children}
