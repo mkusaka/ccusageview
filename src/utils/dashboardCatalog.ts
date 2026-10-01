@@ -31,6 +31,11 @@ export const DASHBOARD_CHARTS = [
     label: "Analysis",
     description: "Compare token mix, cost per million tokens, or cache read rate by dimension",
   },
+  {
+    id: "share",
+    label: "Share stats",
+    description: "Share-ready usage card with prominent numbers and cost breakdown; optional",
+  },
 ] as const;
 
 export type DashboardChartId = (typeof DASHBOARD_CHARTS)[number]["id"];
@@ -256,6 +261,14 @@ export const DASHBOARD_CHART_TABS = {
     },
   ],
   analysis: ANALYSIS_AXIS_OPTIONS.map(({ id, label, description }) => ({ id, label, description })),
+  share: [
+    { id: "tiles", label: "Tiles", description: "Mobile-friendly metric tiles and cost bars" },
+    {
+      id: "compact",
+      label: "Compact",
+      description: "Large total cost with aligned metrics and shares",
+    },
+  ],
 } as const satisfies Record<
   DashboardChartId,
   readonly { id: string; label: string; description: string }[]

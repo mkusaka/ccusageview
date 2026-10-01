@@ -56,6 +56,10 @@ Use the dividers below and between charts to add a predefined chart, tab, and da
 
 On mobile, the add/replace dialog stays within the screen, with chart and date-range choices stacked vertically.
 
+Choose **Share stats → Tiles** or **Compact** for a mobile-friendly sharing card with prominent usage numbers and agent costs (provider costs when agent data is absent). This module is opt-in and is not included in the default dashboard. Its image-copy button captures only the card, without dashboard controls; Markdown export is also available. Tiles uses a portrait layout and Compact uses an aligned summary that fits square sharing images, expanding when necessary to keep every breakdown visible.
+
+Share stats follows the selected card range and uses original report entries even when the dashboard is grouped weekly or monthly. Daily/hourly reports show active days (days with tokens or cost) over the inclusive calendar span and average cost over that span, including missing days. Other reports show entry count and average cost per entry instead. Reported breakdown costs are preserved; if their sum differs from the usage total, the card labels that difference rather than showing misleading percentages.
+
 For **Activity**, choose **Cost**, **Total Tokens**, **Input**, **Output**, **Cache Write**, or **Cache Read** in the chart picker. The original Activity card still starts on Cost. A request such as “ことしのtokenアクティビティ” can select the Total Tokens heatmap and This year range together.
 
 Choose **Presentation** in the add/replace dialog to change how an eligible chart is drawn. Time-series cost and token breakdowns support independent lines, stacked lines, filled stacked areas, side-by-side bars, and stacked bars; single-metric time series offer lines or bars. Token mix by model, agent, or source offers stacked or side-by-side horizontal bars. Cost-per-million and cache-rate breakdowns are ratios, so they cannot be stacked; unordered model/agent/source categories do not offer lines. **Default** retains each chart's existing appearance.

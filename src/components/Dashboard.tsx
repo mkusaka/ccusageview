@@ -48,6 +48,7 @@ import { DataTable } from "./DataTable";
 import { StatisticsSummary } from "./StatisticsSummary";
 import { DayOfWeekChart } from "./DayOfWeekChart";
 import { HourOfDayChart } from "./HourOfDayChart";
+import { ShareStats } from "./ShareStats";
 import { CopyImageButton } from "./CopyImageButton";
 import { CopyMarkdownButton } from "./CopyMarkdownButton";
 import { breakdownHintCommand, HintedTab } from "./BreakdownHint";
@@ -246,7 +247,7 @@ function InsertChartButton({
 
 function initialPanels(available: DashboardChartId[]): ChartPanel[] {
   return available
-    .filter((id) => id !== "analysis")
+    .filter((id) => id !== "analysis" && id !== "share")
     .map((id) => ({ key: id, id, range: "dashboard" }));
 }
 
@@ -482,6 +483,13 @@ export function Dashboard({ data }: Props) {
     return selected.filter((entry) => entry.label >= first && entry.label <= last);
   }
   function chartEntries(panel: ChartPanel): NormalizedEntry[] {
+    if (panel.id === "share") {
+      return panel.range === "dashboard"
+        ? dashboardBaseEntries(baseEntries)
+        : panel.range === "all"
+          ? baseEntries
+          : filterCalendarRange(baseEntries, panel.range, today);
+    }
     if (panel.id === "analysis" && panel.granularity && panel.granularity !== granularity) {
       const selected =
         panel.range === "dashboard"
@@ -658,6 +666,15 @@ export function Dashboard({ data }: Props) {
       );
     }
     switch (panel.id) {
+      case "share":
+        return (
+          <ShareStats
+            key={panel.tab}
+            entries={chartData}
+            reportType={reportType}
+            initialLayout={panel.tab === "compact" ? "compact" : "tiles"}
+          />
+        );
       case "analysis":
         return panel.tab && ANALYSIS_AXIS_OPTIONS.some((axis) => axis.id === panel.tab) ? (
           <AxisChart
