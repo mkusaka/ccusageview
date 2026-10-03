@@ -2290,7 +2290,8 @@
     "output_cost_per_token_flex": 5e-6,
     "source": "https://developers.openai.com/api/docs/pricing",
     "supports_xhigh_reasoning_effort": false,
-    "supports_minimal_reasoning_effort": false
+    "supports_minimal_reasoning_effort": false,
+    "deprecation_date": "2027-04-01"
   },
   "gpt-5.1-2025-11-13": {
     "cache_read_input_token_cost": 1.25e-7,
@@ -2694,7 +2695,8 @@
     "supports_web_search": true,
     "supports_none_reasoning_effort": false,
     "supports_xhigh_reasoning_effort": false,
-    "supports_minimal_reasoning_effort": true
+    "supports_minimal_reasoning_effort": true,
+    "deprecation_date": "2027-04-01"
   },
   "gpt-5.4": {
     "cache_read_input_token_cost": 2.5e-7,
@@ -2922,7 +2924,8 @@
     "default_reasoning_effort": "none",
     "source": "https://developers.openai.com/api/docs/pricing",
     "supports_xhigh_reasoning_effort": true,
-    "supports_minimal_reasoning_effort": false
+    "supports_minimal_reasoning_effort": false,
+    "deprecation_date": "2027-04-01"
   },
   "gpt-5.4-nano-2026-03-17": {
     "cache_read_input_token_cost": 2e-8,
