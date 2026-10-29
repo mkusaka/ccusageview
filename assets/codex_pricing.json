@@ -14,6 +14,11 @@
     "output_cost_per_token": 1e-5,
     "output_cost_per_token_batches": 5e-6,
     "output_cost_per_token_priority": 2e-5,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -43,6 +48,11 @@
     "output_cost_per_token": 1e-5,
     "output_cost_per_token_batches": 5e-6,
     "output_cost_per_token_priority": 2e-5,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -114,6 +124,11 @@
     "output_cost_per_token": 2e-6,
     "output_cost_per_token_batches": 1e-6,
     "output_cost_per_token_priority": 3.6e-6,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -143,6 +158,11 @@
     "output_cost_per_token": 2e-6,
     "output_cost_per_token_batches": 1e-6,
     "output_cost_per_token_priority": 3.6e-6,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -171,6 +191,11 @@
     "mode": "chat",
     "output_cost_per_token": 4e-7,
     "output_cost_per_token_batches": 2e-7,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -197,6 +222,11 @@
     "mode": "chat",
     "output_cost_per_token": 4e-7,
     "output_cost_per_token_batches": 2e-7,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -223,6 +253,11 @@
     "mode": "responses",
     "output_cost_per_token": 0.00012,
     "output_cost_per_token_batches": 6e-5,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -267,6 +302,11 @@
     "input_cost_per_token_priority": 2.5e-6,
     "output_cost_per_token_batches": 5e-6,
     "output_cost_per_token_priority": 2e-5,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'"
   },
   "azure/gpt-5.1-2025-11-13": {
@@ -298,6 +338,11 @@
     "default_reasoning_effort": "none",
     "input_cost_per_token_batches": 6.25e-7,
     "output_cost_per_token_batches": 5e-6,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supports_minimal_reasoning_effort": true,
     "cache_read_input_token_cost_batches": 6.25e-8
@@ -461,6 +506,11 @@
     "output_cost_per_token": 1.4e-5,
     "output_cost_per_token_batches": 7e-6,
     "output_cost_per_token_priority": 2.8e-5,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -490,6 +540,11 @@
     "output_cost_per_token": 1.4e-5,
     "output_cost_per_token_batches": 7e-6,
     "output_cost_per_token_priority": 2.8e-5,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -557,9 +612,9 @@
     "output_cost_per_token": 0.000168,
     "output_cost_per_token_batches": 8.4e-5,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/batch", "/v1/responses"],
@@ -587,9 +642,9 @@
     "output_cost_per_token": 0.000168,
     "output_cost_per_token_batches": 8.4e-5,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/batch", "/v1/responses"],
@@ -636,6 +691,11 @@
     "mode": "responses",
     "output_cost_per_token": 1.4e-5,
     "output_cost_per_token_priority": 2.8e-5,
+    "search_context_cost_per_query": {
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
+    },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -760,9 +820,9 @@
     "mode": "chat",
     "output_cost_per_token": 4.5e-6,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -801,9 +861,9 @@
     "mode": "chat",
     "output_cost_per_token": 4.5e-6,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -843,9 +903,9 @@
     "mode": "chat",
     "output_cost_per_token": 1.25e-6,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -881,9 +941,9 @@
     "mode": "chat",
     "output_cost_per_token": 1.25e-6,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -930,9 +990,9 @@
     "output_cost_per_token_batches": 9e-5,
     "output_cost_per_token_flex": 9e-5,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/batch", "/v1/responses"],
@@ -969,9 +1029,9 @@
     "output_cost_per_token_batches": 9e-5,
     "output_cost_per_token_flex": 9e-5,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/batch", "/v1/responses"],
@@ -1019,9 +1079,9 @@
     "output_cost_per_token_above_272k_tokens_priority": 9e-5,
     "output_cost_per_token_batches": 1.5e-5,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
@@ -1063,9 +1123,9 @@
     "output_cost_per_token_priority": 7.5e-5,
     "output_cost_per_token_above_272k_tokens_priority": 9e-5,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -1114,9 +1174,9 @@
     "output_cost_per_token_priority": 7.5e-5,
     "output_cost_per_token_above_272k_tokens_priority": 9e-5,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -1153,9 +1213,9 @@
     "output_cost_per_token": 0.00018,
     "output_cost_per_token_above_272k_tokens": 0.00027,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "supported_endpoints": ["/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -1188,9 +1248,9 @@
     "output_cost_per_token": 0.00018,
     "output_cost_per_token_above_272k_tokens": 0.00027,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "supported_endpoints": ["/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -1229,9 +1289,9 @@
     "output_cost_per_token_priority": 4e-5,
     "output_cost_per_token_above_272k_tokens_priority": 6e-5,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -1282,9 +1342,9 @@
     "output_cost_per_token_above_272k_tokens_priority": 3.6e-6,
     "output_cost_per_token_flex": 6e-7,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
@@ -1336,9 +1396,9 @@
     "output_cost_per_token_above_272k_tokens_priority": 3.6e-6,
     "output_cost_per_token_flex": 6e-7,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
     "supported_modalities": ["text", "image"],
@@ -1390,9 +1450,9 @@
     "output_cost_per_token_above_272k_tokens_priority": 6e-5,
     "output_cost_per_token_flex": 1e-5,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
@@ -1444,9 +1504,9 @@
     "output_cost_per_token_above_272k_tokens_priority": 6e-5,
     "output_cost_per_token_flex": 1e-5,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
@@ -1498,9 +1558,9 @@
     "output_cost_per_token_above_272k_tokens_priority": 3.6e-5,
     "output_cost_per_token_flex": 6e-6,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
@@ -1552,9 +1612,9 @@
     "output_cost_per_token_above_272k_tokens_priority": 3.6e-5,
     "output_cost_per_token_flex": 6e-6,
     "search_context_cost_per_query": {
-      "search_context_size_high": 0.01,
-      "search_context_size_low": 0.01,
-      "search_context_size_medium": 0.01
+      "search_context_size_high": 0.014,
+      "search_context_size_low": 0.014,
+      "search_context_size_medium": 0.014
     },
     "source": "https://prices.azure.com/api/retail/prices?$filter=serviceName%20eq%20'Foundry%20Models'%20and%20armRegionName%20eq%20'eastus'%20and%20priceType%20eq%20'Consumption'",
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
@@ -1612,6 +1672,7 @@
     "mode": "image_generation",
     "output_cost_per_image": 0.134,
     "output_cost_per_image_token": 0.00012,
+    "output_cost_per_image_token_batches": 6e-5,
     "output_cost_per_token": 1.2e-5,
     "output_cost_per_token_above_200k_tokens": 1.8e-5,
     "output_cost_per_token_above_200k_tokens_priority": 3.24e-5,
@@ -1663,12 +1724,13 @@
     "mode": "image_generation",
     "output_cost_per_image": 0.134,
     "output_cost_per_image_token": 0.00012,
+    "output_cost_per_image_token_batches": 6e-5,
     "output_cost_per_token": 1.2e-5,
     "output_cost_per_token_priority": 2.16e-5,
     "output_cost_per_token_above_200k_tokens": 1.8e-5,
     "output_cost_per_token_above_200k_tokens_priority": 3.24e-5,
     "output_cost_per_token_batches": 6e-6,
-    "source": "https://ai.google.dev/gemini-api/docs/pricing",
+    "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
     "supported_endpoints": [
       "/v1/chat/completions",
       "/v1/images/generations",
@@ -1784,6 +1846,7 @@
     "cache_read_input_token_cost_batches": 6.25e-8,
     "cache_read_input_token_cost_flex": 6.25e-8,
     "cache_read_input_token_cost_priority": 2.5e-7,
+    "deprecation_date": "2026-12-11",
     "input_cost_per_token": 1.25e-6,
     "input_cost_per_token_batches": 6.25e-7,
     "input_cost_per_token_flex": 6.25e-7,
@@ -1796,6 +1859,8 @@
     "output_cost_per_token_batches": 5e-6,
     "output_cost_per_token_flex": 5e-6,
     "output_cost_per_token_priority": 2e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -1838,6 +1903,8 @@
     "output_cost_per_token_batches": 5e-6,
     "output_cost_per_token_flex": 5e-6,
     "output_cost_per_token_priority": 2e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -1940,6 +2007,7 @@
     "cache_read_input_token_cost_batches": 1.25e-8,
     "cache_read_input_token_cost_flex": 1.25e-8,
     "cache_read_input_token_cost_priority": 4.5e-8,
+    "deprecation_date": "2026-12-11",
     "input_cost_per_token": 2.5e-7,
     "input_cost_per_token_batches": 1.25e-7,
     "input_cost_per_token_flex": 1.25e-7,
@@ -1952,6 +2020,8 @@
     "output_cost_per_token_batches": 1e-6,
     "output_cost_per_token_flex": 1e-6,
     "output_cost_per_token_priority": 3.6e-6,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -1994,6 +2064,8 @@
     "output_cost_per_token_batches": 1e-6,
     "output_cost_per_token_flex": 1e-6,
     "output_cost_per_token_priority": 3.6e-6,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2022,10 +2094,10 @@
     "cache_read_input_token_cost": 5e-9,
     "cache_read_input_token_cost_batches": 2.5e-9,
     "cache_read_input_token_cost_flex": 2.5e-9,
+    "deprecation_date": "2026-12-11",
     "input_cost_per_token": 5e-8,
     "input_cost_per_token_batches": 2.5e-8,
     "input_cost_per_token_flex": 2.5e-8,
-    "input_cost_per_token_priority": 2.5e-6,
     "litellm_provider": "openai",
     "max_input_tokens": 272000,
     "max_output_tokens": 128000,
@@ -2033,6 +2105,8 @@
     "output_cost_per_token": 4e-7,
     "output_cost_per_token_batches": 2e-7,
     "output_cost_per_token_flex": 2e-7,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2064,7 +2138,6 @@
     "deprecation_date": "2026-12-11",
     "input_cost_per_token": 5e-8,
     "input_cost_per_token_batches": 2.5e-8,
-    "input_cost_per_token_priority": 2.5e-6,
     "input_cost_per_token_flex": 2.5e-8,
     "litellm_provider": "openai",
     "max_input_tokens": 272000,
@@ -2073,6 +2146,8 @@
     "output_cost_per_token": 4e-7,
     "output_cost_per_token_batches": 2e-7,
     "output_cost_per_token_flex": 2e-7,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2098,6 +2173,7 @@
     "supports_minimal_reasoning_effort": true
   },
   "gpt-5-pro": {
+    "deprecation_date": "2026-12-11",
     "input_cost_per_token": 1.5e-5,
     "input_cost_per_token_batches": 7.5e-6,
     "litellm_provider": "openai",
@@ -2106,6 +2182,8 @@
     "mode": "responses",
     "output_cost_per_token": 0.00012,
     "output_cost_per_token_batches": 6e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["pro"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2140,6 +2218,8 @@
     "mode": "responses",
     "output_cost_per_token": 0.00012,
     "output_cost_per_token_batches": 6e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["pro"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2230,6 +2310,8 @@
     "mode": "chat",
     "output_cost_per_token": 1e-5,
     "output_cost_per_token_priority": 2e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2265,6 +2347,7 @@
     "cache_read_input_token_cost_batches": 6.25e-8,
     "cache_read_input_token_cost_flex": 6.25e-8,
     "cache_read_input_token_cost_priority": 2.5e-7,
+    "deprecation_date": "2027-04-01",
     "input_cost_per_token": 1.25e-6,
     "input_cost_per_token_priority": 2.5e-6,
     "litellm_provider": "openai",
@@ -2273,6 +2356,8 @@
     "mode": "chat",
     "output_cost_per_token": 1e-5,
     "output_cost_per_token_priority": 2e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2409,6 +2494,8 @@
     "mode": "chat",
     "output_cost_per_token": 1.4e-5,
     "output_cost_per_token_priority": 2.8e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2452,6 +2539,8 @@
     "mode": "chat",
     "output_cost_per_token": 1.4e-5,
     "output_cost_per_token_priority": 2.8e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2538,6 +2627,8 @@
     "mode": "responses",
     "output_cost_per_token": 0.000168,
     "output_cost_per_token_batches": 8.4e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["pro"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2571,6 +2662,8 @@
     "mode": "responses",
     "output_cost_per_token": 0.000168,
     "output_cost_per_token_batches": 8.4e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["pro"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2629,6 +2722,8 @@
     "mode": "responses",
     "output_cost_per_token": 1.4e-5,
     "output_cost_per_token_priority": 2.8e-5,
+    "reasoning_contexts": ["auto", "current_turn"],
+    "reasoning_modes": ["standard"],
     "search_context_cost_per_query": {
       "search_context_size_high": 0.01,
       "search_context_size_low": 0.01,
@@ -2678,6 +2773,8 @@
     "output_cost_per_token_batches": 7.5e-6,
     "output_cost_per_token_above_272k_tokens_batches": 1.125e-5,
     "output_cost_per_token_priority": 3e-5,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
@@ -2726,6 +2823,8 @@
     "output_cost_per_token_batches": 7.5e-6,
     "output_cost_per_token_above_272k_tokens_batches": 1.125e-5,
     "output_cost_per_token_priority": 3e-5,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "supported_endpoints": ["/v1/chat/completions", "/v1/batch", "/v1/responses"],
@@ -2768,6 +2867,8 @@
     "output_cost_per_token_flex": 2.25e-6,
     "output_cost_per_token_batches": 2.25e-6,
     "output_cost_per_token_priority": 9e-6,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -2813,6 +2914,8 @@
     "output_cost_per_token_flex": 2.25e-6,
     "output_cost_per_token_batches": 2.25e-6,
     "output_cost_per_token_priority": 9e-6,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -2855,6 +2958,8 @@
     "output_cost_per_token": 1.25e-6,
     "output_cost_per_token_flex": 6.25e-7,
     "output_cost_per_token_batches": 6.25e-7,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -2887,6 +2992,7 @@
     "cache_read_input_token_cost": 2e-8,
     "cache_read_input_token_cost_batches": 1e-8,
     "cache_read_input_token_cost_flex": 1e-8,
+    "deprecation_date": "2027-04-01",
     "input_cost_per_token": 2e-7,
     "input_cost_per_token_flex": 1e-7,
     "input_cost_per_token_batches": 1e-7,
@@ -2897,6 +3003,8 @@
     "output_cost_per_token": 1.25e-6,
     "output_cost_per_token_flex": 6.25e-7,
     "output_cost_per_token_batches": 6.25e-7,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -2939,6 +3047,8 @@
     "output_cost_per_token_flex": 9e-5,
     "output_cost_per_token_batches": 9e-5,
     "output_cost_per_token_above_272k_tokens_batches": 0.000135,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["pro"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -2983,6 +3093,8 @@
     "output_cost_per_token_flex": 9e-5,
     "output_cost_per_token_batches": 9e-5,
     "output_cost_per_token_above_272k_tokens_batches": 0.000135,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["pro"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -3035,6 +3147,8 @@
     "output_cost_per_token_batches": 1.5e-5,
     "output_cost_per_token_above_272k_tokens_batches": 2.25e-5,
     "output_cost_per_token_priority": 7.5e-5,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -3088,6 +3202,8 @@
     "output_cost_per_token_batches": 1.5e-5,
     "output_cost_per_token_above_272k_tokens_batches": 2.25e-5,
     "output_cost_per_token_priority": 7.5e-5,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -3151,6 +3267,8 @@
     "output_cost_per_token_flex": 9e-5,
     "output_cost_per_token_batches": 9e-5,
     "output_cost_per_token_above_272k_tokens_batches": 0.000135,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["pro"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -3194,6 +3312,8 @@
     "output_cost_per_token_flex": 9e-5,
     "output_cost_per_token_batches": 9e-5,
     "output_cost_per_token_above_272k_tokens_batches": 0.000135,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["pro"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -3265,6 +3385,8 @@
     "output_cost_per_token_above_272k_tokens_batches": 1.5e-5,
     "output_cost_per_token_flex": 1e-5,
     "output_cost_per_token_priority": 4e-5,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard", "pro"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -3368,6 +3490,8 @@
     "output_cost_per_token_above_272k_tokens_batches": 9e-7,
     "output_cost_per_token_flex": 6e-7,
     "output_cost_per_token_priority": 2.4e-6,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard", "pro"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -3441,6 +3565,8 @@
     "output_cost_per_token_above_272k_tokens_batches": 1.5e-5,
     "output_cost_per_token_flex": 1e-5,
     "output_cost_per_token_priority": 4e-5,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard", "pro"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -3515,6 +3641,8 @@
     "output_cost_per_token_above_272k_tokens_batches": 9e-6,
     "output_cost_per_token_flex": 6e-6,
     "output_cost_per_token_priority": 2.4e-5,
+    "reasoning_contexts": ["auto", "current_turn", "all_turns"],
+    "reasoning_modes": ["standard", "pro"],
     "regional_processing_uplift_multiplier_eu": 1.1,
     "regional_processing_uplift_multiplier_us": 1.1,
     "search_context_cost_per_query": {
@@ -3545,6 +3673,7 @@
   },
   "moonshot/kimi-k2.5": {
     "cache_read_input_token_cost": 1e-7,
+    "deprecation_date": "2026-08-31",
     "input_cost_per_token": 6e-7,
     "litellm_provider": "moonshot",
     "max_input_tokens": 262144,
@@ -3601,6 +3730,7 @@
     "mode": "image_generation",
     "output_cost_per_image": 0.134,
     "output_cost_per_image_token": 0.00012,
+    "output_cost_per_image_token_batches": 6e-5,
     "output_cost_per_token": 1.2e-5,
     "output_cost_per_token_above_200k_tokens": 1.8e-5,
     "output_cost_per_token_above_200k_tokens_priority": 3.24e-5,
@@ -3634,13 +3764,14 @@
     "mode": "image_generation",
     "output_cost_per_image": 0.134,
     "output_cost_per_image_token": 0.00012,
+    "output_cost_per_image_token_batches": 6e-5,
     "output_cost_per_token": 1.2e-5,
     "output_cost_per_token_priority": 2.16e-5,
     "output_cost_per_token_above_200k_tokens": 1.8e-5,
     "output_cost_per_token_above_200k_tokens_priority": 3.24e-5,
     "output_cost_per_token_batches": 6e-6,
     "supports_reasoning": false,
-    "source": "https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-pro-image",
+    "source": "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing",
     "supported_endpoints": [
       "/v1/chat/completions",
       "/v1/images/generations",
