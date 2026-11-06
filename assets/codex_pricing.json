@@ -3408,6 +3408,8 @@
   },
   "gpt-5.5-cyber-preview": {
     "cache_read_input_token_cost": 1.25e-6,
+    "deprecation_date": "2027-02-01",
+    "deprecation_source": "https://developers.openai.com/api/docs/deprecations",
     "input_cost_per_token": 1.25e-5,
     "litellm_provider": "openai",
     "mode": "chat",
