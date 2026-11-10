@@ -3958,7 +3958,6 @@
   "vertex_ai/gemini-3-pro-preview": {
     "cache_read_input_token_cost": 2e-7,
     "cache_read_input_token_cost_above_200k_tokens": 4e-7,
-    "cache_creation_input_token_cost_above_200k_tokens": 2.5e-7,
     "input_cost_per_token": 2e-6,
     "input_cost_per_token_above_200k_tokens": 4e-6,
     "input_cost_per_token_batches": 1e-6,
