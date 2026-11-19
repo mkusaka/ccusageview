@@ -446,6 +446,7 @@
   },
   "azure/gpt-5.1-codex-max": {
     "cache_read_input_token_cost": 1.25e-7,
+    "successor_model": "azure/gpt-5.6-sol",
     "deprecation_date": "2027-05-18",
     "deprecation_source": "https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule",
     "input_cost_per_token": 1.25e-6,
@@ -470,6 +471,7 @@
     "supports_vision": true
   },
   "azure/gpt-5.1-codex-mini": {
+    "successor_model": "azure/gpt-5.6-terra",
     "deprecation_date": "2027-05-15",
     "deprecation_source": "https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule",
     "cache_read_input_token_cost": 2.5e-8,
@@ -497,6 +499,7 @@
   "azure/gpt-5.1-codex-mini-2025-11-13": {
     "cache_read_input_token_cost": 2.5e-8,
     "cache_read_input_token_cost_priority": 4.5e-8,
+    "successor_model": "azure/gpt-5.6-terra",
     "deprecation_date": "2027-05-15",
     "deprecation_source": "https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule",
     "input_cost_per_token": 2.5e-7,
@@ -723,6 +726,7 @@
   "azure/gpt-5.3-codex": {
     "cache_read_input_token_cost": 1.75e-7,
     "cache_read_input_token_cost_priority": 3.5e-7,
+    "successor_model": "azure/gpt-6-sol",
     "deprecation_date": "2027-08-24",
     "deprecation_source": "https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule",
     "input_cost_per_token": 1.75e-6,
@@ -854,6 +858,7 @@
     "output_cost_per_token_above_272k_tokens_batches": 1.125e-5
   },
   "azure/gpt-5.4-mini": {
+    "successor_model": "azure/gpt-6.1-terra",
     "deprecation_date": "2027-09-21",
     "deprecation_source": "https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule",
     "cache_read_input_token_cost": 7.5e-8,
@@ -900,6 +905,7 @@
     "cache_read_input_token_cost": 7.5e-8,
     "cache_read_input_token_cost_flex": 3.75e-8,
     "cache_read_input_token_cost_priority": 1.5e-7,
+    "successor_model": "azure/gpt-6.1-terra",
     "deprecation_date": "2027-09-21",
     "deprecation_source": "https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule",
     "input_cost_per_token": 7.5e-7,
@@ -940,6 +946,7 @@
     "cache_read_input_token_cost_batches": 3.75e-8
   },
   "azure/gpt-5.4-nano": {
+    "successor_model": "azure/gpt-6-luna",
     "deprecation_date": "2027-09-21",
     "deprecation_source": "https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule",
     "cache_read_input_token_cost": 2e-8,
@@ -982,6 +989,7 @@
   "azure/gpt-5.4-nano-2026-03-17": {
     "cache_read_input_token_cost": 2e-8,
     "cache_read_input_token_cost_flex": 1e-8,
+    "successor_model": "azure/gpt-6-luna",
     "deprecation_date": "2027-09-21",
     "deprecation_source": "https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirement-schedule",
     "input_cost_per_token": 2e-7,
@@ -1708,6 +1716,7 @@
     "supports_minimal_reasoning_effort": false
   },
   "azure_ai/kimi-k2.5": {
+    "successor_model": "azure_ai/kimi-k2.6",
     "deprecation_date": "2027-01-26",
     "deprecation_source": "https://learn.microsoft.com/en-us/azure/foundry/concepts/model-lifecycle-retirement",
     "input_cost_per_token": 6e-7,
@@ -1847,6 +1856,7 @@
     "output_cost_per_image_token_batches": 6e-5,
     "output_cost_per_token": 1.2e-5,
     "rpm": 1000,
+    "supports_logprobs": false,
     "tpm": 4000000,
     "output_cost_per_token_batches": 6e-6,
     "output_cost_per_token_flex": 6e-6,
@@ -1891,6 +1901,7 @@
     "output_cost_per_image_token": 0.00012,
     "output_cost_per_token": 1.2e-5,
     "rpm": 1000,
+    "supports_logprobs": false,
     "tpm": 4000000,
     "output_cost_per_token_batches": 6e-6,
     "output_cost_per_token_flex": 6e-6,
@@ -3406,6 +3417,7 @@
   },
   "gpt-5.5-cyber-preview": {
     "cache_read_input_token_cost": 1.25e-6,
+    "successor_model": "gpt-6-cyber",
     "deprecation_date": "2027-02-01",
     "deprecation_source": "https://developers.openai.com/api/docs/deprecations",
     "input_cost_per_token": 1.25e-5,
@@ -3842,6 +3854,7 @@
   },
   "moonshot/kimi-k2.5": {
     "cache_read_input_token_cost": 1e-7,
+    "successor_model": "moonshot/kimi-k3.1-pro",
     "deprecation_date": "2026-08-31",
     "input_cost_per_token": 6e-7,
     "litellm_provider": "moonshot",
@@ -3913,6 +3926,7 @@
       "/v1/images/edits",
       "/v1/batch"
     ],
+    "supports_logprobs": false,
     "supports_reasoning": false
   },
   "vertex_ai/gemini-3-pro-image-preview": {
