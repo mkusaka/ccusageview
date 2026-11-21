@@ -1927,7 +1927,7 @@
       "shared_group": "gemini-3"
     },
     "web_search_billing_unit": "per_query",
-    "supports_reasoning": false
+    "supports_reasoning": true
   },
   "gpt-5": {
     "cache_read_input_token_cost": 1.25e-7,
